@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Curio Blinkit Entry</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f7;
+    color: #1a1a1a;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .layout { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  .header {
+    background: linear-gradient(135deg, #FFC107, #FF9800);
+    color: #fff;
+    padding: 20px 24px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0;
+  }
+  .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  .header .sub { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+  .header .user-chip {
+    background: rgba(255,255,255,0.25);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+  }
+
+  .body-wrap {
+    background: #fff;
+    border-radius: 0 0 12px 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .date-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 14px 16px;
+    background: #f9fafb;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  .date-bar label { font-size: 13px; color: #666; font-weight: 500; }
+  .date-bar input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+  .date-bar .status-chip {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .date-bar .status-chip.submitted { background: #dcfce7; color: #166534; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 20px;
+  }
+  .tab {
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: #FF9800; border-bottom-color: #FF9800; font-weight: 600; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin: 20px 0 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-title .hint { font-size: 11px; color: #999; font-weight: 400; }
+
+  textarea.paste-area {
+    width: 100%;
+    min-height: 160px;
+    padding: 12px;
+    border: 2px dashed #FFC107;
+    border-radius: 10px;
+    background: #fffbeb;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    resize: vertical;
+    outline: none;
+  }
+  textarea.paste-area:focus { border-color: #FF9800; background: #fff; }
+  .paste-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .btn {
+    background: #FF9800;
+    color: #fff;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn:disabled { background: #ccc; cursor: not-allowed; }
+  .btn.ghost { background: #fff; color: #FF9800; border: 1px solid #FF9800; }
+  .btn.large { padding: 14px 24px; font-size: 15px; }
+  .btn:hover { filter: brightness(1.05); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 11px;
+    color: #666;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+  }
+  td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #f5f5f5;
+    vertical-align: middle;
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+
+  .entry-input {
+    width: 80px;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    text-align: right;
+    background: #fff;
+    color: #FF9800;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .entry-input:focus {
+    outline: none;
+    border-color: #FF9800;
+    background: #fffbeb;
+  }
+  .entry-input.wide { width: 100px; }
+
+  .category-row {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #666;
+    font-size: 12px;
+  }
+  .category-row td { padding: 8px 10px; }
+
+  .totals-row {
+    background: #fef3c7;
+    font-weight: 700;
+  }
+  .totals-row td { padding: 10px; color: #92400e; }
+
+  .kpi-mini {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .kpi-mini .box {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .kpi-mini .label { font-size: 11px; color: #92400e; }
+  .kpi-mini .value { font-size: 20px; font-weight: 600; color: #92400e; margin-top: 2px; }
+
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding: 16px 0 0;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+  .save-bar .summary { font-size: 13px; color: #666; }
+  .save-bar .summary strong { color: #333; }
+
+  .success-modal {
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+  }
+  .success-modal.show { display: flex; }
+  .success-modal .icon {
+    width: 36px; height: 36px; background: #22c55e; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    font-size: 18px;
+  }
+  .success-modal .txt { font-size: 13px; color: #166534; flex: 1; }
+  .success-modal .txt strong { display: block; margin-bottom: 2px; }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px 12px;
+    align-items: center;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+  .metrics-grid .m-label { font-size: 12px; color: #333; }
+  .metrics-grid .m-label small { color: #999; font-weight: normal; margin-left: 4px; }
+  .metrics-grid .m-suffix { font-size: 12px; color: #999; }
+
+  .helper {
+    background: #f0f7ff;
+    border: 1px solid #d9e7f7;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #1F4E78;
+    margin-bottom: 16px;
+  }
+  .helper strong { display: block; margin-bottom: 2px; }
+</style>
+<script src="blinkit_darkstore_names.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <div class="header">
+    <div>
+      <h1>⚡ Curio Blinkit — Daily Entry</h1>
+      <div class="sub">Paste today's Blinkit report or enter manually</div>
+    </div>
+    <div class="user-chip">👤 Faraaz Mir · Manager (Sales) · <span style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px;">🟢 LIVE</span></div>
+  </div>
+
+  <div class="body-wrap">
+
+    <div class="success-modal" id="successBox">
+      <div class="icon">✓</div>
+      <div class="txt">
+        <strong id="successTitle">Saved</strong>
+        <span id="successBody">Today's numbers are in the admin dashboard now.</span>
+      </div>
+      <button class="btn ghost" onclick="document.getElementById('successBox').classList.remove('show');">Enter another day</button>
+    </div>
+
+    <div class="date-bar">
+      <label>Reporting date</label>
+      <input type="date" id="dateInp" />
+      <label>·</label>
+      <div style="font-size: 13px; color: #666;">Blinkit report received via <select style="padding: 6px 10px; border-radius: 6px; border: 1px solid #ddd; font-size: 13px; background: #fff;"><option>Email</option><option>Seller Portal export</option><option>WhatsApp</option></select></div>
+      <div class="status-chip" id="statusChip">Not submitted yet</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="paste">📋 Paste from report</button>
+      <button class="tab" data-tab="manual">✍️ Enter manually</button>
+      <button class="tab" data-tab="history">📁 Past entries</button>
+    </div>
+
+    <!-- TAB: PASTE -->
+    <div class="tab-panel active" id="tab-paste">
+      <div class="helper">
+        <strong>How this works:</strong>
+        Copy the day's row from the Blinkit report (product name + Qty + Amt columns) and paste below. The tool matches product names automatically and populates the form. Missing a product? Add it manually in the next tab.
+      </div>
+
+      <textarea class="paste-area" id="pasteBox" placeholder="Paste the report here. Example:&#10;&#10;Kashmir Almonds (Premium Mamra)	4	7,800&#10;Kashmir Saffron Mongra (Pure Threads)	8	5,600&#10;Multi-Floral Honey (Raw Multi Flower)	0	0&#10;..."></textarea>
+
+      <div class="paste-actions">
+        <button class="btn" onclick="parsePaste()">Parse and preview</button>
+        <button class="btn ghost" onclick="document.getElementById('pasteBox').value=''">Clear</button>
+      </div>
+
+      <div id="parseResult" style="margin-top: 20px; display: none;">
+        <div class="section-title">Preview <span class="hint">Review and edit any row, then save.</span></div>
+        <div id="previewTable"></div>
+      </div>
+    </div>
+
+    <!-- TAB: MANUAL -->
+    <div class="tab-panel" id="tab-manual">
+      <div class="helper">
+        <strong>Manual entry:</strong>
+        Fill Qty and Amt for the products that sold today. Leave zero for the rest. Totals update automatically.
+      </div>
+
+      <div class="section-title">Product sales — 15 SKUs<span class="hint"><span style="background:#dbeafe; color:#1e40af; padding:2px 6px; border-radius:6px; font-size:11px; font-weight:600;">📄 Standard sales report</span> National aggregate from Blinkit's daily/weekly sales report (one row per SKU). Enter Qty + Amt for the reporting date. <button class="btn ghost" style="padding:4px 10px; font-size:12px; margin-left:12px;" onclick="showAddSku()">+ Add SKU</button></span></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="num">MRP</th>
+            <th class="num">Level</th>
+            <th class="num">Live cities</th>
+            <th class="num">Active darkstores</th>
+            <th class="num">Qty sold</th>
+            <th class="num">Amt (₹)</th>
+          </tr>
+        </thead>
+        <tbody id="manualTable"></tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="5">Grand Total</td>
+            <td class="num"><span id="totalQty">0</span></td>
+            <td class="num">₹<span id="totalAmt">0</span></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="section-title" style="margin-top: 28px;">Business metrics<span class="hint">From the second Blinkit report (sales/ads/inventory).</span></div>
+      <div class="metrics-grid" id="metricsGrid"></div>
+
+      <!-- ===== MONTHLY WAREHOUSE INVENTORY ===== -->
+      <div class="section-title" style="margin-top: 32px;">📦 Warehouse inventory — monthly<span class="hint"><span style="background:#fef3c7; color:#78350f; padding:2px 6px; border-radius:6px; font-size:11px; font-weight:600;">🔍 Separate report needed</span> Per-SKU remaining stock at Blinkit regional warehouse. NOT in the standard sales report.</span></div>
+      <div style="padding: 10px 14px; background: #fef3c7; border-radius: 8px; font-size: 12px; color: #78350f; margin-bottom: 12px;">
+        <strong>Blinkit's standard sales report shows what SOLD, not what's LEFT.</strong> To fill this panel, request Blinkit's monthly "Inventory / Stock Report" from your Upriver POC. Enter closing inventory (units) at each warehouse per SKU. Powers the "days of cover" alert so we don't stock out during a promo push.
+      </div>
+      <div style="max-height: 400px; overflow: auto; border: 1px solid #eee; border-radius: 8px;">
+      <table>
+        <thead style="position: sticky; top: 0; background: #f9fafb; z-index: 2;">
+          <tr id="warehouseHead">
+            <th style="text-align:left;">SKU</th>
+            <!-- Warehouse columns rendered by JS -->
+          </tr>
+        </thead>
+        <tbody id="warehouseTable"></tbody>
+      </table>
+      </div>
+
+      <!-- ===== CITY-LEVEL SALES + UNITS ===== -->
+      <div class="section-title" style="margin-top: 32px;">🏙️ City-level sales & units<span class="hint"><span style="background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:6px; font-size:11px; font-weight:600;">📊 City-wise sales report</span> Both value and units per city. From Blinkit Seller Portal → Reports → Sales by City. <button class="btn ghost" style="padding:4px 10px; font-size:12px; margin-left:12px;" onclick="showAddCity()">+ Add City</button></span></div>
+      <div style="padding: 10px 14px; background: #fff7ed; border-radius: 8px; font-size: 12px; color: #7c2d12; margin-bottom: 12px;">
+        85 cities live across all 15 SKUs (per Aug 14 coverage file). Enter values only for cities that had sales; leave others blank. Sales must reconcile to product total above.
+      </div>
+      <div style="max-height: 500px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
+      <table>
+        <thead style="position: sticky; top: 0; background: #f9fafb; z-index: 2;">
+          <tr>
+            <th>City</th>
+            <th class="num">Total darkstores</th>
+            <th class="num">Units sold</th>
+            <th class="num">Sales (₹)</th>
+          </tr>
+        </thead>
+        <tbody id="citiesTable"></tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="2">Total (must match product total)</td>
+            <td class="num"><span id="totalCityUnits">0</span></td>
+            <td class="num">₹<span id="totalCitySales">0</span></td>
+          </tr>
+        </tfoot>
+      </table>
+      </div>
+
+      <!-- ===== PRODUCT AVAILABILITY MATRIX ===== -->
+      <div class="section-title" style="margin-top: 32px;">🎯 Product availability matrix<span class="hint"><span style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:6px; font-size:11px; font-weight:600;">📍 Coverage report</span> Live darkstore count per SKU per city. From Blinkit's monthly "SKU Live City & Darkstore Coverage" report. Edit → 💾 Save. <button class="btn" style="padding:4px 12px; font-size:12px; margin-left:12px; background:#166534;" onclick="saveAvailabilityMatrix()">💾 Save changes</button></span></div>
+      <div id="coverageBanner" style="padding: 10px 14px; background: #f0fdf4; border-radius: 8px; font-size: 12px; color: #166534; margin-bottom: 12px;">
+        <strong>Coverage snapshot from 14-Aug-2026 file.</strong> 85 cities · 15 SKUs · 2,873 total darkstore slots (with all 2,873 store names captured — hover any cell to see the list). Refresh monthly by editing cells and clicking 💾 Save.
+      </div>
+      <div style="max-height: 500px; overflow: auto; border: 1px solid #eee; border-radius: 8px;">
+      <table>
+        <thead style="position: sticky; top: 0; background: #f9fafb; z-index: 2;">
+          <tr id="availHead">
+            <th style="text-align:left; position: sticky; left: 0; background: #f9fafb;">City</th>
+            <!-- 15 SKU columns rendered by JS -->
+            <th class="num">Total<br><small style="font-weight:400; color:#999;">Darkstores</small></th>
+          </tr>
+        </thead>
+        <tbody id="availabilityMatrix"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <!-- TAB: HISTORY -->
+    <div class="tab-panel" id="tab-history">
+      <div class="helper">
+        <strong>Past 5 days of entries.</strong> Click any row to view or edit.
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Entered by</th>
+            <th>Source</th>
+            <th class="num">Total units</th>
+            <th class="num">Total sales</th>
+            <th class="num">Ad spend</th>
+            <th class="num">ROAS</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No past entries yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">Your submitted daily reports will appear here.</div>
+      </div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="save-bar">
+      <div class="summary">
+        Ready to save: <strong id="saveSummary">0 units · ₹0</strong> for <strong id="saveDate">—</strong>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn ghost">Save draft</button>
+        <button class="btn large" onclick="submitEntry()">Submit today's entry</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Full Curio catalog (15 SKUs) — all metadata (MRP, Level, Product ID, Item ID, cities, darkstores)
+  // Source: Curio SKU Live City Darkstore Coverage · Aug 14 2026 (all 15 SKUs now live on Blinkit)
+  const PRODUCTS = [
+    { key: "blackForestHoney", short: "Black Forest",   name: "Curio Lifestyle Black Forest Honey",                        mrp: 1100, level: "Level 3", cities: 32, darkstores: 240, productId: "689013", itemId: "10243716" },
+    { key: "cpAlmondOil",      short: "Almond Oil",     name: "Curio Lifestyle Cold Pressed Almond Oil",                   mrp: 1155, level: "Level 2", cities: 3,  darkstores: 66,  productId: "670153", itemId: "10230499" },
+    { key: "cpApricotOil",     short: "Apricot Oil",    name: "Curio Lifestyle Cold Pressed Apricot Oil",                  mrp: 1200, level: "Level 3", cities: 37, darkstores: 246, productId: "670155", itemId: "10230501" },
+    { key: "cpWalnutOil",      short: "Walnut Oil",     name: "Curio Lifestyle Cold Pressed Walnut Oil",                   mrp: 1200, level: "Level 3", cities: 35, darkstores: 212, productId: "670152", itemId: "10230498" },
+    { key: "cowGheeBadri",     short: "Cow Ghee",       name: "Curio Lifestyle Cow Ghee (Himalayan Badri)",                mrp: 1400, level: "Level 2", cities: 3,  darkstores: 88,  productId: "670147", itemId: "10230493" },
+    { key: "chamomileInfusion",short: "Chamomile",      name: "Curio Lifestyle Himalayan Chamomile Herbal Infusion",       mrp: 550,  level: "Level 3", cities: 26, darkstores: 161, productId: "670202", itemId: "10230528" },
+    { key: "almonds",          short: "Almonds",        name: "Curio Lifestyle Kashmir Almonds (Premium Mamra)",           mrp: 1300, level: "Level 4", cities: 72, darkstores: 318, productId: "669729", itemId: "10230227" },
+    { key: "qahwaTea",         short: "Qahwa Tea",      name: "Curio Lifestyle Kashmir Qahwa Green Tea (Saffron Spice)",   mrp: 550,  level: "Level 2", cities: 3,  darkstores: 81,  productId: "670096", itemId: "10230476" },
+    { key: "saffron",          short: "Saffron",        name: "Curio Lifestyle Kashmir Saffron Mongra (Pure Threads)",     mrp: 545,  level: "Level 4", cities: 51, darkstores: 199, productId: "670099", itemId: "10230479" },
+    { key: "walnuts",          short: "Walnuts",        name: "Curio Lifestyle Kashmir Walnuts",                           mrp: 1200, level: "Level 3", cities: 41, darkstores: 293, productId: "696707", itemId: "10249569" },
+    { key: "zafraniKehwa",     short: "Zafrani Kehwa",  name: "Curio Lifestyle Kashmir Zafrani Kehwa Green Tea (Saffron)", mrp: 550,  level: "Level 3", cities: 28, darkstores: 170, productId: "670097", itemId: "10230477" },
+    { key: "ladakhApricots",   short: "Apricots",       name: "Curio Lifestyle Ladakh Apricots (Sun Dried)",               mrp: 1150, level: "Level 3", cities: 31, darkstores: 143, productId: "669730", itemId: "10230228" },
+    { key: "rawMonofloral",    short: "Monofloral",     name: "Curio Lifestyle Raw Monofloral Honey (Single Origin)",      mrp: 750,  level: "Level 2", cities: 3,  darkstores: 80,  productId: "670149", itemId: "10230495" },
+    { key: "sidrHoney",        short: "SIDR Honey",     name: "Curio Lifestyle SIDR Honey",                                mrp: 1400, level: "Level 4", cities: 73, darkstores: 340, productId: "689004", itemId: "10243707" },
+    { key: "wildFloralHoney",  short: "Multi Floral",   name: "Curio Lifestyle Wild Floral Honey (Raw Multi Flower)",      mrp: 650,  level: "Level 3", cities: 34, darkstores: 236, productId: "670144", itemId: "10230490" }
+  ];
+
+  // Locked sequence per "Business metrics in sequence" sheet (17 metrics). All labels trimmed.
+  const METRICS = [
+    { key: "netSales",        label: "Net Sales (Total sales - Review sales)", hint: "", suffix: "₹" },
+    { key: "netOrder",        label: "Net Order (Total orders - Review orders)", hint: "", suffix: "" },
+    { key: "totalSales",      label: "Total Sales",             hint: "",                          suffix: "₹" },
+    { key: "totalUnits",      label: "Total Units",             hint: "",                          suffix: "" },
+    { key: "organicSales",    label: "Organic Sales",           hint: "",                          suffix: "₹" },
+    { key: "organicOrder",    label: "Organic Order",           hint: "",                          suffix: "" },
+    { key: "reviewSales",     label: "Review Sales",            hint: "🆕 new metric",              suffix: "₹" },
+    { key: "reviewOrder",     label: "Review Order",            hint: "🆕 new metric",              suffix: "" },
+    { key: "adsUnits",        label: "Ads Units",               hint: "",                          suffix: "" },
+    { key: "directAdSales",   label: "Direct Ad Sales",         hint: "",                          suffix: "₹" },
+    { key: "totalSpends",     label: "Total Spends",            hint: "",                          suffix: "₹" },
+    { key: "tacos",           label: "TACOS",                   hint: "",                          suffix: "%" },
+    { key: "acos",            label: "ACOS",                    hint: "",                          suffix: "%" },
+    { key: "totalDirectRoas", label: "Total Direct Sales ROAS", hint: "",                          suffix: "x" },
+    { key: "roi",             label: "ROI",                     hint: "🆕 new metric",              suffix: "x" },
+    { key: "adsContribution", label: "Ads Contribution",        hint: "🆕 new metric",              suffix: "%" },
+    { key: "aov",             label: "AOV",                     hint: "",                          suffix: "₹" }
+  ];
+
+  // 85 real Blinkit cities × 15 SKUs · Aug 14 2026 · 2,873 total darkstore slots
+  // Each city has a `coverage` object keyed by product.key with darkstore count per SKU (only non-zero SKUs listed)
+  const CITIES = [
+    { name: "Bengaluru", ds: 619, coverage: { cpAlmondOil: 38, cowGheeBadri: 48, qahwaTea: 46, rawMonofloral: 46, blackForestHoney: 46, cpApricotOil: 46, cpWalnutOil: 41, chamomileInfusion: 39, walnuts: 48, zafraniKehwa: 36, ladakhApricots: 30, wildFloralHoney: 47, almonds: 48, saffron: 14, sidrHoney: 46 } },
+    { name: "Hyderabad", ds: 309, coverage: { cpAlmondOil: 14, cowGheeBadri: 24, qahwaTea: 21, rawMonofloral: 18, blackForestHoney: 19, cpApricotOil: 22, cpWalnutOil: 24, chamomileInfusion: 25, walnuts: 23, zafraniKehwa: 23, ladakhApricots: 16, wildFloralHoney: 14, almonds: 25, saffron: 21, sidrHoney: 20 } },
+    { name: "Chennai", ds: 206, coverage: { cpAlmondOil: 14, cowGheeBadri: 16, qahwaTea: 14, rawMonofloral: 16, blackForestHoney: 16, cpApricotOil: 16, cpWalnutOil: 16, chamomileInfusion: 14, walnuts: 16, zafraniKehwa: 6, ladakhApricots: 10, wildFloralHoney: 15, almonds: 16, saffron: 5, sidrHoney: 16 } },
+    { name: "Kolkata", ds: 192, coverage: { blackForestHoney: 18, cpApricotOil: 14, cpWalnutOil: 13, walnuts: 31, zafraniKehwa: 11, ladakhApricots: 8, wildFloralHoney: 17, almonds: 31, saffron: 18, sidrHoney: 31 } },
+    { name: "Delhi", ds: 185, coverage: { blackForestHoney: 19, cpApricotOil: 19, cpWalnutOil: 13, chamomileInfusion: 15, walnuts: 26, zafraniKehwa: 12, ladakhApricots: 11, wildFloralHoney: 11, almonds: 15, saffron: 16, sidrHoney: 28 } },
+    { name: "Ghaziabad", ds: 163, coverage: { blackForestHoney: 13, cpApricotOil: 20, cpWalnutOil: 12, chamomileInfusion: 9, walnuts: 20, zafraniKehwa: 13, ladakhApricots: 11, wildFloralHoney: 15, almonds: 17, saffron: 13, sidrHoney: 20 } },
+    { name: "Mumbai", ds: 144, coverage: { blackForestHoney: 10, cpApricotOil: 17, cpWalnutOil: 17, chamomileInfusion: 11, walnuts: 13, zafraniKehwa: 12, ladakhApricots: 7, wildFloralHoney: 13, almonds: 21, saffron: 6, sidrHoney: 17 } },
+    { name: "Pune", ds: 127, coverage: { blackForestHoney: 22, cpApricotOil: 1, walnuts: 22, ladakhApricots: 2, wildFloralHoney: 21, almonds: 22, saffron: 16, sidrHoney: 21 } },
+    { name: "Gurgaon", ds: 109, coverage: { blackForestHoney: 11, cpApricotOil: 13, cpWalnutOil: 13, chamomileInfusion: 11, walnuts: 16, zafraniKehwa: 9, ladakhApricots: 4, wildFloralHoney: 13, almonds: 3, saffron: 8, sidrHoney: 8 } },
+    { name: "Ahmedabad", ds: 80, coverage: { blackForestHoney: 12, cpApricotOil: 12, cpWalnutOil: 9, chamomileInfusion: 2, zafraniKehwa: 9, ladakhApricots: 6, wildFloralHoney: 12, almonds: 5, saffron: 1, sidrHoney: 12 } },
+    { name: "Jaipur", ds: 69, coverage: { blackForestHoney: 7, cpApricotOil: 7, cpWalnutOil: 8, walnuts: 5, zafraniKehwa: 7, ladakhApricots: 4, wildFloralHoney: 8, almonds: 8, saffron: 8, sidrHoney: 7 } },
+    { name: "Lucknow", ds: 54, coverage: { blackForestHoney: 4, cpApricotOil: 7, cpWalnutOil: 3, chamomileInfusion: 5, walnuts: 3, zafraniKehwa: 4, ladakhApricots: 2, wildFloralHoney: 6, almonds: 7, saffron: 7, sidrHoney: 6 } },
+    { name: "Indore", ds: 46, coverage: { blackForestHoney: 4, cpApricotOil: 6, cpWalnutOil: 5, chamomileInfusion: 4, walnuts: 6, ladakhApricots: 1, wildFloralHoney: 3, almonds: 6, saffron: 5, sidrHoney: 6 } },
+    { name: "Patna", ds: 35, coverage: { blackForestHoney: 4, cpApricotOil: 2, cpWalnutOil: 1, walnuts: 6, zafraniKehwa: 1, ladakhApricots: 3, wildFloralHoney: 3, almonds: 7, saffron: 1, sidrHoney: 7 } },
+    { name: "Bhopal", ds: 34, coverage: { blackForestHoney: 4, cpApricotOil: 4, cpWalnutOil: 4, chamomileInfusion: 3, walnuts: 4, ladakhApricots: 1, wildFloralHoney: 3, almonds: 3, saffron: 4, sidrHoney: 4 } },
+    { name: "Faridabad", ds: 34, coverage: { blackForestHoney: 3, cpApricotOil: 4, cpWalnutOil: 1, chamomileInfusion: 1, walnuts: 4, zafraniKehwa: 4, ladakhApricots: 3, wildFloralHoney: 4, almonds: 2, saffron: 3, sidrHoney: 5 } },
+    { name: "Kanpur", ds: 29, coverage: { blackForestHoney: 2, cpApricotOil: 4, cpWalnutOil: 3, chamomileInfusion: 2, walnuts: 1, zafraniKehwa: 2, ladakhApricots: 2, wildFloralHoney: 3, almonds: 4, saffron: 4, sidrHoney: 2 } },
+    { name: "Nagpur", ds: 29, coverage: { blackForestHoney: 2, cpApricotOil: 3, cpWalnutOil: 3, chamomileInfusion: 1, walnuts: 4, ladakhApricots: 2, wildFloralHoney: 2, almonds: 4, saffron: 4, sidrHoney: 4 } },
+    { name: "Visakhapatnam", ds: 27, coverage: { blackForestHoney: 3, cpApricotOil: 2, cpWalnutOil: 3, chamomileInfusion: 3, walnuts: 3, zafraniKehwa: 3, wildFloralHoney: 1, almonds: 3, saffron: 3, sidrHoney: 3 } },
+    { name: "Raipur", ds: 26, coverage: { blackForestHoney: 2, cpApricotOil: 3, cpWalnutOil: 3, chamomileInfusion: 2, walnuts: 3, ladakhApricots: 1, wildFloralHoney: 3, almonds: 3, saffron: 3, sidrHoney: 3 } },
+    { name: "Agra", ds: 25, coverage: { blackForestHoney: 3, cpApricotOil: 2, chamomileInfusion: 2, walnuts: 3, zafraniKehwa: 2, ladakhApricots: 3, wildFloralHoney: 3, almonds: 2, saffron: 2, sidrHoney: 3 } },
+    { name: "Dehradun", ds: 25, coverage: { blackForestHoney: 1, cpApricotOil: 4, cpWalnutOil: 2, walnuts: 5, zafraniKehwa: 2, ladakhApricots: 3, almonds: 2, saffron: 1, sidrHoney: 5 } },
+    { name: "Nashik", ds: 22, coverage: { blackForestHoney: 3, cpApricotOil: 1, cpWalnutOil: 1, chamomileInfusion: 1, walnuts: 3, zafraniKehwa: 2, wildFloralHoney: 3, almonds: 2, saffron: 3, sidrHoney: 3 } },
+    { name: "Goa", ds: 20, coverage: { blackForestHoney: 3, cpApricotOil: 1, walnuts: 3, ladakhApricots: 2, wildFloralHoney: 3, almonds: 3, saffron: 2, sidrHoney: 3 } },
+    { name: "Ludhiana", ds: 19, coverage: { blackForestHoney: 2, cpApricotOil: 2, cpWalnutOil: 2, walnuts: 3, zafraniKehwa: 3, ladakhApricots: 2, wildFloralHoney: 2, almonds: 2, sidrHoney: 1 } },
+    { name: "Prayagraj", ds: 17, coverage: { blackForestHoney: 1, cpApricotOil: 2, cpWalnutOil: 2, chamomileInfusion: 2, walnuts: 2, zafraniKehwa: 1, ladakhApricots: 1, wildFloralHoney: 1, almonds: 2, saffron: 2, sidrHoney: 1 } },
+    { name: "Varanasi", ds: 16, coverage: { blackForestHoney: 1, cpApricotOil: 2, cpWalnutOil: 1, chamomileInfusion: 2, ladakhApricots: 2, wildFloralHoney: 2, almonds: 2, saffron: 2, sidrHoney: 2 } },
+    { name: "Ranchi", ds: 12, coverage: { blackForestHoney: 1, walnuts: 3, zafraniKehwa: 1, almonds: 2, saffron: 2, sidrHoney: 3 } },
+    { name: "Mysore", ds: 11, coverage: { blackForestHoney: 1, cpApricotOil: 1, cpWalnutOil: 1, chamomileInfusion: 1, walnuts: 1, zafraniKehwa: 1, ladakhApricots: 1, wildFloralHoney: 1, almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Haldwani", ds: 11, coverage: { cpApricotOil: 1, cpWalnutOil: 2, chamomileInfusion: 2, walnuts: 2, wildFloralHoney: 1, almonds: 1, sidrHoney: 2 } },
+    { name: "Chandigarh", ds: 9, coverage: { blackForestHoney: 1, cpApricotOil: 1, cpWalnutOil: 1, chamomileInfusion: 1, walnuts: 1, ladakhApricots: 1, wildFloralHoney: 1, sidrHoney: 2 } },
+    { name: "Gorakhpur", ds: 8, coverage: { cpApricotOil: 1, chamomileInfusion: 1, walnuts: 1, ladakhApricots: 1, wildFloralHoney: 1, almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Meerut", ds: 8, coverage: { cpApricotOil: 1, cpWalnutOil: 1, chamomileInfusion: 1, walnuts: 2, almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Udaipur (Rajasthan)", ds: 8, coverage: { cpApricotOil: 1, cpWalnutOil: 1, zafraniKehwa: 1, ladakhApricots: 1, wildFloralHoney: 1, almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Jodhpur", ds: 7, coverage: { blackForestHoney: 1, cpApricotOil: 1, walnuts: 1, wildFloralHoney: 1, almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Rajkot", ds: 7, coverage: { blackForestHoney: 1, cpApricotOil: 1, cpWalnutOil: 1, zafraniKehwa: 1, wildFloralHoney: 1, almonds: 1, sidrHoney: 1 } },
+    { name: "Kharar", ds: 5, coverage: { cpApricotOil: 1, cpWalnutOil: 1, walnuts: 1, almonds: 1, sidrHoney: 1 } },
+    { name: "Jalandhar", ds: 5, coverage: { cpWalnutOil: 1, walnuts: 1, zafraniKehwa: 1, ladakhApricots: 1, saffron: 1 } },
+    { name: "Surat", ds: 5, coverage: { chamomileInfusion: 1, walnuts: 1, zafraniKehwa: 1, ladakhApricots: 1, almonds: 1 } },
+    { name: "Amritsar", ds: 5, coverage: { walnuts: 1, zafraniKehwa: 1, saffron: 1, sidrHoney: 2 } },
+    { name: "Bareilly", ds: 5, coverage: { almonds: 2, saffron: 2, sidrHoney: 1 } },
+    { name: "Mohali", ds: 4, coverage: { cpApricotOil: 1, cpWalnutOil: 1, walnuts: 1, sidrHoney: 1 } },
+    { name: "Panchkula", ds: 4, coverage: { cpWalnutOil: 1, walnuts: 1, zafraniKehwa: 1, almonds: 1 } },
+    { name: "Zirakpur", ds: 4, coverage: { cpWalnutOil: 1, wildFloralHoney: 1, almonds: 1, sidrHoney: 1 } },
+    { name: "Belgaum", ds: 4, coverage: { almonds: 2, sidrHoney: 2 } },
+    { name: "Bhubaneswar", ds: 4, coverage: { almonds: 2, sidrHoney: 2 } },
+    { name: "Coimbatore", ds: 4, coverage: { almonds: 2, sidrHoney: 2 } },
+    { name: "Kochi", ds: 4, coverage: { almonds: 2, sidrHoney: 2 } },
+    { name: "Siliguri", ds: 4, coverage: { almonds: 2, saffron: 1, sidrHoney: 1 } },
+    { name: "Aligarh", ds: 3, coverage: { walnuts: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Sonipat", ds: 3, coverage: { walnuts: 1, almonds: 1, sidrHoney: 1 } },
+    { name: "Bilaspur (Chhattisgarh)", ds: 3, coverage: { almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Guwahati", ds: 3, coverage: { almonds: 2, sidrHoney: 1 } },
+    { name: "Gwalior", ds: 3, coverage: { almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Kota", ds: 3, coverage: { almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Latur", ds: 3, coverage: { almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Nanded", ds: 3, coverage: { almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Sikar", ds: 3, coverage: { almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Vijayawada", ds: 3, coverage: { almonds: 1, saffron: 1, sidrHoney: 1 } },
+    { name: "Akola", ds: 2, coverage: { almonds: 1, saffron: 1 } },
+    { name: "Ayodhya", ds: 2, coverage: { almonds: 1, saffron: 1 } },
+    { name: "Bhagalpur", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Davanagere", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Dibrugarh", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Eluru", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Gulbarga", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Hubli", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Jabalpur", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Kharagpur (West Bengal)", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Manipal", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Raebareli", ds: 2, coverage: { almonds: 1, saffron: 1 } },
+    { name: "Sitapur", ds: 2, coverage: { almonds: 1, saffron: 1 } },
+    { name: "Solapur", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Tirupati", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Trivandrum", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Vellore", ds: 2, coverage: { almonds: 1, sidrHoney: 1 } },
+    { name: "Jamshedpur", ds: 2, coverage: { sidrHoney: 2 } },
+    { name: "Rohtak", ds: 1, coverage: { walnuts: 1 } },
+    { name: "Jhansi", ds: 1, coverage: { almonds: 1 } },
+    { name: "Bhiwadi", ds: 1, coverage: { saffron: 1 } },
+    { name: "Karnal", ds: 1, coverage: { saffron: 1 } },
+    { name: "Mathura", ds: 1, coverage: { saffron: 1 } },
+    { name: "Durgapur", ds: 1, coverage: { sidrHoney: 1 } },
+    { name: "Gandhidham", ds: 1, coverage: { sidrHoney: 1 } },
+    { name: "Muzaffarpur", ds: 1, coverage: { sidrHoney: 1 } }
+  ];
+
+  // Blinkit regional warehouses (edit as your warehouse network changes)
+  const WAREHOUSES = ["North (Delhi NCR)", "West (Mumbai)", "South (Bengaluru)", "East (Kolkata)", "Central (Hyderabad)"];
+
+  const state = {
+    date: "",
+    entries: {},   // key: product key, value: { qty, amt }
+    metrics: {},
+    cities: {},    // key: city name, value: { units, sales }
+    warehouse: {}  // key: warehouse-sku, value: units
+  };
+
+  // Safety: trim + collapse whitespace on all product names and short labels
+  PRODUCTS.forEach(p => {
+    p.name = String(p.name).trim().replace(/\s+/g, ' ');
+    p.short = String(p.short).trim().replace(/\s+/g, ' ');
+  });
+
+  // Full 85-city × 15-SKU darkstore names/codes (2,873 total) loaded from blinkit_darkstore_names.js.
+  // Hover any cell in the availability matrix to see the specific store list.
+  // Read at hover-time (not at parse-time) so the sideloaded file can populate window.DARKSTORE_NAMES.
+  function getDarkstoreNames(city, sku) {
+    const map = window.DARKSTORE_NAMES || {};
+    return (map[city] && map[city][sku]) || '';
+  }
+  const DARKSTORE_NAMES = {}; // legacy fallback, unused
+
+
+  // Init state
+  PRODUCTS.forEach(p => state.entries[p.key] = { qty: 0, amt: 0 });
+  CITIES.forEach(c => state.cities[c.name] = { units: 0, sales: 0 });
+  WAREHOUSES.forEach(w => PRODUCTS.forEach(p => state.warehouse[w + '|' + p.key] = 0));
+
+  // Ensure each city has an entry for every SKU (fill zero where missing so inputs render)
+  CITIES.forEach(c => {
+    if (!c.coverage) c.coverage = {};
+    PRODUCTS.forEach(p => { if (c.coverage[p.key] === undefined) c.coverage[p.key] = 0; });
+    c.ds = PRODUCTS.reduce((s, p) => s + (c.coverage[p.key] || 0), 0);
+  });
+
+  // Render product sales table (with per-SKU MRP, level, cities/darkstores)
+  const tbody = document.getElementById("manualTable");
+  PRODUCTS.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    const levelBadge = p.level ? `<span style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:8px; font-size:11px; font-weight:600;">${p.level}</span>` : '<span style="color:#ccc;">—</span>';
+    tr.innerHTML = `
+      <td><strong>${p.name}</strong></td>
+      <td class="num">${p.mrp ? '₹' + p.mrp.toLocaleString('en-IN') : '<span style="color:#ccc;">—</span>'}</td>
+      <td class="num">${levelBadge}</td>
+      <td class="num" style="color:#166534;">${p.cities || '<span style="color:#ccc;">—</span>'}</td>
+      <td class="num" style="color:#166534;">${p.darkstores || '<span style="color:#ccc;">—</span>'}</td>
+      <td class="num"><input type="number" class="entry-input" min="0" data-p="${i}" data-f="qty" placeholder="0" /></td>
+      <td class="num"><input type="number" class="entry-input wide" min="0" data-p="${i}" data-f="amt" placeholder="0" /></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Wire product inputs
+  document.querySelectorAll("[data-p]").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const p = PRODUCTS[e.target.dataset.p];
+      const f = e.target.dataset.f;
+      state.entries[p.key][f] = e.target.value === "" ? 0 : Number(e.target.value);
+      updateTotals();
+    });
+  });
+
+  // Render metrics grid
+  const mg = document.getElementById("metricsGrid");
+  METRICS.forEach(m => {
+    const row = document.createElement("div");
+    row.style.display = "contents";
+    row.innerHTML = `
+      <div class="m-label">${m.label}${m.hint ? ` <small>(${m.hint})</small>` : ""}</div>
+      <input type="number" class="entry-input wide" data-m="${m.key}" placeholder="0" />
+      <div class="m-suffix">${m.suffix || ""}</div>
+    `;
+    mg.appendChild(row);
+  });
+  document.querySelectorAll("[data-m]").forEach(inp => {
+    inp.addEventListener("input", e => {
+      state.metrics[e.target.dataset.m] = e.target.value === "" ? 0 : Number(e.target.value);
+    });
+  });
+
+  // Render warehouse inventory (transposed: 15 SKU rows × 5 warehouse columns)
+  const whHead = document.getElementById("warehouseHead");
+  const whBody = document.getElementById("warehouseTable");
+  if (whHead && whBody) {
+    WAREHOUSES.forEach(w => {
+      const th = document.createElement("th");
+      th.className = "num";
+      th.innerHTML = `<span style="font-size:11px;">${w}</span>`;
+      whHead.appendChild(th);
+    });
+    PRODUCTS.forEach((p, pi) => {
+      const tr = document.createElement("tr");
+      let cells = `<td><strong>${p.short}</strong> <small style="color:#999;">${p.level || ''}</small></td>`;
+      WAREHOUSES.forEach((w, wi) => {
+        cells += `<td class="num"><input type="number" class="entry-input" style="width:70px;" min="0" data-wh="${wi}" data-wp="${pi}" placeholder="0" /></td>`;
+      });
+      tr.innerHTML = cells;
+      whBody.appendChild(tr);
+    });
+    whBody.querySelectorAll("[data-wh]").forEach(inp => {
+      inp.addEventListener("input", e => {
+        const wh = WAREHOUSES[e.target.dataset.wh];
+        const p = PRODUCTS[e.target.dataset.wp];
+        state.warehouse[wh + '|' + p.key] = e.target.value === "" ? 0 : Number(e.target.value);
+      });
+    });
+  }
+
+  // Cities table — units + sales per city
+  const cityBody = document.getElementById("citiesTable");
+  CITIES.forEach((c, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${c.name}</td>
+      <td class="num" style="color: #999;">${c.ds}</td>
+      <td class="num"><input type="number" class="entry-input" min="0" data-c="${i}" data-cf="units" placeholder="0" /></td>
+      <td class="num"><input type="number" class="entry-input wide" min="0" data-c="${i}" data-cf="sales" placeholder="0" /></td>
+    `;
+    cityBody.appendChild(tr);
+  });
+  document.querySelectorAll("[data-c]").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const c = CITIES[e.target.dataset.c].name;
+      const f = e.target.dataset.cf;
+      state.cities[c][f] = e.target.value === "" ? 0 : Number(e.target.value);
+      const totU = CITIES.reduce((s, x) => s + state.cities[x.name].units, 0);
+      const totS = CITIES.reduce((s, x) => s + state.cities[x.name].sales, 0);
+      document.getElementById("totalCityUnits").textContent = totU.toLocaleString('en-IN');
+      document.getElementById("totalCitySales").textContent = '₹' + totS.toLocaleString('en-IN');
+    });
+  });
+
+  // Render availability matrix header (15 SKU columns · shows short name + Level badge)
+  (function renderAvailHeader() {
+    const head = document.getElementById("availHead");
+    if (!head) return;
+    const totalTh = head.lastElementChild;
+    PRODUCTS.forEach(p => {
+      const th = document.createElement("th");
+      th.className = "num";
+      th.style.minWidth = "80px";
+      const levelBadge = p.level ? `<div style="background:#dcfce7; color:#166534; padding:1px 5px; border-radius:6px; font-size:9px; font-weight:600; display:inline-block; margin-top:2px;">${p.level}</div>` : '<div style="color:#ccc; font-size:9px; margin-top:2px;">—</div>';
+      const itemBadge = p.itemId ? `<div style="color:#999; font-size:9px; margin-top:2px;">${p.itemId}</div>` : '';
+      th.innerHTML = `<div style="font-size:11px; font-weight:600;">${p.short}</div>${levelBadge}${itemBadge}`;
+      head.insertBefore(th, totalTh);
+    });
+  })();
+
+  // Render availability matrix body — every cell editable, all 15 SKUs
+  function renderAvailabilityMatrix(sourceCities) {
+    const src = sourceCities || CITIES;
+    const availBody = document.getElementById("availabilityMatrix");
+    if (!availBody) return;
+    availBody.innerHTML = '';
+    src.forEach((c, i) => {
+      // Ensure coverage object exists
+      if (!c.coverage) { c.coverage = {}; PRODUCTS.forEach(p => c.coverage[p.key] = 0); }
+      const tr = document.createElement("tr");
+      let cells = `<td style="position: sticky; left: 0; background: #fff;">${c.name}</td>`;
+      PRODUCTS.forEach((p, pi) => {
+        const stores = getDarkstoreNames(c.name, p.key);
+        const tip = stores ? ` title="${stores.replace(/"/g, '&quot;')}"` : '';
+        const cursor = stores ? 'cursor:help;' : '';
+        cells += `<td class="num"${tip} style="${cursor}"><input type="number" class="entry-input" style="width:60px; text-align:right; padding:4px 6px;" min="0" value="${c.coverage[p.key] || 0}" data-av="${i}" data-avf="${p.key}" /></td>`;
+      });
+      cells += `<td class="num" style="font-weight:600;" data-total="${i}">${c.ds}</td>`;
+      tr.innerHTML = cells;
+      availBody.appendChild(tr);
+    });
+    // Wire inputs — update per-city coverage, recompute total
+    availBody.querySelectorAll('input[data-av]').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const i = Number(e.target.dataset.av);
+        const key = e.target.dataset.avf;
+        src[i].coverage[key] = Number(e.target.value) || 0;
+        src[i].ds = PRODUCTS.reduce((s, p) => s + (src[i].coverage[p.key] || 0), 0);
+        availBody.querySelector(`[data-total="${i}"]`).textContent = src[i].ds;
+      });
+    });
+  }
+  renderAvailabilityMatrix(CITIES);
+
+  // Save whole matrix to backend (long format: one record per city per SKU)
+  window.saveAvailabilityMatrix = async function() {
+    if (typeof CurioAPI === 'undefined') { alert('Backend not connected.'); return; }
+    const records = [];
+    CITIES.forEach(c => {
+      const total = PRODUCTS.reduce((s, p) => s + (c.coverage[p.key] || 0), 0);
+      PRODUCTS.forEach(p => {
+        records.push({
+          city: c.name,
+          sku_key: p.key,
+          sku_name: p.name,
+          darkstores: c.coverage[p.key] || 0,
+          city_total_ds: total
+        });
+      });
+    });
+    const res = await CurioAPI.submit('blinkit_availability_bulk_load', 'Faraaz Mir', { records, uploaded_at: new Date().toISOString() });
+    if (res.ok) {
+      const totalDs = CITIES.reduce((s, c) => s + PRODUCTS.reduce((ss, p) => ss + (c.coverage[p.key] || 0), 0), 0);
+      document.getElementById("coverageBanner").innerHTML = `<strong>✅ Saved.</strong> ${CITIES.length} cities · ${PRODUCTS.length} SKUs · ${totalDs} total darkstores. Persists to backend.`;
+    } else {
+      alert('Save failed: ' + (res.error || 'unknown'));
+    }
+  };
+
+  function updateTotals() {
+    const q = PRODUCTS.reduce((s, p) => s + state.entries[p.key].qty, 0);
+    const a = PRODUCTS.reduce((s, p) => s + state.entries[p.key].amt, 0);
+    document.getElementById("totalQty").textContent = q.toLocaleString('en-IN');
+    document.getElementById("totalAmt").textContent = a.toLocaleString('en-IN');
+    document.getElementById("saveSummary").textContent =
+      `${q.toLocaleString('en-IN')} units · ₹${a.toLocaleString('en-IN')}`;
+  }
+
+  // Date change
+  document.getElementById("dateInp").addEventListener("change", e => {
+    state.date = e.target.value;
+    const d = new Date(e.target.value);
+    document.getElementById("saveDate").textContent = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  });
+
+  // Tabs
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      document.getElementById("tab-" + t.dataset.tab).classList.add("active");
+    });
+  });
+
+  // Parse paste
+  function parsePaste() {
+    const raw = document.getElementById("pasteBox").value.trim();
+    if (!raw) return alert("Paste the report first.");
+
+    const lines = raw.split("\n").filter(l => l.trim());
+    const matches = [];
+    const unmatched = [];
+
+    lines.forEach(line => {
+      // Try tab-separated first, then multi-space
+      const parts = line.split(/\t|\s{2,}/).map(p => p.trim()).filter(Boolean);
+      if (parts.length < 3) return;
+      const name = parts[0];
+      const qty = Number(parts[parts.length - 2].replace(/[₹,]/g, ""));
+      const amt = Number(parts[parts.length - 1].replace(/[₹,]/g, ""));
+      if (isNaN(qty) || isNaN(amt)) return;
+
+      // Normalize both sides: lowercase, trim, collapse internal whitespace, strip "curio lifestyle" prefix
+      const normalize = s => String(s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/^curio lifestyle\s+/, '');
+      const inputNorm = normalize(name);
+      const found = PRODUCTS.find(p => {
+        const pn = normalize(p.name);
+        return pn === inputNorm || pn.includes(inputNorm) || inputNorm.includes(pn);
+      });
+      if (found) {
+        matches.push({ product: found, qty, amt });
+      } else {
+        unmatched.push({ name, qty, amt });
+      }
+    });
+
+    // Fill state (keyed by product.key)
+    matches.forEach(m => {
+      state.entries[m.product.key] = { qty: m.qty, amt: m.amt };
+    });
+
+    // Render preview
+    const box = document.getElementById("parseResult");
+    box.style.display = "block";
+    let html = `<table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Amt</th><th>Status</th></tr></thead><tbody>`;
+    PRODUCTS.forEach(p => {
+      const m = matches.find(x => x.product.key === p.key);
+      html += `<tr>
+        <td>${p.name}</td>
+        <td class="num">${m ? m.qty : 0}</td>
+        <td class="num">₹${(m ? m.amt : 0).toLocaleString('en-IN')}</td>
+        <td>${m ? '<span style="color: #22c55e; font-size: 11px;">✓ Matched</span>' : '<span style="color: #999; font-size: 11px;">— (no data)</span>'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+
+    if (unmatched.length > 0) {
+      html += `<div style="margin-top: 14px; padding: 12px; background: #fee2e2; border-radius: 8px; font-size: 12px; color: #991b1b;">
+        <strong>${unmatched.length} row(s) couldn't be matched:</strong> ${unmatched.map(u => u.name).join(", ")}. Edit them manually in the Enter tab.
+      </div>`;
+    }
+
+    document.getElementById("previewTable").innerHTML = html;
+
+    // Sync back into manual inputs
+    document.querySelectorAll(".entry-input[data-p]").forEach(inp => {
+      const p = PRODUCTS[inp.dataset.p];
+      const f = inp.dataset.f;
+      inp.value = state.entries[p.key][f] || "";
+    });
+    updateTotals();
+  }
+
+  async function submitEntry() {
+    const q = PRODUCTS.reduce((s, p) => s + state.entries[p.key].qty, 0);
+    const a = PRODUCTS.reduce((s, p) => s + state.entries[p.key].amt, 0);
+    if (q === 0 && a === 0) {
+      alert("Nothing to submit — enter or paste data first.");
+      return;
+    }
+    const dateStr = document.getElementById("dateInp").value;
+    const items = PRODUCTS.filter(p => state.entries[p.key].qty > 0 || state.entries[p.key].amt > 0).map(p => ({
+      sku: p.name, units: state.entries[p.key].qty,
+      net_sales: state.entries[p.key].amt, total_sales: state.entries[p.key].amt
+    }));
+    // Include city breakdown (units + sales), warehouse inventory, and full metrics
+    const cityRows = CITIES.filter(c => state.cities[c.name].units > 0 || state.cities[c.name].sales > 0).map(c => ({
+      city: c.name, units: state.cities[c.name].units, sales: state.cities[c.name].sales
+    }));
+    const warehouseRows = [];
+    WAREHOUSES.forEach(w => PRODUCTS.forEach(p => {
+      const v = state.warehouse[w + '|' + p.key];
+      if (v > 0) warehouseRows.push({ warehouse: w, sku: p.name, closing_units: v });
+    }));
+    document.getElementById("statusChip").textContent = "Sending...";
+    const res = await CurioAPI.submit('blinkit_sale', 'Faraaz Mir', {
+      date: dateStr,
+      items,
+      cities: cityRows,
+      warehouse: warehouseRows,
+      metrics: state.metrics,
+      source: 'entry-app'
+    });
+    if (res.ok) {
+      document.getElementById("successTitle").textContent = `Saved for ${document.getElementById("saveDate").textContent}`;
+      document.getElementById("successBody").textContent = `${q} units · ₹${a.toLocaleString('en-IN')} · ${res.message || 'saved'}`;
+      document.getElementById("successBox").classList.add("show");
+      document.getElementById("statusChip").textContent = res.offline ? "⚠ Queued offline" : "✓ Submitted";
+      document.getElementById("statusChip").classList.add("submitted");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      document.getElementById("statusChip").textContent = "❌ Failed";
+      alert("Save failed: " + (res.error || "unknown error"));
+    }
+  }
+
+  updateTotals();
+
+  // ============ ADD SKU / ADD CITY (backend-persisted) ============
+  async function showAddSku() {
+    const name = prompt("New SKU name (e.g. 'Curio Lifestyle Cow Ghee 500ml'):");
+    if (!name || !name.trim()) return;
+    const mrp = Number(prompt("MRP (₹):", "0")) || 0;
+    const level = prompt("Blinkit Level (e.g. 'Level 4' or leave blank):", "") || "";
+    const productId = prompt("Blinkit Product ID (optional):", "");
+    const sku = { key: 'sku_' + Date.now(), name: name.trim(), mrp, level: level.trim(), cities: 0, darkstores: 0, productId: productId || '' };
+    // Local add
+    PRODUCTS.push(sku);
+    state.entries[sku.key] = { qty: 0, amt: 0 };
+    // Append to product sales table
+    const tbody = document.getElementById("manualTable");
+    const i = PRODUCTS.length - 1;
+    const tr = document.createElement("tr");
+    const levelBadge = sku.level ? `<span style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:8px; font-size:11px; font-weight:600;">${sku.level}</span>` : '<span style="color:#ccc;">—</span>';
+    tr.innerHTML = `
+      <td><strong>${sku.name}</strong> <span style="color:#22c55e; font-size:11px;">(new)</span></td>
+      <td class="num">${sku.mrp ? '₹' + sku.mrp.toLocaleString('en-IN') : '—'}</td>
+      <td class="num">${levelBadge}</td>
+      <td class="num" style="color:#999;">—</td>
+      <td class="num" style="color:#999;">—</td>
+      <td class="num"><input type="number" class="entry-input" min="0" data-p="${i}" data-f="qty" placeholder="0" /></td>
+      <td class="num"><input type="number" class="entry-input wide" min="0" data-p="${i}" data-f="amt" placeholder="0" /></td>
+    `;
+    tbody.appendChild(tr);
+    tr.querySelectorAll("input").forEach(inp => inp.addEventListener("input", e => {
+      state.entries[sku.key][e.target.dataset.f] = e.target.value === "" ? 0 : Number(e.target.value);
+      updateTotals();
+    }));
+    // Persist to backend
+    if (typeof CurioAPI !== 'undefined') {
+      const res = await CurioAPI.submit('blinkit_add_sku', 'Faraaz Mir', sku);
+      if (res.ok) alert("SKU '" + sku.name + "' added and saved to backend.");
+      else alert("Added locally but backend save failed: " + (res.error || "unknown"));
+    }
+  }
+
+  async function showAddCity() {
+    const name = prompt("New city name (e.g. 'Nashik'):");
+    if (!name || !name.trim()) return;
+    const ds = Number(prompt("Total darkstores in this city (optional):", "0")) || 0;
+    const city = { name: name.trim(), ds, almonds: 0, saffron: 0, sidrHoney: 0 };
+    CITIES.push(city);
+    state.cities[city.name] = { units: 0, sales: 0 };
+    // Append to city table
+    const cityBody = document.getElementById("citiesTable");
+    const i = CITIES.length - 1;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${city.name} <span style="color:#22c55e; font-size:11px;">(new)</span></td>
+      <td class="num" style="color:#999;">${city.ds}</td>
+      <td class="num"><input type="number" class="entry-input" min="0" data-c="${i}" data-cf="units" placeholder="0" /></td>
+      <td class="num"><input type="number" class="entry-input wide" min="0" data-c="${i}" data-cf="sales" placeholder="0" /></td>
+    `;
+    cityBody.appendChild(tr);
+    tr.querySelectorAll("input").forEach(inp => inp.addEventListener("input", e => {
+      const c = CITIES[e.target.dataset.c].name;
+      state.cities[c][e.target.dataset.cf] = e.target.value === "" ? 0 : Number(e.target.value);
+      const totU = CITIES.reduce((s, x) => s + state.cities[x.name].units, 0);
+      const totS = CITIES.reduce((s, x) => s + state.cities[x.name].sales, 0);
+      document.getElementById("totalCityUnits").textContent = totU.toLocaleString('en-IN');
+      document.getElementById("totalCitySales").textContent = '₹' + totS.toLocaleString('en-IN');
+    }));
+    // Persist
+    if (typeof CurioAPI !== 'undefined') {
+      const res = await CurioAPI.submit('blinkit_add_city', 'Faraaz Mir', city);
+      if (res.ok) alert("City '" + city.name + "' added and saved to backend.");
+      else alert("Added locally but backend save failed: " + (res.error || "unknown"));
+    }
+  }
+
+  // On load: fetch any user-added SKUs/cities from backend and merge
+  (async () => {
+    if (typeof CurioAPI === 'undefined') return;
+    try {
+      const [skuRes, cityRes] = await Promise.all([
+        CurioAPI.get('blinkit_custom_skus'),
+        CurioAPI.get('blinkit_custom_cities')
+      ]);
+      if (skuRes.ok && skuRes.data) {
+        skuRes.data.forEach(row => {
+          if (PRODUCTS.some(p => p.name === row.name)) return;
+          const sku = { key: 'sku_' + row.name.replace(/\s+/g, '_'), name: row.name, mrp: Number(row.mrp || row.MRP || 0), level: row.level || row.Level || '', cities: 0, darkstores: 0, productId: row.productId || row.Product_ID || '' };
+          PRODUCTS.push(sku);
+          state.entries[sku.key] = { qty: 0, amt: 0 };
+        });
+      }
+      if (cityRes.ok && cityRes.data) {
+        cityRes.data.forEach(row => {
+          if (CITIES.some(c => c.name === row.name)) return;
+          CITIES.push({ name: row.name, ds: Number(row.ds || 0), almonds: 0, saffron: 0, sidrHoney: 0 });
+          state.cities[row.name] = { units: 0, sales: 0 };
+        });
+      }
+      // Force full re-render on load if custom rows were added
+      if ((skuRes.data && skuRes.data.length) || (cityRes.data && cityRes.data.length)) location.reload();
+    } catch(e) { console.warn('Custom SKU/city load skipped:', e); }
+  })();
+
+  // On load: check backend for latest saved availability (long format: one record per city × SKU)
+  (async () => {
+    if (typeof CurioAPI === 'undefined') return;
+    try {
+      const res = await CurioAPI.get('blinkit_availability');
+      if (res.ok && res.data && res.data.length) {
+        // Merge: group by city, then key by SKU
+        res.data.forEach(row => {
+          const cityName = row.City || row.city;
+          const skuKey = row.SKU_Key || row.sku_key;
+          const ds = Number(row.Darkstores || row.darkstores || 0);
+          if (!cityName || !skuKey) return;
+          let city = CITIES.find(c => c.name === cityName);
+          if (!city) {
+            city = { name: cityName, ds: 0, coverage: {} };
+            PRODUCTS.forEach(p => city.coverage[p.key] = 0);
+            CITIES.push(city);
+            state.cities[cityName] = { units: 0, sales: 0 };
+          }
+          if (!city.coverage) { city.coverage = {}; PRODUCTS.forEach(p => city.coverage[p.key] = 0); }
+          city.coverage[skuKey] = ds;
+        });
+        // Recompute city totals
+        CITIES.forEach(c => { c.ds = PRODUCTS.reduce((s, p) => s + (c.coverage[p.key] || 0), 0); });
+        renderAvailabilityMatrix(CITIES);
+        const updatedAt = res.data[0].Uploaded_At ? new Date(res.data[0].Uploaded_At).toLocaleDateString('en-IN') : 'earlier';
+        document.getElementById("coverageBanner").innerHTML = `<strong>Coverage last updated: ${updatedAt}.</strong> ${CITIES.length} cities × ${PRODUCTS.length} SKUs. Edit any cell and click 💾 Save to persist.`;
+      }
+    } catch(e) { console.warn('Availability load skipped:', e); }
+  })();
+
+  // ============ CSV EXPORT ============
+  window.exportBlinkitCsv = function() {
+    const rows = [['Section','Row','Field','Value']];
+    // Products
+    PRODUCTS.forEach(p => {
+      rows.push(['Product', p.name, 'Qty', state.entries[p.key].qty]);
+      rows.push(['Product', p.name, 'Amt', state.entries[p.key].amt]);
+    });
+    // Metrics
+    METRICS.forEach(m => rows.push(['Metric', m.label, m.suffix || 'value', state.metrics[m.key] || 0]));
+    // Cities
+    CITIES.forEach(c => {
+      if (state.cities[c.name].units || state.cities[c.name].sales) {
+        rows.push(['City', c.name, 'Units', state.cities[c.name].units]);
+        rows.push(['City', c.name, 'Sales', state.cities[c.name].sales]);
+      }
+    });
+    // Warehouse
+    WAREHOUSES.forEach(w => PRODUCTS.forEach(p => {
+      const v = state.warehouse[w + '|' + p.key];
+      if (v) rows.push(['Warehouse', w, p.name, v]);
+    }));
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Blinkit_${state.date || 'today'}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+</script>
+<script src="curio-api.js"></script>
+</body>
+</html>

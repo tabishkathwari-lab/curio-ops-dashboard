@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Curio Factory Entry</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f7;
+    color: #1a1a1a;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .layout { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  .header {
+    background: linear-gradient(135deg, #6b21a8, #a78bfa);
+    color: #fff;
+    padding: 20px 24px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  .header .sub { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+  .header .user-chip {
+    background: rgba(255,255,255,0.25);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+  }
+
+  .body-wrap {
+    background: #fff;
+    border-radius: 0 0 12px 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .date-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 14px 16px;
+    background: #f9fafb;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  .date-bar label { font-size: 13px; color: #666; font-weight: 500; }
+  .date-bar input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+  .date-bar .stats {
+    margin-left: auto;
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: #666;
+  }
+  .date-bar .stats strong { color: #6b21a8; font-size: 14px; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #eee; margin-bottom: 20px; }
+  .tab { padding: 10px 16px; background: none; border: none; color: #666; cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+  .tab.active { color: #6b21a8; border-bottom-color: #6b21a8; font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .section-title { font-size: 13px; font-weight: 600; color: #333; margin: 20px 0 10px; display: flex; justify-content: space-between; align-items: center; }
+  .section-title .hint { font-size: 11px; color: #999; font-weight: 400; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    padding: 16px;
+    background: #faf5ff;
+    border-radius: 10px;
+    border: 1px solid #e9d5ff;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-grid label { display: block; font-size: 11px; font-weight: 500; color: #666; margin-bottom: 4px; }
+  .form-grid input, .form-grid select, .form-grid textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    color: #333;
+  }
+  .form-grid input:focus, .form-grid select:focus { outline: none; border-color: #a78bfa; }
+  .form-grid textarea { resize: vertical; min-height: 60px; }
+
+  .btn {
+    background: #6b21a8;
+    color: #fff;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: #fff; color: #6b21a8; border: 1px solid #6b21a8; }
+  .btn.large { padding: 14px 24px; font-size: 15px; }
+  .btn.small { padding: 6px 12px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; font-size: 11px; color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid #eee; background: #fafafa; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 500; }
+  .badge.ok { background: #dcfce7; color: #166534; }
+  .badge.warn { background: #fef3c7; color: #92400e; }
+  .badge.danger { background: #fee2e2; color: #991b1b; }
+
+  .qc-inputs { display: flex; gap: 8px; align-items: center; }
+  .qc-inputs input[type="number"] { width: 80px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; text-align: right; font-size: 13px; }
+
+  .stock-take-row .actual-input { color: #6b21a8; font-weight: 600; }
+  .stock-take-row .variance { font-weight: 600; }
+  .stock-take-row .variance.pos { color: #166534; }
+  .stock-take-row .variance.neg { color: #991b1b; }
+
+  .helper {
+    background: #faf5ff;
+    border: 1px solid #e9d5ff;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #6b21a8;
+    margin-bottom: 16px;
+  }
+  .helper strong { display: block; margin-bottom: 2px; color: #4c1d95; }
+
+  .success-modal {
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+  }
+  .success-modal.show { display: flex; }
+  .success-modal .icon { width: 36px; height: 36px; background: #22c55e; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
+  .success-modal .txt { font-size: 13px; color: #166534; flex: 1; }
+  .success-modal .txt strong { display: block; margin-bottom: 2px; }
+
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding: 14px 0 0;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+  .save-bar .summary { font-size: 13px; color: #666; }
+  .save-bar .summary strong { color: #333; }
+
+  .priority-callout {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-left: 4px solid #991b1b;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: #7f1d1d;
+  }
+  .priority-callout strong { color: #991b1b; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="header">
+    <div>
+      <h1>🏭 Curio Factory · Daily Entry</h1>
+      <div class="sub">Himlahar Harvests Pvt Ltd · Production floor + Warehouse</div>
+    </div>
+    <div class="user-chip">👷 Dheeraj Kumar · Factory Data (reports to Jasmeen) · <span style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px;">🟢 LIVE</span></div>
+  </div>
+
+  <div class="body-wrap">
+
+    <div class="success-modal" id="successBox">
+      <div class="icon">✓</div>
+      <div class="txt">
+        <strong id="successTitle">Saved</strong>
+        <span id="successBody">Recorded to inventory and production log.</span>
+      </div>
+      <button class="btn ghost" onclick="document.getElementById('successBox').classList.remove('show');">Log another</button>
+    </div>
+
+    <div class="date-bar">
+      <label>Date</label>
+      <input type="date" id="dateInp" />
+      <div class="stats">
+        <div>Batches today · <strong id="batchesToday">0</strong></div>
+        <div>Units produced · <strong id="unitsToday">0</strong></div>
+        <div>Value added · <strong id="valueToday">₹0</strong></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="production">⚙️ Log production batch</button>
+      <button class="tab" data-tab="intake">📥 Raw material &amp; packaging intake</button>
+      <button class="tab" data-tab="stocktake">📊 Stock take</button>
+      <button class="tab" data-tab="qc">✅ QC review</button>
+      <button class="tab" data-tab="history">📁 History</button>
+    </div>
+
+    <!-- TAB: LOG PRODUCTION BATCH -->
+    <div class="tab-panel active" id="tab-production">
+      <div class="helper">
+        <strong>Log a production batch</strong>
+        Every packing run gets a batch number. Batch is added to Finished Goods inventory. Raw materials + packaging consumed are auto-deducted based on the SKU's BOM (bill of materials).
+      </div>
+
+      <div class="section-title">Batch details<span class="hint">Fields marked * are required.</span></div>
+      <div class="form-grid">
+        <div>
+          <label>SKU *</label>
+          <select id="prodSku">
+            <option value="">Choose SKU…</option>
+            <optgroup label="🍵 Tea">
+              <option>Kashmir Qahwa · 150 g · TEA-KQ-150</option>
+              <option>Himalayan Chamomile Tea · 50 g · TEA-HC-50</option>
+              <option>Zafrani Kehwa · 200 g · TEA-ZK-200</option>
+            </optgroup>
+            <optgroup label="🌰 Dry Fruits">
+              <option>Kashmir Almond · 250 g · DRF-KA-250</option>
+              <option>Kashmir Almond · 500 g · DRF-KA-500</option>
+              <option>Kashmir Almond · 1 kg · DRF-KA-1000</option>
+              <option>Walnuts · 250 g · DRF-KW-250</option>
+              <option>Walnuts · 500 g · DRF-KW-500</option>
+              <option>Walnuts · 1 kg · DRF-KW-1000</option>
+              <option>Ladakh Apricots · 250 g · DRF-LA-250</option>
+              <option>Ladakh Apricots · 500 g · DRF-LA-500</option>
+              <option>Ladakh Apricots · 1 kg · DRF-LA-1000</option>
+            </optgroup>
+            <optgroup label="🫒 Cold Pressed Oils">
+              <option>Walnut Oil · 100 ml · OIL-WO-100</option>
+              <option>Walnut Oil · 250 ml · OIL-WO-250</option>
+              <option>Apricot Oil · 100 ml · OIL-APO-100</option>
+              <option>Apricot Oil · 250 ml · OIL-APO-250</option>
+              <option>Almond Oil · 100 ml · OIL-ALO-100</option>
+              <option>Almond Oil · 250 ml · OIL-ALO-250</option>
+              <option>Mustard Oil · 500 ml · OIL-MO-500</option>
+            </optgroup>
+            <optgroup label="🌸 Saffron">
+              <option>Kashmir Saffron Mogra A+ · 1 g · SAF-MGA-1</option>
+              <option>Kashmir Saffron Mogra A+ · 2 g · SAF-MGA-2</option>
+            </optgroup>
+            <optgroup label="🧈 Ghee">
+              <option>Himalayan Badri Cow Ghee · 250 ml · GHE-HBG-250</option>
+              <option>Himalayan Badri Cow Ghee · 500 ml · GHE-HBG-500</option>
+            </optgroup>
+            <optgroup label="🍯 Honey">
+              <option>Multi-Floral Honey · 250 g · HON-MF-250</option>
+              <option>Multi-Floral Honey · 500 g · HON-MF-500</option>
+              <option>Mono-Floral Borage · 250 g · HON-BOR-250</option>
+              <option>Mono-Floral Borage · 500 g · HON-BOR-500</option>
+              <option>Mono-Floral Sidr · 250 g · HON-SID-250</option>
+              <option>Mono-Floral Sidr · 500 g · HON-SID-500</option>
+              <option>Multifloral Black Forest · 250 g · HON-BF-250</option>
+              <option>Multifloral Black Forest · 500 g · HON-BF-500</option>
+            </optgroup>
+            <optgroup label="💼 B2B Bulk SKUs">
+              <option>Walnuts 100 kg drum · BLK-KW-100KG</option>
+              <option>Kashmir Almonds 100 kg drum · BLK-KA-100KG</option>
+              <option>Multi-Floral Honey 100 kg drum · BLK-HF-100KG</option>
+              <option>Badri Ghee 15 kg tin · BLK-GHE-15KG</option>
+              <option>Walnut Oil 200 L drum · BLK-WO-200L</option>
+            </optgroup>
+          </select>
+        </div>
+        <div>
+          <label>Batch number *</label>
+          <input type="text" id="prodBatch" placeholder="e.g., TEA-HC-50-YYMMDD" />
+        </div>
+        <div>
+          <label>Quantity produced *</label>
+          <input type="number" id="prodQty" placeholder="units" />
+        </div>
+        <div>
+          <label>Packed date *</label>
+          <input type="date" id="prodPacked" />
+        </div>
+        <div>
+          <label>Expiry date *</label>
+          <input type="date" id="prodExpiry" />
+        </div>
+        <div>
+          <label>COP per unit (₹)</label>
+          <input type="number" step="0.01" id="prodCop" placeholder="0" />
+        </div>
+        <div>
+          <label>Operator</label>
+          <input type="text" placeholder="Name of packer" />
+        </div>
+        <div>
+          <label>QC status</label>
+          <select id="prodQc">
+            <option>Pending QC</option>
+            <option>Released</option>
+            <option>Rework</option>
+            <option>Rejected</option>
+          </select>
+        </div>
+        <div class="full">
+          <label>Notes (optional)</label>
+          <textarea placeholder="Anything worth flagging — quality observations, deviations, etc."></textarea>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: 24px;">Bill of Materials — auto-calculated deduction<span class="hint">Select an SKU + quantity above to see components that will be deducted.</span></div>
+      <table>
+        <thead>
+          <tr><th>Component</th><th class="num">Per unit</th><th class="num">Total needed</th><th class="num">In stock</th><th>OK?</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="padding: 30px 24px; text-align: center; color: #999;">
+        <div style="font-size: 12px;">Choose an SKU and quantity to preview the BOM deduction.</div>
+      </div>
+    </div>
+
+    <!-- TAB: RAW MATERIAL + PACKAGING INTAKE -->
+    <div class="tab-panel" id="tab-intake">
+      <div class="helper">
+        <strong>Log new stock arriving at the factory</strong>
+        When raw materials or packaging arrive from a supplier, log them here. Inventory increases; supplier ledger is updated for future payment.
+      </div>
+
+      <div class="section-title">Intake details</div>
+      <div class="form-grid">
+        <div>
+          <label>Type *</label>
+          <select>
+            <option value="">Choose type…</option>
+            <optgroup label="Raw materials">
+              <option>Almond Oil (raw)</option>
+              <option>Apricot Oil (raw)</option>
+              <option>Walnut Oil (raw)</option>
+              <option>Mustard oil (raw)</option>
+              <option>Almonds A+ / B</option>
+              <option>Apricots</option>
+              <option>Walnuts (500g / SP / 3kg vaccum)</option>
+              <option>Ghee (raw)</option>
+              <option>Kashmir Saffron Mogra A+ (raw)</option>
+              <option>Chamomile flowers</option>
+              <option>Kashmir Qahwa mix</option>
+              <option>Zafrani Kehwa mix</option>
+              <option>Multi-Floral Honey (raw)</option>
+              <option>Mono-Floral Borage (raw)</option>
+              <option>Multifloral Black Forest (raw)</option>
+              <option>Mono-Floral Sidr (raw)</option>
+            </optgroup>
+            <optgroup label="Packaging — Labels">
+              <option>Front label (any SKU)</option>
+              <option>Cap/back label</option>
+            </optgroup>
+            <optgroup label="Packaging — Bottles">
+              <option>100ml glass bottle</option>
+              <option>250ml glass bottle</option>
+              <option>500ml glass bottle</option>
+              <option>Saffron 1g bottle</option>
+              <option>Saffron 2g bottle</option>
+              <option>500g Honey jar</option>
+              <option>500ml Ghee jar</option>
+            </optgroup>
+            <optgroup label="Packaging — Caps">
+              <option>White small cap</option>
+              <option>Black cap 100ml</option>
+              <option>Ghee cap 500ml</option>
+              <option>250/500ml black cap</option>
+              <option>Honey cap 500g</option>
+              <option>Saffron 1g/2g cap</option>
+            </optgroup>
+            <optgroup label="Packaging — Boxes">
+              <option>Product box (choose SKU)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div>
+          <label>Quantity received *</label>
+          <input type="number" step="0.01" placeholder="e.g., 50" />
+        </div>
+        <div>
+          <label>Unit *</label>
+          <select>
+            <option value="">Choose unit…</option>
+            <option>Kg</option>
+            <option>Litre</option>
+            <option>Pieces</option>
+            <option>Grams</option>
+          </select>
+        </div>
+        <div>
+          <label>Supplier *</label>
+          <select>
+            <option value="">Choose supplier…</option>
+            <option>+ New supplier…</option>
+          </select>
+        </div>
+        <div>
+          <label>Cost per unit (₹)</label>
+          <input type="number" step="0.01" placeholder="e.g., 800" />
+        </div>
+        <div>
+          <label>Total invoice value (₹)</label>
+          <input type="number" placeholder="Auto-calculated" />
+        </div>
+        <div>
+          <label>Date received *</label>
+          <input type="date" />
+        </div>
+        <div>
+          <label>Invoice / bill #</label>
+          <input type="text" placeholder="Supplier's invoice number" />
+        </div>
+        <div>
+          <label>Payment terms</label>
+          <select>
+            <option value="">Choose terms…</option>
+            <option>Cash on delivery</option>
+            <option>Net 15 days</option>
+            <option>Net 30 days</option>
+            <option>Net 45 days</option>
+          </select>
+        </div>
+        <div class="full">
+          <label>Notes (optional)</label>
+          <textarea placeholder="Quality notes, storage location, etc."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: STOCK TAKE -->
+    <div class="tab-panel" id="tab-stocktake">
+      <div class="helper">
+        <strong>Physical stock reconciliation</strong>
+        Do this weekly or monthly. Enter what you actually count on the shelf. Variance vs system count is flagged for you to investigate before overwriting inventory.
+      </div>
+
+      <div class="section-title">Finished goods stock take<span class="hint">Fill "Actual count" column. System count populates from the live inventory feed.</span></div>
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th class="num">System count</th>
+            <th class="num">Actual count</th>
+            <th class="num">Variance</th>
+            <th>Reason (if any)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">Stock take list will populate from live inventory</div>
+        <div style="font-size: 12px; margin-top: 6px;">Once the inventory feed is wired, each finished-goods SKU will appear here for counting.</div>
+      </div>
+    </div>
+
+    <!-- TAB: QC REVIEW -->
+    <div class="tab-panel" id="tab-qc">
+      <div class="helper">
+        <strong>Batches awaiting QC release</strong>
+        Review each pending batch — pass to release for sale, rework/reject if quality issues found.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Batch #</th><th>SKU</th><th>Packed date</th><th class="num">Units</th><th>Sitting in QC for</th><th>Decision</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No batches waiting for QC</div>
+        <div style="font-size: 12px; margin-top: 6px;">Newly logged batches with "Pending QC" status will appear here.</div>
+      </div>
+    </div>
+
+    <!-- TAB: HISTORY -->
+    <div class="tab-panel" id="tab-history">
+      <div class="helper">
+        <strong>Recent factory activity</strong>
+        Production batches, intakes, stock takes, QC decisions — chronological log.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Details</th><th class="num">Value change</th><th>Logged by</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No factory activity yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">Production runs, intakes, stock takes and QC decisions will appear here.</div>
+      </div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="save-bar">
+      <div class="summary">
+        Ready to save: <strong id="saveSummary">Fill batch details above.</strong>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn ghost">Save draft</button>
+        <button class="btn large" onclick="submitEntry()">Save entry</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      document.getElementById("tab-" + t.dataset.tab).classList.add("active");
+    });
+  });
+
+  // Live variance calc for stock take
+  document.querySelectorAll(".stock-take-row .actual-input").forEach(inp => {
+    inp.addEventListener("input", (e) => {
+      const row = e.target.closest("tr");
+      const system = Number(row.cells[1].textContent);
+      const actual = Number(e.target.value);
+      const variance = actual - system;
+      const varCell = row.querySelector(".variance");
+      varCell.textContent = variance > 0 ? "+" + variance : String(variance);
+      varCell.classList.remove("pos", "neg");
+      varCell.classList.add(variance >= 0 ? "pos" : "neg");
+    });
+  });
+
+  async function submitEntry() {
+    // Read form fields with graceful fallback
+    const sku = document.querySelector('[name="batch-sku"]')?.value || '';
+    const qty = parseInt(document.querySelector('[name="batch-qty"]')?.value || '0');
+    const rawKg = parseFloat(document.querySelector('[name="raw-kg"]')?.value || '0');
+    const notes = document.querySelector('[name="batch-notes"]')?.value || '';
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await CurioAPI.submit('production_batch', 'Dheeraj Kumar', {
+      date: today, sku, quantity: qty, raw_kg: rawKg,
+      qc_status: 'pending', notes
+    });
+    if (res.ok) {
+      document.getElementById("successTitle").textContent = "Batch logged: " + (res.id || '');
+      document.getElementById("successBody").textContent = `${sku} × ${qty} units queued for QC. ${res.message || ''}`;
+      document.getElementById("successBox").classList.add("show");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      alert("Save failed: " + (res.error || "unknown error"));
+    }
+  }
+</script>
+<script src="curio-api.js"></script>
+</body>
+</html>

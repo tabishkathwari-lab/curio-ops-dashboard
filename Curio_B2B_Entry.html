@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Curio B2B Sales Entry</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f7; color: #1a1a1a; font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .layout { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .header {
+    background: linear-gradient(135deg, #6b21a8, #a78bfa);
+    color: #fff; padding: 20px 24px; border-radius: 12px 12px 0 0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  .header .sub { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+  .header .user-chip { background: rgba(255,255,255,0.25); padding: 6px 12px; border-radius: 20px; font-size: 13px; }
+  .body-wrap { background: #fff; border-radius: 0 0 12px 12px; padding: 24px; margin-bottom: 20px; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #eee; margin-bottom: 20px; }
+  .tab { padding: 10px 16px; background: none; border: none; color: #666; cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+  .tab.active { color: #6b21a8; border-bottom-color: #6b21a8; font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .section-title { font-size: 13px; font-weight: 600; color: #333; margin: 20px 0 10px; display: flex; justify-content: space-between; align-items: center; }
+  .section-title .hint { font-size: 11px; color: #999; font-weight: 400; }
+
+  .form-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px; padding: 16px; background: #faf5ff; border-radius: 10px; border: 1px solid #e9d5ff;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-grid .half { grid-column: span 2; }
+  .form-grid label { display: block; font-size: 11px; font-weight: 500; color: #666; margin-bottom: 4px; }
+  .form-grid input, .form-grid select, .form-grid textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-size: 13px; color: #333;
+  }
+  .form-grid input:focus, .form-grid select:focus { outline: none; border-color: #a78bfa; }
+  .form-grid textarea { resize: vertical; min-height: 60px; }
+
+  .btn { background: #6b21a8; color: #fff; padding: 10px 18px; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: #fff; color: #6b21a8; border: 1px solid #6b21a8; }
+  .btn.large { padding: 14px 24px; font-size: 15px; }
+  .btn.small { padding: 6px 12px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; font-size: 11px; color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid #eee; background: #fafafa; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 500; }
+  .badge.ok { background: #dcfce7; color: #166534; }
+  .badge.warn { background: #fef3c7; color: #92400e; }
+  .badge.danger { background: #fee2e2; color: #991b1b; }
+  .badge.quote { background: #dbeafe; color: #1e40af; }
+  .badge.confirmed { background: #faf5ff; color: #6b21a8; }
+  .badge.dispatched { background: #fef3c7; color: #92400e; }
+  .badge.paid { background: #dcfce7; color: #166534; }
+
+  .helper {
+    background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px;
+    padding: 10px 14px; font-size: 12px; color: #6b21a8; margin-bottom: 16px;
+  }
+  .helper strong { display: block; margin-bottom: 2px; color: #4c1d95; }
+
+  .success-modal { background: #dcfce7; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; display: none; align-items: center; gap: 12px; }
+  .success-modal.show { display: flex; }
+  .success-modal .icon { width: 36px; height: 36px; background: #22c55e; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
+  .success-modal .txt { font-size: 13px; color: #166534; flex: 1; }
+  .success-modal .txt strong { display: block; margin-bottom: 2px; }
+
+  .order-items { border: 1px solid #e9d5ff; border-radius: 10px; overflow: hidden; margin: 16px 0; }
+  .order-items .head { padding: 10px 14px; background: #faf5ff; font-size: 12px; font-weight: 600; color: #6b21a8; display: flex; justify-content: space-between; align-items: center; }
+  .order-items .item-row {
+    display: grid;
+    grid-template-columns: 2fr 100px 90px 90px 90px 30px;
+    gap: 10px;
+    padding: 10px 14px;
+    align-items: center;
+    border-top: 1px solid #f0e8f9;
+    font-size: 13px;
+  }
+  .order-items .item-row.header-row {
+    background: #fafafa; font-size: 11px; color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .order-items .item-row select, .order-items .item-row input {
+    padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; width: 100%;
+  }
+  .order-items .add-row {
+    padding: 10px 14px; border-top: 1px solid #f0e8f9; background: #fafbfd;
+    text-align: left;
+  }
+  .order-items .add-row button { background: none; border: 1px dashed #a78bfa; color: #6b21a8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+
+  .order-summary {
+    background: #f5f5f7; border-radius: 10px; padding: 14px 16px; margin: 16px 0;
+  }
+  .order-summary .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; color: #666; }
+  .order-summary .row.total { font-weight: 700; font-size: 15px; color: #6b21a8; padding-top: 8px; border-top: 1px solid #ddd; margin-top: 6px; }
+
+  .save-bar { position: sticky; bottom: 0; background: #fff; padding: 14px 0 0; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+  .save-bar .summary { font-size: 13px; color: #666; }
+  .save-bar .summary strong { color: #333; }
+
+  .customer-card {
+    background: #fff; border: 1px solid #eee; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .customer-card .avatar {
+    width: 36px; height: 36px; border-radius: 50%; background: #faf5ff;
+    display: flex; align-items: center; justify-content: center;
+    color: #6b21a8; font-weight: 600; font-size: 14px; flex-shrink: 0;
+  }
+  .customer-card .name { font-size: 13px; font-weight: 600; }
+  .customer-card .meta { font-size: 11px; color: #666; margin-top: 2px; }
+  .customer-card .m-actions { margin-left: auto; display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="header">
+    <div>
+      <h1>💼 Curio B2B · Sales</h1>
+      <div class="sub">Log new orders · Track pipeline · Manage customers</div>
+    </div>
+    <div class="user-chip">👤 Faraaz Mir · Manager (Sales) · <span style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px;">🟢 LIVE</span></div>
+  </div>
+
+  <div class="body-wrap">
+
+    <div class="success-modal" id="successBox">
+      <div class="icon">✓</div>
+      <div class="txt">
+        <strong id="successTitle">Order created</strong>
+        <span id="successBody">Order sent to production planning. Customer will receive confirmation email.</span>
+      </div>
+      <button class="btn ghost" onclick="document.getElementById('successBox').classList.remove('show');">Enter another</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="new">✍️ New order</button>
+      <button class="tab" data-tab="pipeline">📊 Order pipeline</button>
+      <button class="tab" data-tab="customers">👥 Customers</button>
+      <button class="tab" data-tab="history">📁 History</button>
+    </div>
+
+    <!-- TAB: NEW ORDER -->
+    <div class="tab-panel active" id="tab-new">
+      <div class="helper">
+        <strong>Create a new B2B order</strong>
+        Mix of bulk SKUs (100 kg drums, 15 kg ghee tins, 200 L oil drums) and custom hampers for corporate gifting. 20% B2B discount applied automatically to standard bulk SKUs. Custom prices can be entered per line.
+      </div>
+
+      <div class="section-title">Order details</div>
+      <div class="form-grid">
+        <div class="half">
+          <label>Customer *</label>
+          <select>
+            <option value="">Search / add customer…</option>
+            <optgroup label="💼 Existing B2B customers (from ledger)">
+              <option>Kissansay Agtech Pvt Ltd</option>
+              <option>Lulu Hypermarket CL India</option>
+              <option>Landcraft Retail Pvt Ltd</option>
+              <option>New Modern Bazaar Dept Stores</option>
+              <option>Pick N Choose Bengaluru</option>
+              <option>Hamiast Global Pvt Ltd</option>
+              <option>The Jammu &amp; Kashmir Bank Ltd</option>
+            </optgroup>
+            <option>+ Add new customer…</option>
+          </select>
+        </div>
+        <div>
+          <label>Segment</label>
+          <select>
+            <option value="">Choose segment…</option>
+            <option>🎁 Corporate gifting</option>
+            <option>🏨 HORECA (hotels/cafes)</option>
+            <option>🛒 Reseller / Wholesale</option>
+          </select>
+        </div>
+        <div>
+          <label>Order date *</label>
+          <input type="date" />
+        </div>
+        <div>
+          <label>Payment terms *</label>
+          <select>
+            <option value="">Choose terms…</option>
+            <option>30 days</option>
+            <option>45 days</option>
+            <option>60 days</option>
+            <option>Advance (upfront)</option>
+          </select>
+        </div>
+        <div>
+          <label>Expected delivery</label>
+          <input type="date" />
+        </div>
+        <div>
+          <label>PO number (from customer)</label>
+          <input type="text" placeholder="Their reference" />
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: 24px;">Line items<span class="hint">Add bulk SKUs, hampers, or custom-size packs.</span></div>
+
+      <div class="order-items">
+        <div class="head">
+          <span>Order lines</span>
+          <span>Add SKUs, hampers, or custom-size packs. Prices default to your B2B rate card.</span>
+        </div>
+        <div class="item-row header-row">
+          <div>Product</div>
+          <div style="text-align: right;">Unit price</div>
+          <div style="text-align: right;">Discount</div>
+          <div style="text-align: right;">Qty</div>
+          <div style="text-align: right;">Line total</div>
+          <div></div>
+        </div>
+        <div class="item-row">
+          <select>
+            <option value="">Choose product…</option>
+            <optgroup label="🎁 Corporate hamper packs">
+              <option>Diwali hamper (6 SKU assortment)</option>
+              <option>Wellness hamper (Tea + Honey)</option>
+              <option>Premium hamper (Saffron + Ghee + Honey)</option>
+              <option>Custom hamper (build below)…</option>
+            </optgroup>
+            <optgroup label="🏨 Bulk SKUs — HORECA">
+              <option>Walnuts 100 kg drum · BLK-KW-100KG</option>
+              <option>Kashmir Almonds 100 kg drum · BLK-KA-100KG</option>
+              <option>Ladakh Apricots 100 kg drum · BLK-LA-100KG</option>
+              <option>Multi-Floral Honey 100 kg drum · BLK-HF-100KG</option>
+              <option>Mono-Floral Sidr 50 kg drum · BLK-HSID-50KG</option>
+              <option>Badri Cow Ghee 15 kg tin · BLK-GHE-15KG</option>
+              <option>Walnut Oil 200 L drum · BLK-WO-200L</option>
+              <option>Mustard Oil 200 L drum · BLK-MO-200L</option>
+              <option>Kashmir Qahwa 50 kg sack · BLK-KQ-50KG</option>
+              <option>Kashmir Saffron 100 g bulk · SAF-MGA-100G</option>
+            </optgroup>
+            <optgroup label="📦 Standard retail SKUs (with 20% B2B discount)">
+              <option>Kashmir Almonds 500g</option>
+              <option>Walnuts 500g</option>
+              <option>Multi-Floral Honey 500g</option>
+            </optgroup>
+          </select>
+          <input type="number" style="text-align: right;" placeholder="0" />
+          <input type="number" style="text-align: right;" placeholder="%" />
+          <input type="number" style="text-align: right;" placeholder="0" />
+          <div style="text-align: right; font-weight: 600; color: #6b21a8;">₹0</div>
+          <button style="background: none; border: none; color: #991b1b; cursor: pointer; font-size: 16px;">×</button>
+        </div>
+        <div class="add-row">
+          <button>+ Add another line</button>
+        </div>
+      </div>
+
+      <div class="order-summary">
+        <div class="row"><span>Subtotal</span><span>₹0</span></div>
+        <div class="row"><span>GST</span><span>₹0</span></div>
+        <div class="row"><span>Freight / logistics</span><span>₹0</span></div>
+        <div class="row total"><span>Order total</span><span>₹0</span></div>
+      </div>
+
+      <div class="section-title" style="margin-top: 24px;">Delivery + notes</div>
+      <div class="form-grid">
+        <div class="half">
+          <label>Delivery address</label>
+          <textarea placeholder="Where should this be shipped?"></textarea>
+        </div>
+        <div class="half">
+          <label>Special instructions</label>
+          <textarea placeholder="Custom packaging, gift card, timing, etc."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: PIPELINE -->
+    <div class="tab-panel" id="tab-pipeline">
+      <div class="helper">
+        <strong>Active orders in the pipeline</strong>
+        Track every open order through its stages: Quote sent → Confirmed → In production → Dispatched → Delivered → Paid.
+      </div>
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No open orders yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">Create an order in the New order tab to see it here.</div>
+      </div>
+    </div>
+
+    <!-- TAB: CUSTOMERS -->
+    <div class="tab-panel" id="tab-customers">
+      <div class="helper">
+        <strong>B2B customer directory</strong>
+        Contact info, credit terms, and running balance. Click any customer to see their full order history and account statement.
+      </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+        <input type="text" placeholder="Search customer…" style="flex: 1; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px;" />
+        <button class="btn">+ Add customer</button>
+      </div>
+
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No B2B customers added yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">Existing customers from the Zoho ledger will appear here once the backend is wired.</div>
+      </div>
+    </div>
+
+    <!-- TAB: HISTORY -->
+    <div class="tab-panel" id="tab-history">
+      <div class="helper">
+        <strong>Order history</strong>
+        Last 30 days of activity — created, updated, delivered, paid.
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Action</th><th>Order</th><th>Customer</th><th class="num">Value</th><th>By</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No order activity yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">Order events (created, dispatched, paid) will appear here.</div>
+      </div>
+    </div>
+
+    <div class="save-bar">
+      <div class="summary">Ready to save: <strong>Fill order details above to create a new B2B order.</strong></div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn ghost">Save as draft</button>
+        <button class="btn ghost">Send as quote</button>
+        <button class="btn large" onclick="submitEntry()">Create order</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      document.getElementById("tab-" + t.dataset.tab).classList.add("active");
+    });
+  });
+  async function submitEntry() {
+    const customer = document.querySelector('[name="customer-name"]')?.value || 'Unknown';
+    const gstin = document.querySelector('[name="customer-gstin"]')?.value || '';
+    const city = document.querySelector('[name="customer-city"]')?.value || '';
+    const status = document.querySelector('[name="order-status"]')?.value || 'quote';
+    const terms = document.querySelector('[name="payment-terms"]')?.value || '';
+    // Gather items from form (simple approach — assume first row of item table)
+    const items = [{
+      item_type: 'SKU', sku_or_description: document.querySelector('[name="item-desc"]')?.value || '',
+      quantity: parseFloat(document.querySelector('[name="item-qty"]')?.value || '0'),
+      unit_price: parseFloat(document.querySelector('[name="item-price"]')?.value || '0'),
+    }];
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await CurioAPI.submit('b2b_order', 'Faraaz Mir', {
+      order_date: today, customer_name: customer, customer_gstin: gstin, city,
+      status, payment_terms: terms, items
+    });
+    if (res.ok) {
+      document.getElementById("successTitle").textContent = "Order " + res.id + " created";
+      document.getElementById("successBody").textContent = `${customer} · ${res.message}`;
+      document.getElementById("successBox").classList.add("show");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      alert("Save failed: " + (res.error || "unknown error"));
+    }
+  }
+</script>
+<script src="curio-api.js"></script>
+</body>
+</html>

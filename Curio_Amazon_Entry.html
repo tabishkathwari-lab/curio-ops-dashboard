@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Curio Amazon Entry</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f7;
+    color: #1a1a1a;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .layout { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  .header {
+    background: linear-gradient(135deg, #232F3E, #37475A);
+    color: #fff;
+    padding: 20px 24px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  .header .sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .header .user-chip {
+    background: rgba(255,255,255,0.2);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+  }
+  .brand-accent { color: #FF9900; }
+
+  .body-wrap {
+    background: #fff;
+    border-radius: 0 0 12px 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .date-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 14px 16px;
+    background: #f9fafb;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  .date-bar label { font-size: 13px; color: #666; font-weight: 500; }
+  .date-bar input[type="date"], .date-bar select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+  .date-bar .status-chip {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .date-bar .status-chip.submitted { background: #dcfce7; color: #166534; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 20px;
+  }
+  .tab {
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: #FF9900; border-bottom-color: #FF9900; font-weight: 600; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin: 20px 0 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-title .hint { font-size: 11px; color: #999; font-weight: 400; }
+
+  textarea.paste-area {
+    width: 100%;
+    min-height: 160px;
+    padding: 12px;
+    border: 2px dashed #FF9900;
+    border-radius: 10px;
+    background: #fffbe6;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    resize: vertical;
+    outline: none;
+  }
+  textarea.paste-area:focus { border-color: #232F3E; background: #fff; }
+
+  .paste-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+  .btn {
+    background: #FF9900;
+    color: #fff;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:disabled { background: #ccc; cursor: not-allowed; }
+  .btn.ghost { background: #fff; color: #232F3E; border: 1px solid #232F3E; }
+  .btn.large { padding: 14px 24px; font-size: 15px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 11px;
+    color: #666;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+  }
+  td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #f5f5f5;
+    vertical-align: middle;
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+
+  .entry-input {
+    width: 80px;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    text-align: right;
+    background: #fff;
+    color: #FF9900;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .entry-input:focus {
+    outline: none;
+    border-color: #FF9900;
+    background: #fffbe6;
+  }
+  .entry-input.wide { width: 110px; }
+
+  .totals-row {
+    background: #fef3c7;
+    font-weight: 700;
+  }
+  .totals-row td { padding: 10px; color: #92400e; }
+
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding: 16px 0 0;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+  .save-bar .summary { font-size: 13px; color: #666; }
+  .save-bar .summary strong { color: #333; }
+
+  .success-modal {
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+  }
+  .success-modal.show { display: flex; }
+  .success-modal .icon {
+    width: 36px; height: 36px; background: #22c55e; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    font-size: 18px;
+  }
+  .success-modal .txt { font-size: 13px; color: #166534; flex: 1; }
+  .success-modal .txt strong { display: block; margin-bottom: 2px; }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px 12px;
+    align-items: center;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+  .metrics-grid .m-label { font-size: 12px; color: #333; }
+  .metrics-grid .m-label small { color: #999; font-weight: normal; margin-left: 4px; }
+  .metrics-grid .m-suffix { font-size: 12px; color: #999; }
+
+  .helper {
+    background: #fffbe6;
+    border: 1px solid #FF9900;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #232F3E;
+    margin-bottom: 16px;
+  }
+  .helper strong { display: block; margin-bottom: 2px; color: #FF9900; }
+
+  .metric-group {
+    font-size: 11px;
+    font-weight: 600;
+    color: #FF9900;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 0 6px;
+    grid-column: 1 / -1;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="header">
+    <div>
+      <h1>🛒 Curio <span class="brand-accent">Amazon</span> — Daily Entry</h1>
+      <div class="sub">From Amazon Business Reports or Seller Central export</div>
+    </div>
+    <div class="user-chip">👤 Faraaz Mir · Manager (Sales) · <span style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px;">🟢 LIVE</span></div>
+  </div>
+
+  <div class="body-wrap">
+
+    <div class="success-modal" id="successBox">
+      <div class="icon">✓</div>
+      <div class="txt">
+        <strong id="successTitle">Saved</strong>
+        <span id="successBody">Today's numbers are in the admin dashboard now.</span>
+      </div>
+      <button class="btn ghost" onclick="document.getElementById('successBox').classList.remove('show');">Enter another day</button>
+    </div>
+
+    <div class="date-bar">
+      <label>Reporting date</label>
+      <input type="date" id="dateInp" />
+      <label>·</label>
+      <div style="font-size: 13px; color: #666;">Report from
+        <select style="padding: 6px 10px; border-radius: 6px; border: 1px solid #ddd; font-size: 13px; background: #fff;">
+          <option>Seller Central Business Report (CSV)</option>
+          <option>Business Report — Detail Page Sales &amp; Traffic by ASIN</option>
+          <option>Business Report — Sales &amp; Orders</option>
+          <option>Advertising console export</option>
+          <option>Manual entry</option>
+        </select>
+      </div>
+      <div class="status-chip" id="statusChip">Not submitted yet</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="paste">📋 Paste from report</button>
+      <button class="tab" data-tab="manual">✍️ Enter manually</button>
+      <button class="tab" data-tab="history">📁 Past entries</button>
+    </div>
+
+    <!-- TAB: PASTE -->
+    <div class="tab-panel active" id="tab-paste">
+      <div class="helper">
+        <strong>How this works</strong>
+        Paste the Amazon Business Report CSV rows below. Product-level data goes to Table 1. If you also have Traffic + Ads data, paste that too — parser picks up both. If your ASINs don't match the 15 product names, unmatched rows will be flagged for manual entry.
+      </div>
+
+      <textarea class="paste-area" id="pasteBox" placeholder="Paste Amazon report here. Common formats supported:&#10;&#10;Product name / ASIN&#9;Units Ordered&#9;Ordered Product Sales&#10;Kashmir Almonds (Premium Mamra)&#9;5&#9;9,750&#10;Kashmir Saffron Mongra (Pure Threads)&#9;8&#9;5,600&#10;Cold Pressed Walnut Oil&#9;2&#9;2,400&#10;..."></textarea>
+
+      <div class="paste-actions">
+        <button class="btn" onclick="parsePaste()">Parse and preview</button>
+        <button class="btn ghost" onclick="document.getElementById('pasteBox').value=''">Clear</button>
+      </div>
+
+      <div id="parseResult" style="margin-top: 20px; display: none;">
+        <div class="section-title">Preview <span class="hint">Review and edit any row, then save.</span></div>
+        <div id="previewTable"></div>
+      </div>
+    </div>
+
+    <!-- TAB: MANUAL -->
+    <div class="tab-panel" id="tab-manual">
+      <div class="helper">
+        <strong>Manual entry</strong>
+        Product sales in the first table, then Traffic + Ads metrics below. Every metric maps to a column in Amazon Business Reports.
+      </div>
+
+      <div class="section-title">Product sales — 15 SKUs<span class="hint">Ordered Product Sales for the date above.</span></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="num">Units Ordered</th>
+            <th class="num">Ordered Sales (₹)</th>
+          </tr>
+        </thead>
+        <tbody id="manualTable"></tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td>Grand Total</td>
+            <td class="num"><span id="totalQty">0</span></td>
+            <td class="num">₹<span id="totalAmt">0</span></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="section-title" style="margin-top: 28px;">Business metrics<span class="hint">Traffic + Buy Box from Business Reports · Ads data from Advertising Console.</span></div>
+      <div class="metrics-grid" id="metricsGrid"></div>
+    </div>
+
+    <!-- TAB: HISTORY -->
+    <div class="tab-panel" id="tab-history">
+      <div class="helper">
+        <strong>Past 5 days.</strong> Click any row to review or edit.
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Entered by</th>
+            <th>Source</th>
+            <th class="num">Units</th>
+            <th class="num">Sales (₹)</th>
+            <th class="num">Sessions</th>
+            <th class="num">Buy Box %</th>
+            <th class="num">ROAS</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="padding: 40px 24px; text-align: center; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No past entries yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">Your submitted daily reports will appear here.</div>
+      </div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="save-bar">
+      <div class="summary">
+        Ready to save: <strong id="saveSummary">0 units · ₹0</strong> for <strong id="saveDate">—</strong>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn ghost">Save draft</button>
+        <button class="btn large" onclick="submitEntry()">Submit today's entry</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const PRODUCTS = [
+    "Black Forest Honey",
+    "Cold Pressed Almond Oil",
+    "Cold Pressed Apricot Oil",
+    "Cold Pressed Walnut Oil",
+    "Cow Ghee (Himalayan Badri)",
+    "Himalayan Chamomile Herbal Infusion",
+    "Kashmir Almonds (Premium Mamra)",
+    "Kashmir Qahwa Green Tea (Saffron Spice)",
+    "Kashmir Saffron Mongra (Pure Threads)",
+    "Kashmir Walnuts",
+    "Kashmir Zafrani Kehwa Green Tea (Saffron)",
+    "Ladakh Apricots (Sun Dried)",
+    "Raw Monofloral Honey (Single Origin)",
+    "SIDR Honey",
+    "Multi-Floral Honey (Raw Multi Flower)"
+  ];
+
+  // Amazon-specific metrics grouped
+  const METRIC_GROUPS = [
+    {
+      group: "Traffic",
+      metrics: [
+        { key: "sessions",       label: "Sessions",              hint: "Unique visitors to product page", suffix: "" },
+        { key: "pageViews",      label: "Page Views",            hint: "", suffix: "" },
+        { key: "buyBoxPct",      label: "Featured Offer (Buy Box) %", hint: "", suffix: "%" },
+        { key: "unitSessionPct", label: "Unit Session %",        hint: "Units ÷ Sessions", suffix: "%" }
+      ]
+    },
+    {
+      group: "Orders",
+      metrics: [
+        { key: "totalOrderItems", label: "Total Order Items",    hint: "", suffix: "" },
+        { key: "aov",             label: "AOV",                  hint: "Sales ÷ Order Items", suffix: "₹" }
+      ]
+    },
+    {
+      group: "Advertising",
+      metrics: [
+        { key: "adImpressions", label: "Ad Impressions", hint: "", suffix: "" },
+        { key: "adClicks",      label: "Ad Clicks",      hint: "", suffix: "" },
+        { key: "ctr",           label: "CTR",            hint: "Clicks ÷ Impressions", suffix: "%" },
+        { key: "adSales",       label: "Ad Sales (attributed)", hint: "", suffix: "₹" },
+        { key: "adSpend",       label: "Ad Spend",       hint: "", suffix: "₹" },
+        { key: "acos",          label: "ACOS",           hint: "Spend ÷ Ad Sales", suffix: "%" },
+        { key: "tacos",         label: "TACOS",          hint: "Spend ÷ Total Sales", suffix: "%" },
+        { key: "roas",          label: "ROAS",           hint: "Ad Sales ÷ Spend", suffix: "x" }
+      ]
+    },
+    {
+      group: "Returns",
+      metrics: [
+        { key: "returns",     label: "Returns (units)", hint: "", suffix: "" },
+        { key: "returnValue", label: "Return Value",    hint: "", suffix: "₹" }
+      ]
+    }
+  ];
+
+  const state = { date: "", entries: {}, metrics: {} };
+  PRODUCTS.forEach(p => state.entries[p] = { qty: 0, amt: 0 });
+
+  const tbody = document.getElementById("manualTable");
+  PRODUCTS.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${p}</td>
+      <td class="num"><input type="number" class="entry-input" min="0" data-p="${i}" data-f="qty" placeholder="0" /></td>
+      <td class="num"><input type="number" class="entry-input wide" min="0" data-p="${i}" data-f="amt" placeholder="0" /></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.querySelectorAll(".entry-input").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const p = PRODUCTS[e.target.dataset.p];
+      const f = e.target.dataset.f;
+      state.entries[p][f] = e.target.value === "" ? 0 : Number(e.target.value);
+      updateTotals();
+    });
+  });
+
+  const mg = document.getElementById("metricsGrid");
+  METRIC_GROUPS.forEach(g => {
+    const header = document.createElement("div");
+    header.className = "metric-group";
+    header.textContent = g.group;
+    mg.appendChild(header);
+    g.metrics.forEach(m => {
+      const row = document.createElement("div");
+      row.style.display = "contents";
+      row.innerHTML = `
+        <div class="m-label">${m.label}${m.hint ? ` <small>(${m.hint})</small>` : ""}</div>
+        <input type="number" class="entry-input wide" data-m="${m.key}" placeholder="0" step="0.01" />
+        <div class="m-suffix">${m.suffix || ""}</div>
+      `;
+      mg.appendChild(row);
+    });
+  });
+  document.querySelectorAll("[data-m]").forEach(inp => {
+    inp.addEventListener("input", e => {
+      state.metrics[e.target.dataset.m] = e.target.value === "" ? 0 : Number(e.target.value);
+    });
+  });
+
+  function updateTotals() {
+    const q = PRODUCTS.reduce((s, p) => s + state.entries[p].qty, 0);
+    const a = PRODUCTS.reduce((s, p) => s + state.entries[p].amt, 0);
+    document.getElementById("totalQty").textContent = q.toLocaleString('en-IN');
+    document.getElementById("totalAmt").textContent = a.toLocaleString('en-IN');
+    document.getElementById("saveSummary").textContent = `${q.toLocaleString('en-IN')} units · ₹${a.toLocaleString('en-IN')}`;
+  }
+
+  document.getElementById("dateInp").addEventListener("change", e => {
+    state.date = e.target.value;
+    const d = new Date(e.target.value);
+    document.getElementById("saveDate").textContent = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  });
+
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      document.getElementById("tab-" + t.dataset.tab).classList.add("active");
+    });
+  });
+
+  function parsePaste() {
+    const raw = document.getElementById("pasteBox").value.trim();
+    if (!raw) return alert("Paste the report first.");
+    const lines = raw.split("\n").filter(l => l.trim());
+    const matches = [];
+    const unmatched = [];
+
+    lines.forEach(line => {
+      const parts = line.split(/\t|\s{2,}/).map(p => p.trim()).filter(Boolean);
+      if (parts.length < 3) return;
+      const name = parts[0];
+      const qty = Number(parts[parts.length - 2].replace(/[₹,]/g, ""));
+      const amt = Number(parts[parts.length - 1].replace(/[₹,]/g, ""));
+      if (isNaN(qty) || isNaN(amt)) return;
+
+      const found = PRODUCTS.find(p =>
+        p.toLowerCase() === name.toLowerCase() ||
+        p.toLowerCase().includes(name.toLowerCase().split(" ").slice(0, 2).join(" ")) ||
+        name.toLowerCase().includes(p.toLowerCase().split(" ").slice(0, 2).join(" "))
+      );
+      if (found) matches.push({ product: found, qty, amt });
+      else unmatched.push({ name, qty, amt });
+    });
+
+    matches.forEach(m => { state.entries[m.product] = { qty: m.qty, amt: m.amt }; });
+
+    const box = document.getElementById("parseResult");
+    box.style.display = "block";
+    let html = `<table><thead><tr><th>Product</th><th class="num">Units</th><th class="num">Sales</th><th>Status</th></tr></thead><tbody>`;
+    PRODUCTS.forEach(p => {
+      const m = matches.find(x => x.product === p);
+      html += `<tr>
+        <td>${p}</td>
+        <td class="num">${m ? m.qty : 0}</td>
+        <td class="num">₹${(m ? m.amt : 0).toLocaleString('en-IN')}</td>
+        <td>${m ? '<span style="color: #22c55e; font-size: 11px;">✓ Matched</span>' : '<span style="color: #999; font-size: 11px;">— (no data)</span>'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    if (unmatched.length > 0) {
+      html += `<div style="margin-top: 14px; padding: 12px; background: #fee2e2; border-radius: 8px; font-size: 12px; color: #991b1b;">
+        <strong>${unmatched.length} row(s) couldn't be matched:</strong> ${unmatched.map(u => u.name).join(", ")}. Might be ASINs — add product name aliases in Settings, or enter manually.
+      </div>`;
+    }
+    document.getElementById("previewTable").innerHTML = html;
+
+    document.querySelectorAll(".entry-input[data-p]").forEach(inp => {
+      const p = PRODUCTS[inp.dataset.p];
+      inp.value = state.entries[p][inp.dataset.f] || "";
+    });
+    updateTotals();
+  }
+
+  async function submitEntry() {
+    const q = PRODUCTS.reduce((s, p) => s + state.entries[p].qty, 0);
+    const a = PRODUCTS.reduce((s, p) => s + state.entries[p].amt, 0);
+    if (q === 0 && a === 0) { alert("Nothing to submit — enter or paste data first."); return; }
+    const dateStr = document.getElementById("dateInp").value;
+    const items = PRODUCTS.filter(p => state.entries[p].qty > 0 || state.entries[p].amt > 0)
+      .map(p => ({ sku: p, units: state.entries[p].qty, ordered_product_sales: state.entries[p].amt }));
+    document.getElementById("statusChip").textContent = "Sending...";
+    const res = await CurioAPI.submit('amazon_sale', 'Faraaz Mir', { date: dateStr, items, source: 'entry-app' });
+    if (res.ok) {
+      document.getElementById("successTitle").textContent = `Saved for ${document.getElementById("saveDate").textContent}`;
+      document.getElementById("successBody").textContent = `${q} units · ₹${a.toLocaleString('en-IN')} · ${res.message || 'saved'}`;
+      document.getElementById("successBox").classList.add("show");
+      document.getElementById("statusChip").textContent = res.offline ? "⚠ Queued offline" : "✓ Submitted";
+      document.getElementById("statusChip").classList.add("submitted");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      document.getElementById("statusChip").textContent = "❌ Failed";
+      alert("Save failed: " + (res.error || "unknown error"));
+    }
+  }
+
+  updateTotals();
+</script>
+<script src="curio-api.js"></script>
+</body>
+</html>

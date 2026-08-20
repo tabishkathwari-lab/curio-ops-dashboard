@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Curio Promoter App</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f7;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 76px;
+    position: relative;
+  }
+  .header {
+    background: #1F4E78;
+    color: #fff;
+    padding: 20px 20px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header h1 { font-size: 18px; font-weight: 600; margin: 0; }
+  .header .user-chip { font-size: 12px; background: rgba(255,255,255,0.18); padding: 4px 10px; border-radius: 12px; }
+
+  .content { padding: 20px; flex: 1; }
+  .step-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .step-help { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .section-title { font-size: 13px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 10px; }
+
+  .field { margin-bottom: 20px; }
+  .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #333; }
+  .field select, .field input {
+    width: 100%; padding: 12px 14px; font-size: 15px;
+    border: 1px solid #ddd; border-radius: 10px; background: #fafafa;
+    color: #1a1a1a; -webkit-appearance: none; appearance: none;
+  }
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px;
+  }
+
+  .attendance-banner {
+    background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .attendance-banner .icon {
+    width: 36px; height: 36px; background: #22c55e; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 18px; flex-shrink: 0;
+  }
+  .attendance-banner .txt { font-size: 13px; color: #166534; }
+  .attendance-banner .txt strong { display: block; font-size: 14px; margin-bottom: 2px; }
+
+  .status-card {
+    background: #f0f7ff; border: 1px solid #d9e7f7; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 20px; font-size: 13px; color: #1F4E78;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .status-card .dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; }
+  .status-card .loc { font-weight: 500; }
+  .status-card .time { color: #666; margin-left: auto; font-size: 12px; }
+
+  .delivery-alert {
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 20px;
+  }
+  .delivery-alert .head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 600; color: #92400e; margin-bottom: 8px;
+  }
+  .delivery-alert .item { font-size: 13px; color: #78350f; padding: 4px 0; }
+  .delivery-alert .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .delivery-alert button {
+    flex: 1; padding: 10px; border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .delivery-alert .confirm { background: #92400e; color: #fff; }
+  .delivery-alert .mismatch { background: #fff; color: #92400e; border: 1px solid #fde68a; }
+
+  .photo-btn {
+    display: block; width: 100%; padding: 18px;
+    border: 2px dashed #c9c9d0; border-radius: 10px; background: #fafafa;
+    text-align: center; color: #666; font-size: 14px;
+    cursor: pointer; margin-bottom: 20px;
+  }
+  .photo-btn.done { border-style: solid; border-color: #22c55e; background: #f0fdf4; color: #166534; }
+  .photo-btn input { display: none; }
+  .photo-btn .icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+  .sku-list { margin: 0 0 20px 0; }
+  .cat-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; margin-top: 12px;
+    background: #f5f5f7; border-radius: 10px; cursor: pointer;
+    user-select: none;
+  }
+  .cat-header:first-child { margin-top: 0; }
+  .cat-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 600; color: #1a1a1a;
+  }
+  .cat-meta {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11px; color: #666;
+  }
+  .cat-progress { font-weight: 600; color: #1F4E78; }
+  .cat-progress.done { color: #22c55e; }
+  .cat-body { padding: 0 4px; }
+  .cat-body.collapsed { display: none; }
+  .chev { font-size: 12px; color: #999; }
+  .sku-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 14px 0; border-bottom: 1px solid #eee;
+  }
+  .sku-row:last-child { border-bottom: none; }
+  .sku-name { font-size: 14px; font-weight: 500; color: #222; flex: 1; }
+  .sku-name small { display: block; font-size: 11px; color: #999; font-weight: 400; margin-top: 2px; }
+  .sku-name .yest { display: block; font-size: 11px; color: #1F4E78; font-weight: 500; margin-top: 2px; }
+  .sku-input-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .stock-input {
+    width: 72px; padding: 10px; font-size: 16px; text-align: center;
+    border: 1px solid #ddd; border-radius: 8px; background: #fff;
+    font-weight: 600; color: #1F4E78;
+  }
+  .stock-input.received { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+  .stock-input.zeroed { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .sold-input { text-align: right; }
+  .sold-input[data-touched="1"] { background: #f0fdf4; border-color: #86efac; color: #166534; font-weight: 600; }
+  .sold-input[data-touched="1"][value="0"], .sold-input.confirmed-zero { background: #f9fafb; color: #9ca3af; border-color: #e5e7eb; font-weight: 400; }
+  .oos-btn {
+    background: none; border: none; color: #991b1b;
+    font-size: 11px; text-decoration: underline; padding: 2px 4px; cursor: pointer;
+  }
+  .oos-btn.active {
+    background: #991b1b; color: #fff; text-decoration: none;
+    padding: 3px 8px; border-radius: 8px; font-weight: 500;
+  }
+  .received-toggle {
+    display: block; text-align: center; color: #1F4E78;
+    font-size: 13px; margin: -6px 0 16px; text-decoration: underline;
+    cursor: pointer; background: none; border: none; width: 100%;
+  }
+
+  .submit-btn {
+    display: block; width: 100%; padding: 16px;
+    background: #1F4E78; color: #fff; border: none; border-radius: 12px;
+    font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px;
+  }
+  .submit-btn:disabled { background: #94a3b8; }
+  .submit-btn:active { transform: scale(0.98); }
+
+  .success-screen { text-align: center; padding: 60px 30px; }
+  .success-screen .check {
+    width: 72px; height: 72px; background: #22c55e; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 36px; margin-bottom: 20px;
+  }
+  .success-screen h2 { margin: 0 0 8px; font-size: 20px; }
+  .success-screen p { color: #666; font-size: 14px; margin-bottom: 24px; }
+  .success-summary {
+    background: #f9fafb; border-radius: 10px; padding: 16px;
+    text-align: left; font-size: 13px; color: #333; margin-bottom: 24px;
+  }
+  .success-summary div { display: flex; justify-content: space-between; padding: 4px 0; }
+
+  .link-btn {
+    background: none; border: none; color: #1F4E78; font-size: 14px;
+    cursor: pointer; text-decoration: underline; padding: 8px;
+  }
+  .hidden { display: none !important; }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    max-width: 480px; margin: 0 auto; background: #fff;
+    border-top: 1px solid #eee; display: flex; padding: 6px 0 10px;
+    z-index: 20;
+  }
+  .bottom-nav button {
+    flex: 1; background: none; border: none; padding: 8px 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    color: #999; font-size: 11px; cursor: pointer;
+  }
+  .bottom-nav button.active { color: #1F4E78; font-weight: 600; }
+  .bottom-nav button .icon { font-size: 22px; line-height: 1; }
+  .bottom-nav button .badge {
+    position: absolute; top: 0; right: 30%;
+    background: #ef4444; color: #fff; font-size: 9px;
+    padding: 1px 5px; border-radius: 8px; font-weight: 600;
+  }
+  .nav-btn { position: relative; }
+
+  /* History */
+  .history-card {
+    background: #fff; border: 1px solid #eee; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 12px;
+  }
+  .history-card .top-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .history-card .date { font-size: 13px; font-weight: 600; }
+  .history-card .revenue { font-size: 13px; font-weight: 600; color: #22c55e; }
+  .history-card .store { font-size: 12px; color: #666; margin-bottom: 8px; }
+  .history-card .stats { display: flex; gap: 12px; font-size: 11px; color: #666; }
+  .history-card .stats strong { color: #333; font-weight: 600; }
+  .history-card .badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .pill {
+    font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 500;
+  }
+  .pill.ok { background: #f0fdf4; color: #166534; }
+  .pill.warn { background: #fef3c7; color: #92400e; }
+  .pill.danger { background: #fee2e2; color: #991b1b; }
+  .pill.info { background: #dbeafe; color: #1e40af; }
+
+  /* Alerts */
+  .alert-card {
+    display: flex; gap: 12px; padding: 14px 16px;
+    background: #fff; border: 1px solid #eee; border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .alert-card.unread { border-left: 3px solid #1F4E78; background: #f7faff; }
+  .alert-card .a-icon {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .alert-card .a-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .alert-card .a-body { font-size: 12px; color: #666; }
+  .alert-card .a-time { font-size: 10px; color: #999; margin-top: 4px; }
+  .icon-orange { background: #fef3c7; color: #92400e; }
+  .icon-red { background: #fee2e2; color: #991b1b; }
+  .icon-blue { background: #dbeafe; color: #1e40af; }
+  .icon-green { background: #dcfce7; color: #166534; }
+
+  /* Profile */
+  .profile-hero {
+    background: linear-gradient(135deg, #1F4E78, #2d6ba7); color: #fff;
+    padding: 24px 20px; text-align: center; border-radius: 0 0 24px 24px;
+    margin: -20px -20px 20px;
+  }
+  .profile-avatar {
+    width: 64px; height: 64px; background: rgba(255,255,255,0.2);
+    border-radius: 50%; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 24px; font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .profile-name { font-size: 18px; font-weight: 600; margin: 0; }
+  .profile-role { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .stat-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
+  }
+  .stat-box {
+    background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 14px;
+  }
+  .stat-box .label { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .stat-box .value { font-size: 20px; font-weight: 600; }
+  .stat-box .sub { font-size: 11px; color: #22c55e; margin-top: 2px; }
+  .stat-box .sub.down { color: #ef4444; }
+  .list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px; background: #fff; border: 1px solid #eee;
+    border-radius: 10px; margin-bottom: 8px; cursor: pointer;
+  }
+  .list-item .li-title { font-size: 14px; }
+  .list-item .li-sub { font-size: 12px; color: #666; }
+  .list-item .arrow { color: #999; }
+
+  /* Attendance streak */
+  .streak-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    margin-bottom: 12px;
+  }
+  .streak-day {
+    aspect-ratio: 1; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 500;
+  }
+  .streak-day.present { background: #22c55e; color: #fff; }
+  .streak-day.absent { background: #fee2e2; color: #991b1b; }
+  .streak-day.today { background: #1F4E78; color: #fff; }
+  .streak-day.future { background: #f5f5f5; color: #ccc; }
+  .streak-day.weekend { background: #fafafa; color: #ccc; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <h1 id="hdrTitle">Curio Daily Entry</h1>
+    <span class="user-chip" id="userChip">Not signed in</span>
+  </div>
+
+  <!-- ================================================== -->
+  <!-- TAB 1: TODAY -->
+  <!-- ================================================== -->
+  <div class="tab-view" id="tab-today-view">
+
+    <!-- STEP 1: LOGIN (only if not signed in) -->
+    <div class="content" id="step-login">
+      <div class="step-title">Sign in</div>
+      <div class="step-help">Pick your name and today's store. Signing in marks your attendance.</div>
+      <div class="field">
+        <label>Promoter name</label>
+        <select id="promoterSel"><option value="">Choose your name…</option></select>
+      </div>
+      <div class="field">
+        <label>Store you're at today</label>
+        <select id="storeSel"><option value="">Choose store…</option></select>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+        <button class="submit-btn action-in" id="checkInBtn" disabled style="background:#166534;">📥 Check IN<br><span style="font-size:11px; font-weight:400; opacity:0.85;">start my shift</span></button>
+        <button class="submit-btn action-out" id="checkOutBtn" disabled style="background:#1F4E78;">📤 Check OUT<br><span style="font-size:11px; font-weight:400; opacity:0.85;">end my shift</span></button>
+      </div>
+      <div style="margin-top:14px; text-align:center;">
+        <button id="onLeaveBtn" type="button" style="background:transparent; border:none; color:#dc2626; font-size:13px; text-decoration:underline; cursor:pointer; padding:8px;">🚫 Not available today</button>
+      </div>
+      <!-- Leave modal -->
+      <div id="leaveModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center;">
+        <div style="background:#fff; padding:24px; border-radius:16px; max-width:340px; width:90%;">
+          <h2 style="margin:0 0 8px; font-size:18px;">Mark yourself on leave</h2>
+          <p style="margin:0 0 16px; color:#666; font-size:13px;">You won't be marked overdue on the ops dashboard today.</p>
+          <div class="field">
+            <label>Your name</label>
+            <select id="leavePromoterSel"><option value="">Choose your name…</option></select>
+          </div>
+          <div class="field">
+            <label>Reason</label>
+            <select id="leaveReasonSel">
+              <option value="">Choose reason…</option>
+              <option value="Sick">🤒 Sick</option>
+              <option value="Personal">🏠 Personal</option>
+              <option value="Weekly off">📅 Weekly off</option>
+              <option value="Store closed">🚫 Store closed</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Note (optional)</label>
+            <input type="text" id="leaveNote" placeholder="e.g. flu, back tomorrow" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+          </div>
+          <button class="submit-btn" id="submitLeaveBtn" disabled style="margin-top:8px;">Mark on leave</button>
+          <button type="button" id="cancelLeaveBtn" style="background:transparent; border:none; color:#666; font-size:13px; margin-top:8px; width:100%; padding:8px; cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2a: MORNING CHECK-IN -->
+    <div class="content hidden" id="step-checkin">
+      <div class="attendance-banner">
+        <div class="icon">✓</div>
+        <div class="txt"><strong>Checked in — shift started</strong><span id="checkinStoreAM"></span></div>
+      </div>
+      <label class="photo-btn" id="photoBtnAM">
+        <span class="icon">📷</span>
+        <span id="photoLabelAM">Take opening shelf photo</span>
+        <input type="file" accept="image/*" capture="environment" id="photoInputAM" />
+      </label>
+      <div style="margin-top:16px; padding:14px 16px; background:linear-gradient(135deg,#fff7ed,#fff); border:1px dashed #fb923c; border-radius:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; font-weight:600; color:#9a3412;">🛒 Log sales as they happen</div>
+            <div style="font-size:11px; color:#9a3412; margin-top:2px;">Or wait and enter everything at check-out</div>
+          </div>
+          <button type="button" id="openSaleBtnAM" style="background:#ea580c; color:#fff; border:none; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">Log a sale</button>
+        </div>
+      </div>
+      <div style="margin-top:20px; padding:16px; background:#f0f7ff; border-radius:12px; text-align:center;">
+        <div style="font-size:36px;">⏱</div>
+        <div style="font-size:14px; font-weight:600; color:#1e3a5f; margin-top:6px;">Have a good shift, <span id="promoterNameAM"></span>!</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">Come back at end of shift → tap <strong>Check OUT</strong> to submit your daily sales.</div>
+      </div>
+      <button class="submit-btn" id="doneCheckinBtn" style="margin-top:16px; background:#166534;">✓ Attendance saved · close app</button>
+    </div>
+
+    <!-- STEP 2b: CHECK OUT — end-of-shift sales entry -->
+    <div class="content hidden" id="step-entry">
+      <div class="attendance-banner" style="background:#dbeafe; border-left-color:#1e40af;">
+        <div class="icon" style="background:#1e40af;">📤</div>
+        <div class="txt" style="color:#1e3a5f;"><strong>End of shift · <span id="checkoutStoreLabel"></span></strong>Enter what you sold today, then submit to close out.</div>
+      </div>
+
+      <!-- TODAY'S SALES WIDGET — auto-computed from your stock counts -->
+      <div id="salesTodayWidget" style="display:none; background:linear-gradient(135deg,#dcfce7,#fff); border-left:4px solid #16a34a; border-radius:12px; padding:14px 16px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:12px; color:#166534; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">💰 Your sales today</div>
+          <div style="font-size:11px; color:#666;" id="salesTodayDate"></div>
+        </div>
+        <div style="margin-top:6px; display:flex; gap:20px; align-items:baseline;">
+          <div>
+            <div style="font-size:26px; font-weight:800; color:#166534;" id="salesTodayValue">₹0</div>
+          </div>
+          <div style="font-size:14px; color:#166534;"><span id="salesTodayUnits">0</span> units</div>
+        </div>
+        <div id="salesTodaySkus" style="margin-top:10px; font-size:12px; color:#166534;"></div>
+        <div style="margin-top:8px; font-size:10px; color:#999; font-style:italic;">From sales you've logged today (live sales + end-of-shift entries).</div>
+      </div>
+      <div class="status-card" id="locCard">
+        <span class="dot"></span>
+        <span class="loc" id="locText">Getting your location…</span>
+        <span class="time" id="timeText"></span>
+      </div>
+
+      <div class="delivery-alert hidden" id="deliveryAlert">
+        <div class="head">📦 Stock delivered — please confirm</div>
+        <div id="deliveryItems"></div>
+        <div style="font-size: 11px; color: #92400e; margin-top: 6px;">Add received stock to your shelf before counting.</div>
+        <div class="actions">
+          <button class="mismatch">Doesn't match</button>
+          <button class="confirm">Confirm received</button>
+        </div>
+      </div>
+
+      <label class="photo-btn" id="photoBtn">
+        <span class="icon">📷</span>
+        <span id="photoLabel">Take shelf photo</span>
+        <input type="file" accept="image/*" capture="environment" id="photoInput" />
+      </label>
+
+      <div class="step-title" style="margin-top: 8px;">🏁 End of shift — what did you sell today?</div>
+      <div class="step-help">Type the quantity sold for each product. Leave 0 if nothing sold. Backend uses this + your stock counts to reconcile.</div>
+      <div class="sku-list" id="skuList"></div>
+
+      <!-- Running total footer -->
+      <div id="shiftTotal" style="position:sticky; bottom:0; background:linear-gradient(135deg,#f0fdf4,#fff); border:1px solid #86efac; border-radius:12px; padding:12px 16px; margin:12px 0; display:flex; justify-content:space-between; align-items:center; box-shadow:0 -4px 10px rgba(0,0,0,0.05);">
+        <div><span style="font-size:11px; color:#166534; font-weight:600; text-transform:uppercase; letter-spacing:0.4px;">Shift total</span><div style="font-size:22px; font-weight:800; color:#166534;" id="shiftTotalValue">₹0</div></div>
+        <div style="text-align:right;"><span style="font-size:11px; color:#166534;">Items sold</span><div style="font-size:14px; font-weight:600; color:#166534;" id="shiftTotalUnits">0 units · 0 SKUs</div></div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" disabled>End shift & submit sales</button>
+
+      <!-- Quick log-a-sale button (individual real-time transactions during shift) -->
+      <div style="margin-top:20px; padding:14px 16px; background:linear-gradient(135deg,#fff7ed,#fff); border:1px dashed #fb923c; border-radius:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; font-weight:600; color:#9a3412;">🛒 Made a sale right now?</div>
+            <div style="font-size:11px; color:#9a3412; margin-top:2px;">Log it live instead of waiting for end of shift</div>
+          </div>
+          <button type="button" id="openSaleBtn" style="background:#ea580c; color:#fff; border:none; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">Log a sale</button>
+        </div>
+      </div>
+
+      <!-- Log Sale modal -->
+      <div id="saleModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center;">
+        <div style="background:#fff; padding:24px; border-radius:16px; max-width:400px; width:92%; max-height:85vh; overflow-y:auto;">
+          <h2 style="margin:0 0 8px; font-size:18px;">🛒 Log a sale</h2>
+          <p style="margin:0 0 16px; color:#666; font-size:13px;">Quick entry for a single transaction. Records now, deducts from stock.</p>
+          <div class="field">
+            <label>Product</label>
+            <select id="saleSkuSel" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+              <option value="">Choose product…</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Quantity sold</label>
+            <input type="number" id="saleQty" inputmode="numeric" min="1" placeholder="e.g. 2" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+          </div>
+          <div class="field">
+            <label>Note (optional)</label>
+            <input type="text" id="saleNote" placeholder="customer name, remarks…" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+          </div>
+          <div id="salePreview" style="padding:10px 14px; background:#f0fdf4; border-radius:8px; font-size:13px; color:#166534; margin:8px 0; display:none;">
+            <strong id="salePreviewText"></strong>
+          </div>
+          <button class="submit-btn" id="submitSaleBtn" disabled style="margin-top:8px;">Log sale</button>
+          <button type="button" id="cancelSaleBtn" style="background:transparent; border:none; color:#666; font-size:13px; margin-top:8px; width:100%; padding:8px; cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: SUCCESS -->
+    <div class="content hidden" id="step-success">
+      <div class="success-screen">
+        <div class="check">✓</div>
+        <h2>Entry submitted</h2>
+        <p>Attendance recorded. Sales computed automatically.</p>
+        <div class="success-summary" id="summaryBox"></div>
+        <button class="submit-btn" id="anotherBtn">Submit another store</button>
+        <button class="link-btn" id="logoutBtn" style="margin-top: 10px;">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================== -->
+  <!-- TAB 2: HISTORY -->
+  <!-- ================================================== -->
+  <div class="tab-view hidden" id="tab-history-view">
+    <div class="content">
+      <div class="step-title">Your submissions</div>
+      <div class="step-help">Your check-ins and stock reports appear here after you submit.</div>
+      <div style="text-align:center; padding: 60px 20px; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📋</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No submissions yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">Start by checking in from the Today tab.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================== -->
+  <!-- TAB 3: ALERTS -->
+  <!-- ================================================== -->
+  <div class="tab-view hidden" id="tab-alerts-view">
+    <div class="content">
+      <div class="step-title">Alerts</div>
+      <div class="step-help">Updates from the office and reminders.</div>
+
+      <div style="text-align:center; padding: 60px 20px; color: #999;">
+        <div style="font-size: 40px; margin-bottom: 12px;">🔔</div>
+        <div style="font-size: 14px; font-weight: 600; color: #666;">No alerts yet</div>
+        <div style="font-size: 12px; margin-top: 6px;">You'll see stock deliveries and messages from the office here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================== -->
+  <!-- TAB 4: PROFILE / ME -->
+  <!-- ================================================== -->
+  <div class="tab-view hidden" id="tab-me-view">
+    <div class="content" style="padding-top: 0;">
+      <div class="profile-hero">
+        <div class="profile-avatar">LS</div>
+        <p class="profile-name" id="profileName">Signed in as: —</p>
+        <p class="profile-role">Sales Promoter</p>
+      </div>
+
+      <div class="section-title">This month</div>
+
+      <div class="stat-grid">
+        <div class="stat-box"><div class="label">Days present</div><div class="value">—</div><div class="sub">Updates after check-ins</div></div>
+        <div class="stat-box"><div class="label">On-time rate</div><div class="value">—</div><div class="sub">—</div></div>
+        <div class="stat-box"><div class="label">Units sold</div><div class="value">—</div><div class="sub">—</div></div>
+        <div class="stat-box"><div class="label">Stores covered</div><div class="value">—</div><div class="sub">—</div></div>
+      </div>
+
+      <div class="section-title" style="margin-top: 20px;">Account</div>
+      <div class="list-item"><div><div class="li-title">Help &amp; support</div><div class="li-sub">Contact admin (Tabish)</div></div><span class="arrow">›</span></div>
+      <div class="list-item" onclick="alert('Sign out')"><div><div class="li-title" style="color: #ef4444;">Sign out</div></div><span class="arrow">›</span></div>
+    </div>
+  </div>
+
+  <!-- Bottom nav -->
+  <div class="bottom-nav">
+    <button class="nav-btn active" data-tab="today"><span class="icon">🏠</span><span>Today</span></button>
+    <button class="nav-btn" data-tab="history"><span class="icon">📋</span><span>History</span></button>
+    <button class="nav-btn" data-tab="alerts"><span class="icon">🔔</span><span>Alerts</span></button>
+    <button class="nav-btn" data-tab="me"><span class="icon">👤</span><span>Me</span></button>
+  </div>
+</div>
+
+<script>
+  const PROMOTERS = ["Laxmi Sharma", "Laxmi Verma", "Anjali"];
+  // 19 stores across 3 retail chains — Delhi & Gurgaon
+  const STORE_CHAINS = [
+    {
+      chain: "Modern Bazaar",
+      stores: [
+        { code: "MB001", name: "MB Saket", city: "Delhi" },
+        { code: "MB002", name: "MB Vasant Vihar", city: "Delhi" },
+        { code: "MB003", name: "MB Green Park", city: "Delhi" },
+        { code: "MB004", name: "MB New Friends Colony", city: "Delhi" },
+        { code: "MB005", name: "MB Kailash Colony", city: "Delhi" },
+        { code: "MB006", name: "MB Dwarka", city: "Delhi" },
+        { code: "MB007", name: "MB Civil Lines", city: "Delhi" },
+        { code: "MB008", name: "MB Cyberhub", city: "Gurgaon" },
+        { code: "MB009", name: "MB Arjun Marg", city: "Gurgaon" },
+        { code: "MB010", name: "MB SS Plaza", city: "Gurgaon" },
+        { code: "MB011", name: "MB World Mark Sector 65", city: "Gurgaon" }
+      ]
+    },
+    {
+      chain: "Le Marche",
+      stores: [
+        { code: "LM001", name: "LM Chattarpur", city: "Delhi" },
+        { code: "LM002", name: "LM Promenade Vasant Kunj", city: "Delhi" },
+        { code: "LM003", name: "LM South Point Mall", city: "Gurgaon" },
+        { code: "LM004", name: "LM Good Earth", city: "Gurgaon" },
+        { code: "LM005", name: "LM Camelias", city: "Gurgaon" },
+        { code: "LM006", name: "LM Galleria", city: "Gurgaon" }
+      ]
+    },
+    {
+      chain: "Apna Bazaar",
+      stores: [
+        { code: "AB001", name: "AB Sector 23", city: "Gurgaon" },
+        { code: "AB002", name: "AB Sector 12", city: "Gurgaon" }
+      ]
+    }
+  ];
+  // Flat list used elsewhere in the app
+  const STORES = STORE_CHAINS.flatMap(c => c.stores.map(s => ({ ...s, chain: c.chain })));
+  // Real SKU catalog — 31 SKUs across 6 categories (Profitability Analysis Curio.xlsx — authoritative)
+  const CATEGORIES = [
+    {
+      name: "Cold Pressed Oils",
+      icon: "🫒",
+      skus: [
+        { name: "Walnut Oil",   size: "100 ml", code: "OIL-WO-100",  mrp: 1200, cop: 186 },
+        { name: "Walnut Oil",   size: "250 ml", code: "OIL-WO-250",  mrp: 3000, cop: 331 },
+        { name: "Apricot Oil",  size: "100 ml", code: "OIL-APO-100", mrp: 1200, cop: 186 },
+        { name: "Apricot Oil",  size: "250 ml", code: "OIL-APO-250", mrp: 3000, cop: 331 },
+        { name: "Almond Oil",   size: "100 ml", code: "OIL-ALO-100", mrp: 1155, cop: 134 },
+        { name: "Almond Oil",   size: "250 ml", code: "OIL-ALO-250", mrp: 2800, cop: 201 },
+        { name: "Mustard Oil",  size: "500 ml", code: "OIL-MO-500",  mrp: 430,  cop: 196 }
+      ]
+    },
+    {
+      name: "Dry Fruits",
+      icon: "🌰",
+      skus: [
+        { name: "Walnuts",         size: "250 g", code: "DRF-KW-250",  mrp: 700,  cop: 317 },
+        { name: "Walnuts",         size: "500 g", code: "DRF-KW-500",  mrp: 1200, cop: 587 },
+        { name: "Walnuts",         size: "1 kg",  code: "DRF-KW-1000", mrp: 2300, cop: 1062 },
+        { name: "Almond",          size: "250 g", code: "DRF-KA-250",  mrp: 750,  cop: 350 },
+        { name: "Almond",          size: "500 g", code: "DRF-KA-500",  mrp: 1300, cop: 587 },
+        { name: "Almond",          size: "1 kg",  code: "DRF-KA-1000", mrp: 2500, cop: 1062 },
+        { name: "Apricot",         size: "250 g", code: "DRF-LA-250",  mrp: 600,  cop: 287 },
+        { name: "Apricot",         size: "500 g", code: "DRF-LA-500",  mrp: 1150, cop: 462 },
+        { name: "Apricot",         size: "1 kg",  code: "DRF-LA-1000", mrp: 2300, cop: 812 }
+      ]
+    },
+    {
+      name: "Saffron",
+      icon: "🌸",
+      skus: [
+        { name: "Kashmir Saffron Mogra A+", size: "1 g", code: "SAF-MGA-1", mrp: 545,  cop: 299 },
+        { name: "Kashmir Saffron Mogra A+", size: "2 g", code: "SAF-MGA-2", mrp: 1100, cop: 535 }
+      ]
+    },
+    {
+      name: "Ghee",
+      icon: "🧈",
+      skus: [
+        { name: "Himalayan Badri Cow Ghee", size: "250 ml", code: "GHE-HBG-250", mrp: 800,  cop: 329 },
+        { name: "Himalayan Badri Cow Ghee", size: "500 ml", code: "GHE-HBG-500", mrp: 1400, cop: 541 }
+      ]
+    },
+    {
+      name: "Artisanal Honey",
+      icon: "🍯",
+      skus: [
+        { name: "Multi-Floral Honey",       size: "250 g", code: "HON-MF-250",  mrp: 350,  cop: 171 },
+        { name: "Multi-Floral Honey",       size: "500 g", code: "HON-MF-500",  mrp: 650,  cop: 221 },
+        { name: "Mono-Floral Borage",       size: "250 g", code: "HON-BOR-250", mrp: 375,  cop: 171 },
+        { name: "Mono-Floral Borage",       size: "500 g", code: "HON-BOR-500", mrp: 750,  cop: 221 },
+        { name: "Mono-Floral Sidr",         size: "250 g", code: "HON-SID-250", mrp: 700,  cop: 196 },
+        { name: "Mono-Floral Sidr",         size: "500 g", code: "HON-SID-500", mrp: 1400, cop: 271 },
+        { name: "Multifloral Black Forest", size: "250 g", code: "HON-BF-250",  mrp: 600,  cop: 196 },
+        { name: "Multifloral Black Forest", size: "500 g", code: "HON-BF-500",  mrp: 1100, cop: 271 }
+      ]
+    },
+    {
+      name: "Tea & Infusions",
+      icon: "🍵",
+      skus: [
+        { name: "Kashmir Qahwa",           size: "150 g", code: "TEA-KQ-150", mrp: 550, cop: 238 },
+        { name: "Zafrani Kehwa",           size: "200 g", code: "TEA-ZK-200", mrp: 550, cop: 206 },
+        { name: "Himalayan Chamomile Tea", size: "50 g",  code: "TEA-HC-50",  mrp: 550, cop: 188 }
+      ]
+    }
+  ];
+  // Flatten for state tracking + submit logic
+  const SKUS = CATEGORIES.flatMap((cat, ci) => cat.skus.map((s, si) => ({
+    ...s, category: cat.name, catIndex: ci, id: `${ci}-${si}`
+  })));
+
+  // Session auto-detects AM (before 3pm) or PM (3pm+) — promoter can override
+  const currentSession = () => new Date().getHours() < 15 ? 'AM' : 'PM';
+  const state = { promoter: "", store: "", session: currentSession(), photo: null, photo_base64: null, photo_mime: null, photo_filename: null, closing: {}, received: {}, location: null };
+
+  const promoterSel = document.getElementById("promoterSel");
+  PROMOTERS.forEach(p => {
+    const o = document.createElement("option"); o.value = p; o.textContent = p;
+    promoterSel.appendChild(o);
+  });
+  const storeSel = document.getElementById("storeSel");
+  STORE_CHAINS.forEach(chain => {
+    const g = document.createElement("optgroup");
+    g.label = `${chain.chain} (${chain.stores.length})`;
+    chain.stores.forEach(s => {
+      const o = document.createElement("option");
+      o.value = s.name;   // ← store NAME is the canonical key now (not code)
+      o.textContent = `${s.name} · ${s.city}`;
+      o.dataset.chain = chain.chain;
+      o.dataset.city = s.city;
+      g.appendChild(o);
+    });
+    storeSel.appendChild(g);
+  });
+
+  const skuList = document.getElementById("skuList");
+  let flatIndex = 0;
+  CATEGORIES.forEach((cat, ci) => {
+    // Category header (tap to collapse/expand)
+    const header = document.createElement("div");
+    header.className = "cat-header";
+    header.dataset.cat = ci;
+    header.innerHTML = `
+      <div class="cat-title"><span style="font-size: 18px;">${cat.icon}</span>${cat.name}</div>
+      <div class="cat-meta">
+        <span class="cat-progress" data-cat="${ci}">0/${cat.skus.length}</span>
+        <span class="chev">▾</span>
+      </div>
+    `;
+    skuList.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "cat-body";
+    body.dataset.cat = ci;
+    cat.skus.forEach((sku) => {
+      const i = flatIndex++;
+      const row = document.createElement("div");
+      row.className = "sku-row";
+      row.innerHTML = `
+        <div class="sku-name">${sku.name}
+          <small>${sku.size} · MRP ₹${sku.mrp.toLocaleString('en-IN')}</small>
+        </div>
+        <div class="sku-input-wrap">
+          <input type="number" inputmode="numeric" min="0" value="0" class="stock-input sold-input" data-sku="${i}" data-mrp="${sku.mrp}" placeholder="0" />
+        </div>
+      `;
+      body.appendChild(row);
+    });
+    skuList.appendChild(body);
+  });
+
+  // Collapse/expand category sections
+  document.querySelectorAll(".cat-header").forEach(h => {
+    h.addEventListener("click", (e) => {
+      // Don't collapse if the user is clicking an input inside a body
+      if (e.target.closest(".cat-body")) return;
+      const ci = h.dataset.cat;
+      const body = document.querySelector(`.cat-body[data-cat="${ci}"]`);
+      const isCollapsed = body.classList.toggle("collapsed");
+      h.querySelector(".chev").textContent = isCollapsed ? "▸" : "▾";
+    });
+  });
+
+  function updateLoginBtn() {
+    state.promoter = promoterSel.value;
+    state.store = storeSel.value;
+    const ready = !!(state.promoter && state.store);
+    document.getElementById("checkInBtn").disabled = !ready;
+    document.getElementById("checkOutBtn").disabled = !ready;
+  }
+  promoterSel.addEventListener("change", updateLoginBtn);
+  storeSel.addEventListener("change", updateLoginBtn);
+
+  // Route to morning check-in flow
+  document.getElementById("checkInBtn").addEventListener("click", async () => {
+    const storeObj = STORES.find(s => s.name === state.store);
+    const displayName = storeObj ? `${storeObj.name} · ${storeObj.city}` : state.store;
+    state.session = 'AM';
+    state.mode = 'checkin';
+    document.getElementById("userChip").textContent = state.promoter + ' · AM';
+    document.getElementById("checkinStoreAM").textContent = displayName;
+    document.getElementById("promoterNameAM").textContent = state.promoter;
+    document.getElementById("step-login").classList.add("hidden");
+    document.getElementById("step-checkin").classList.remove("hidden");
+    getLocation();
+    // Auto-fire attendance record (no photo required to be checked-in — photo is a nice-to-have)
+    try {
+      await CurioAPI.submit('promoter_checkin', state.promoter, {
+        store_code: state.store, store_name: displayName,
+        session: 'AM',
+        gps_lat: state.location?.lat || null, gps_lng: state.location?.lng || null
+      });
+    } catch(e) { console.warn('checkin save failed', e); }
+  });
+
+  // Route to end-of-shift check-out flow
+  document.getElementById("checkOutBtn").addEventListener("click", () => {
+    const storeObj = STORES.find(s => s.name === state.store);
+    const displayName = storeObj ? `${storeObj.name} · ${storeObj.city}` : state.store;
+    state.session = 'PM';
+    state.mode = 'checkout';
+    document.getElementById("userChip").textContent = state.promoter + ' · PM';
+    document.getElementById("checkoutStoreLabel").textContent = displayName;
+    document.getElementById("step-login").classList.add("hidden");
+    document.getElementById("step-entry").classList.remove("hidden");
+    document.getElementById("deliveryAlert").classList.add("hidden");
+    getLocation();
+    updateTime();
+    refreshSalesToday();
+  });
+
+  // "Done" button on morning check-in screen just resets to login
+  document.getElementById("doneCheckinBtn").addEventListener("click", () => {
+    document.getElementById("step-checkin").classList.add("hidden");
+    document.getElementById("step-login").classList.remove("hidden");
+    document.getElementById("userChip").textContent = "Not signed in";
+    promoterSel.value = ""; storeSel.value = ""; updateLoginBtn();
+  });
+
+  // AM photo handler
+  document.getElementById("photoInputAM").addEventListener("change", async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    const b64 = dataUrl.split(',')[1];
+    const sizeKB = Math.round(b64.length * 0.75 / 1024);
+    document.getElementById("photoLabelAM").textContent = `✓ Opening photo saved · ${sizeKB} KB`;
+    document.getElementById("photoBtnAM").classList.add("done");
+    // Fire off to backend as an update to today's AM checkin (photo attached)
+    try {
+      await CurioAPI.submit('promoter_checkin', state.promoter, {
+        store_code: state.store, session: 'AM',
+        photo_base64: b64, photo_mime: 'image/jpeg', photo_filename: file.name.replace(/\.[^.]+$/, '') + '.jpg'
+      });
+    } catch(err) { console.warn('AM photo save failed', err); }
+  });
+
+  // AM log-a-sale reuses the same modal as PM
+  document.getElementById("openSaleBtnAM").addEventListener("click", () => {
+    document.getElementById("saleModal").style.display = "flex";
+  });
+
+  // ==== TODAY'S SALES WIDGET — fetch sell-through for this promoter today ====
+  const promoterSkuMap = {
+    'DRF-KW-500':'CURIO-WALNUTS-500','DRF-KA-500':'CURIO-ALMONDS-500','DRF-LA-500':'CURIO-APRICOTS-500',
+    'GHE-HBG-500':'CURIO-GHEE-500','GHE-HBG-250':'CURIO-GHEE-500',
+    'HON-MF-500':'CURIO-MONOFLORAL-HONEY-500','HON-BOR-500':'CURIO-MONOFLORAL-HONEY-500',
+    'HON-SID-500':'CURIO-SIDR-HONEY-500','HON-BF-500':'CURIO-BLACKFOREST-HONEY-500','HON-WF-500':'CURIO-WILD-HONEY-500',
+    'TEA-KQ-150':'CURIO-QAHWA-TEA-200','TEA-KQ-200':'CURIO-QAHWA-TEA-200',
+    'TEA-ZK-200':'CURIO-ZAFRANI-KEHWA-250','TEA-ZK-250':'CURIO-ZAFRANI-KEHWA-250',
+    'TEA-CHA-INF':'CURIO-CHAMOMILE-INF','SAF-1':'CURIO-SAFFRON-1G','SAF-2':'CURIO-SAFFRON-2G',
+    'OIL-WO-100':'CURIO-WALNUT-OIL-100','OIL-APO-100':'CURIO-APRICOT-OIL-100',
+    'OIL-ALO-100':'CURIO-ALMOND-OIL-100','OIL-MU-500':'CURIO-MUSTARD-OIL-500',
+  };
+  async function refreshSalesToday() {
+    if (typeof CurioAPI === 'undefined' || !state.promoter) return;
+    try {
+      const [stRes, skuRes] = await Promise.all([
+        CurioAPI.get('sell_through_computed'),
+        CurioAPI.get('sku_master')
+      ]);
+      const priceMap = {};
+      const canonToName = {};
+      ((skuRes && skuRes.data) || []).forEach(s => { priceMap[s.Canonical_SKU] = Number(s.MRP)||0; canonToName[s.Canonical_SKU] = s.Product_Name + ' · ' + s.Pack; });
+      const today = new Date().toISOString().slice(0,10);
+      const myRows = ((stRes && stRes.data) || []).filter(r =>
+        r.Attributed_Promoter === state.promoter &&
+        String(r.To_Time||'').slice(0,10) === today &&
+        Number(r.Units_Sold) > 0
+      );
+      let totalUnits = 0, totalRev = 0;
+      const bySku = {};
+      myRows.forEach(r => {
+        const u = Number(r.Units_Sold)||0;
+        const canon = promoterSkuMap[r.SKU];
+        const rev = u * (canon ? (priceMap[canon]||0) : 0);
+        totalUnits += u; totalRev += rev;
+        bySku[r.SKU] = (bySku[r.SKU]||0) + u;
+      });
+      const widget = document.getElementById('salesTodayWidget');
+      if (!widget) return;
+      if (totalUnits > 0) {
+        widget.style.display = 'block';
+        document.getElementById('salesTodayValue').textContent = '₹' + Math.round(totalRev).toLocaleString('en-IN');
+        document.getElementById('salesTodayUnits').textContent = totalUnits;
+        document.getElementById('salesTodayDate').textContent = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
+        const skuList = Object.entries(bySku).sort((a,b) => b[1]-a[1]).slice(0, 8)
+          .map(([sku,u]) => { const canon = promoterSkuMap[sku]; const nm = canon ? (canonToName[canon] || canon) : sku; return `<span style="display:inline-block; background:rgba(22,101,52,0.1); padding:3px 8px; border-radius:10px; margin:2px; font-size:11px;">${nm}: <strong>${u}</strong></span>`; }).join(' ');
+        document.getElementById('salesTodaySkus').innerHTML = skuList;
+      } else {
+        widget.style.display = 'block';
+        document.getElementById('salesTodayValue').textContent = '₹0';
+        document.getElementById('salesTodayUnits').textContent = '0';
+        document.getElementById('salesTodayDate').textContent = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
+        document.getElementById('salesTodaySkus').innerHTML = '<em style="color:#999;">No units sold yet today. Sales appear here after your PM count shows depletion vs the AM count.</em>';
+      }
+    } catch(e) { console.warn('sales today refresh failed:', e); }
+  }
+  // Auto-refresh every 60s while user is on the entry page
+  setInterval(() => { if (!document.getElementById('step-entry').classList.contains('hidden')) refreshSalesToday(); }, 60000);
+
+  document.querySelector("#deliveryAlert .confirm").addEventListener("click", () => {
+    const btn = document.querySelector("#deliveryAlert .confirm");
+    btn.textContent = "✓ Confirmed"; btn.style.background = "#166534"; btn.disabled = true;
+  });
+
+  function updateTime() {
+    const now = new Date();
+    document.getElementById("timeText").textContent = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+  setInterval(updateTime, 30000);
+
+  function getLocation() {
+    const locText = document.getElementById("locText");
+    if (!navigator.geolocation) { locText.textContent = "Location not available"; return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        state.location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        locText.textContent = `Location captured (${state.location.lat.toFixed(4)}, ${state.location.lng.toFixed(4)})`;
+        checkReady();
+      },
+      () => {
+        state.location = { lat: null, lng: null };
+        locText.textContent = "Location denied — you can still submit";
+        checkReady();
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
+  document.getElementById("photoInput").addEventListener("change", async e => {
+    if (!e.target.files.length) return;
+    const file = e.target.files[0];
+    state.photo = file.name;
+    const btn = document.getElementById("photoBtn");
+    document.getElementById("photoLabel").textContent = `Compressing ${file.name}…`;
+    try {
+      // Compress + downscale (max 1200px, JPEG q=0.7 → typical shelf photo ~150–300 KB)
+      const bmp = await createImageBitmap(file);
+      const scale = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+      const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      state.photo_base64 = dataUrl.split(',')[1];  // strip "data:image/jpeg;base64," prefix
+      state.photo_mime = 'image/jpeg';
+      state.photo_filename = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+      const sizeKB = Math.round(state.photo_base64.length * 0.75 / 1024);
+      document.getElementById("photoLabel").textContent = `✓ Photo ready · ${sizeKB} KB`;
+      btn.classList.add("done");
+    } catch (err) {
+      // Fallback: read raw file as base64 if bitmap fails (very old Android WebView)
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.photo_base64 = String(reader.result).split(',')[1];
+        state.photo_mime = file.type || 'image/jpeg';
+        state.photo_filename = file.name;
+        document.getElementById("photoLabel").textContent = `✓ Photo ready · ${Math.round(file.size / 1024)} KB (uncompressed)`;
+        btn.classList.add("done"); checkReady();
+      };
+      reader.readAsDataURL(file);
+    }
+    checkReady();
+  });
+
+  // Track sold quantities (default 0 for every SKU)
+  state.sold = {};
+  SKUS.forEach((_, i) => { state.sold[i] = 0; });
+
+  document.querySelectorAll(".sold-input").forEach(inp => {
+    // Auto-select the "0" on focus so user can just type over it
+    inp.addEventListener("focus", e => { e.target.select(); });
+    inp.addEventListener("input", e => {
+      const v = e.target.value === '' ? 0 : Number(e.target.value);
+      state.sold[e.target.dataset.sku] = isNaN(v) ? 0 : v;
+      e.target.dataset.touched = "1";
+      // Style: green if positive, muted gray if confirmed zero
+      e.target.classList.toggle('confirmed-zero', state.sold[e.target.dataset.sku] === 0);
+      updateShiftTotal();
+      checkReady();
+    });
+  });
+
+  function updateShiftTotal() {
+    let units = 0, rev = 0, distinctSkus = 0;
+    SKUS.forEach((sku, i) => {
+      const q = state.sold[i] || 0;
+      if (q > 0) { units += q; rev += q * sku.mrp; distinctSkus++; }
+    });
+    document.getElementById("shiftTotalValue").textContent = '₹' + rev.toLocaleString('en-IN');
+    document.getElementById("shiftTotalUnits").textContent = `${units} units · ${distinctSkus} SKUs`;
+  }
+
+  function checkReady() {
+    // Per-category progress: count SKUs where sold > 0
+    CATEGORIES.forEach((cat, ci) => {
+      const start = SKUS.findIndex(s => s.catIndex === ci);
+      const sold = cat.skus.filter((_, si) => (state.sold[start + si] || 0) > 0).length;
+      const el = document.querySelector(`.cat-progress[data-cat="${ci}"]`);
+      if (el) {
+        el.textContent = `${sold}/${cat.skus.length} sold`;
+        el.classList.toggle("done", sold > 0);
+      }
+    });
+    // Ready to submit when photo taken (sold can be all 0 = no sales that shift)
+    document.getElementById("submitBtn").disabled = !state.photo;
+  }
+
+  document.getElementById("submitBtn").addEventListener("click", async () => {
+    const storeObj = STORES.find(s => s.name === state.store);
+    const displayName = storeObj ? `${storeObj.name}` : state.store;
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = true; btn.textContent = "Saving...";
+
+    // Session was set by which button was pressed on login (defaults to PM for checkout)
+    if (!state.session) state.session = 'PM';
+    // 1. Submit check-in (with base64-encoded photo — backend uploads to Drive and returns a real URL)
+    const checkinRes = await CurioAPI.submit('promoter_checkin', state.promoter, {
+      store_code: state.store, store_name: displayName,
+      session: state.session,
+      gps_lat: state.location?.lat || null, gps_lng: state.location?.lng || null,
+      store_gps_lat: storeObj?.lat || null, store_gps_lng: storeObj?.lng || null,
+      photo_url: state.photo || '',
+      photo_base64: state.photo_base64 || '',
+      photo_mime: state.photo_mime || 'image/jpeg',
+      photo_filename: state.photo_filename || state.photo || ''
+    });
+
+    // 2. Submit end-of-shift sales — send ALL SKUs (zero is a valid, confirmed value)
+    // If every SKU is 0, we still record a shift_summary row so we know the promoter reported "no sales today"
+    const soldItems = SKUS.map((sku, i) => ({
+      sku: sku.code || sku.name || String(i),
+      units: Number(state.sold[i]) || 0,
+      revenue: (Number(state.sold[i]) || 0) * sku.mrp
+    }));
+    const anySold = soldItems.some(it => it.units > 0);
+    const salesRes = await CurioAPI.submit('mt_office_entry', state.promoter, {
+      store_code: state.store, store_name: displayName,
+      date: new Date().toISOString().slice(0,10),
+      entry_method: 'shift_summary',
+      note: `End-of-shift ${anySold ? 'sales' : 'ZERO-SALES report'} by ${state.promoter} · ${state.session} shift`,
+      // Send only items with units > 0 to keep Sales_MT tidy, but if none, send a single 0-row to mark the day
+      items: anySold ? soldItems.filter(it => it.units > 0) : [{ sku: '__ZERO_DAY__', units: 0, revenue: 0 }]
+    });
+
+    const totalUnits = soldItems.reduce((s,it) => s + it.units, 0);
+    const totalRev = soldItems.reduce((s,it) => s + it.revenue, 0);
+    const success = checkinRes.ok && salesRes.ok;
+    const offlineNote = (checkinRes.offline || salesRes.offline) ? ' (offline — will sync)' : '';
+    document.getElementById("summaryBox").innerHTML = `
+      <div><span>Store</span><strong>${displayName}</strong></div>
+      <div><span>Promoter</span><strong>${state.promoter}</strong></div>
+      <div><span>Date</span><strong>${new Date().toLocaleDateString('en-IN')} · ${state.session}</strong></div>
+      <div><span>Attendance</span><strong>${success ? '✓ Marked' + offlineNote : '❌ Failed'}</strong></div>
+      <div><span>Sales recorded</span><strong>${totalUnits} units · ₹${totalRev.toLocaleString('en-IN')} · ${soldItems.length} SKUs</strong></div>
+      <div><span>Photo</span><strong>${state.photo_base64 ? '✓ uploaded' : '—'}</strong></div>
+      <div><span>Location</span><strong>${state.location && state.location.lat ? '✓ captured' : 'not captured'}</strong></div>
+      <div><span>Status</span><strong>${success ? (salesRes.message || 'Saved') : (checkinRes.error || salesRes.error || 'error')}</strong></div>
+    `;
+    document.getElementById("step-entry").classList.add("hidden");
+    document.getElementById("step-success").classList.remove("hidden");
+    btn.textContent = "End shift & submit sales";
+  });
+
+  document.getElementById("anotherBtn").addEventListener("click", () => {
+    state.store = ""; state.photo = null; state.photo_base64 = null; state.photo_mime = null; state.photo_filename = null; state.sold = {}; state.location = null; state.session = null; state.mode = null;
+    SKUS.forEach((_, i) => { state.sold[i] = 0; });
+    storeSel.value = "";
+    document.getElementById("photoInput").value = "";
+    document.getElementById("photoBtn").classList.remove("done");
+    document.getElementById("photoLabel").textContent = "Take shelf photo";
+    document.getElementById("photoInputAM").value = "";
+    document.getElementById("photoBtnAM").classList.remove("done");
+    document.getElementById("photoLabelAM").textContent = "Take opening shelf photo";
+    document.querySelectorAll(".sold-input").forEach(i => { i.value = "0"; });
+    updateShiftTotal();
+    document.getElementById("step-success").classList.add("hidden");
+    document.getElementById("step-checkin").classList.add("hidden");
+    document.getElementById("step-login").classList.remove("hidden");
+    document.getElementById("submitBtn").disabled = true;
+    document.getElementById("userChip").textContent = "Not signed in";
+    updateLoginBtn();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    promoterSel.value = ""; storeSel.value = ""; updateLoginBtn();
+    document.getElementById("userChip").textContent = "Not signed in";
+    document.getElementById("step-success").classList.add("hidden");
+    document.getElementById("step-login").classList.remove("hidden");
+  });
+
+  // ================================================================
+  // LEAVE MODAL
+  // ================================================================
+  const leaveModal = document.getElementById("leaveModal");
+  const leavePromoterSel = document.getElementById("leavePromoterSel");
+  const leaveReasonSel = document.getElementById("leaveReasonSel");
+  const leaveNote = document.getElementById("leaveNote");
+  const submitLeaveBtn = document.getElementById("submitLeaveBtn");
+
+  // Populate promoter dropdown in leave modal (same list as login)
+  PROMOTERS.forEach(name => {
+    const o = document.createElement("option"); o.value = name; o.textContent = name;
+    leavePromoterSel.appendChild(o);
+  });
+
+  document.getElementById("onLeaveBtn").addEventListener("click", () => {
+    leaveModal.style.display = "flex";
+    if (promoterSel.value) leavePromoterSel.value = promoterSel.value;
+    updateLeaveBtn();
+  });
+  document.getElementById("cancelLeaveBtn").addEventListener("click", () => { leaveModal.style.display = "none"; });
+  function updateLeaveBtn() { submitLeaveBtn.disabled = !(leavePromoterSel.value && leaveReasonSel.value); }
+  leavePromoterSel.addEventListener("change", updateLeaveBtn);
+  leaveReasonSel.addEventListener("change", updateLeaveBtn);
+  submitLeaveBtn.addEventListener("click", async () => {
+    submitLeaveBtn.disabled = true; submitLeaveBtn.textContent = "Saving...";
+    // Piggyback on promoter_checkin with session='LEAVE' and store_code='LEAVE'
+    const r = await CurioAPI.submit('promoter_checkin', leavePromoterSel.value, {
+      store_code: 'LEAVE', store_name: 'On leave',
+      session: 'LEAVE',
+      note: `${leaveReasonSel.value}${leaveNote.value ? ' — ' + leaveNote.value : ''}`
+    });
+    if (r.ok) {
+      leaveModal.style.display = "none";
+      alert('✓ You are marked on leave today. See you tomorrow!');
+      leaveReasonSel.value = ""; leaveNote.value = "";
+    } else {
+      alert('Could not mark leave: ' + (r.error || 'unknown error'));
+      submitLeaveBtn.disabled = false; submitLeaveBtn.textContent = "Mark on leave";
+    }
+  });
+
+  // ================================================================
+  // LOG-A-SALE MODAL
+  // ================================================================
+  const saleModal = document.getElementById("saleModal");
+  const saleSkuSel = document.getElementById("saleSkuSel");
+  const saleQty = document.getElementById("saleQty");
+  const saleNote = document.getElementById("saleNote");
+  const submitSaleBtn = document.getElementById("submitSaleBtn");
+  const salePreview = document.getElementById("salePreview");
+  const salePreviewText = document.getElementById("salePreviewText");
+
+  // Populate SKU dropdown with grouped options (name + size)
+  CATEGORIES.forEach(cat => {
+    const g = document.createElement("optgroup");
+    g.label = `${cat.icon} ${cat.name}`;
+    cat.skus.forEach(s => {
+      const o = document.createElement("option");
+      o.value = s.code; o.textContent = `${s.name} · ${s.size}`;
+      o.dataset.mrp = s.mrp; o.dataset.name = `${s.name} · ${s.size}`;
+      g.appendChild(o);
+    });
+    saleSkuSel.appendChild(g);
+  });
+
+  document.getElementById("openSaleBtn").addEventListener("click", () => { saleModal.style.display = "flex"; updateSaleBtn(); });
+  document.getElementById("cancelSaleBtn").addEventListener("click", () => { saleModal.style.display = "none"; });
+  function updateSaleBtn() {
+    const skuOk = !!saleSkuSel.value;
+    const qtyOk = Number(saleQty.value) > 0;
+    submitSaleBtn.disabled = !(skuOk && qtyOk);
+    if (skuOk && qtyOk) {
+      const opt = saleSkuSel.selectedOptions[0];
+      const total = Number(opt.dataset.mrp) * Number(saleQty.value);
+      salePreview.style.display = "block";
+      salePreviewText.textContent = `${opt.dataset.name} × ${saleQty.value} = ₹${total.toLocaleString('en-IN')}`;
+    } else {
+      salePreview.style.display = "none";
+    }
+  }
+  saleSkuSel.addEventListener("change", updateSaleBtn);
+  saleQty.addEventListener("input", updateSaleBtn);
+  submitSaleBtn.addEventListener("click", async () => {
+    submitSaleBtn.disabled = true; submitSaleBtn.textContent = "Saving...";
+    const storeObj = STORES.find(s => s.name === state.store);
+    const opt = saleSkuSel.selectedOptions[0];
+    const units = Number(saleQty.value);
+    const revenue = Number(opt.dataset.mrp) * units;
+    // Log via mt_office_entry (writes to Sales_MT) — promoter+direct entry method
+    const r = await CurioAPI.submit('mt_office_entry', state.promoter, {
+      store_code: state.store,
+      store_name: storeObj ? storeObj.name : state.store,
+      date: new Date().toISOString().slice(0,10),
+      entry_method: 'promoter_direct',
+      note: `Live sale by ${state.promoter}${saleNote.value ? ' — ' + saleNote.value : ''}`,
+      items: [{ sku: opt.value, units, revenue }]
+    });
+    if (r.ok) {
+      saleModal.style.display = "none";
+      alert(`✓ Sale logged: ${opt.dataset.name} × ${units} = ₹${revenue.toLocaleString('en-IN')}`);
+      saleQty.value = ""; saleNote.value = ""; saleSkuSel.value = ""; salePreview.style.display = "none";
+      // Refresh today's sales widget so promoter sees the update
+      if (typeof refreshSalesToday === 'function') refreshSalesToday();
+    } else {
+      alert('Could not log sale: ' + (r.error || 'unknown error'));
+      submitSaleBtn.disabled = false; submitSaleBtn.textContent = "Log sale";
+    }
+  });
+
+  // Bottom nav
+  document.querySelectorAll(".nav-btn").forEach(b => {
+    b.addEventListener("click", () => {
+      const t = b.dataset.tab;
+      document.querySelectorAll(".nav-btn").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".tab-view").forEach(x => x.classList.add("hidden"));
+      b.classList.add("active");
+      document.getElementById(`tab-${t}-view`).classList.remove("hidden");
+      const titles = { today: "Curio Daily Entry", history: "History", alerts: "Alerts", me: "Profile" };
+      document.getElementById("hdrTitle").textContent = titles[t];
+    });
+  });
+</script>
+<script src="curio-api.js"></script>
+</body>
+</html>
