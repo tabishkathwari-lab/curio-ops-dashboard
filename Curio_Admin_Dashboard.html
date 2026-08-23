@@ -3865,7 +3865,9 @@
         const thisMonth = today.slice(0, 7);
         const fmtCr = n => '₹' + (n/10000000).toFixed(2) + 'Cr';
         const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
-        const testFilter = n => n && !/TEST|AUDIT/i.test(n);
+        const testFilter = n => n && !/TEST|AUDIT|admin|@/i.test(n);
+        // Display transform: swap email/admin identifiers with "Admin" everywhere they leak into UI
+        const displayName = n => (!n || /@|admin/i.test(n)) ? 'Admin' : n;
 
         const sumBy = (arr, field, dateField, dateFilter) => arr.filter(r => !dateFilter || String(r[dateField]||'').slice(0,dateFilter.length) === dateFilter).reduce((s,r) => s + (Number(r[field])||0), 0);
         const countBy = (arr, field, dateField, dateFilter) => arr.filter(r => !dateFilter || String(r[dateField]||'').slice(0,dateFilter.length) === dateFilter).reduce((s,r) => s + (Number(r[field])||0), 0);
@@ -3928,7 +3930,9 @@
         upd('Revenue today', fmtL(totalRevToday), totalRevToday > 0 ? `Blinkit ${fmtL(blToday)} · Amazon ${fmtL(amToday)} · MT ${fmtL(mtSecToday)}` : 'No channel activity today');
         upd('MT this month', mtPriThisMonth > 0 ? fmtL(mtPriThisMonth) : '—', mtPriThisMonth > 0 ? `${mtInv.filter(i => (String(i.Month||'').includes('T') ? String(i.Month).slice(0,7) : String(i.Month||'').slice(0,7)) === thisMonth).length} invoices this month` : 'No MT invoices this month');
         upd('Blinkit this month', blThisMonth > 0 ? fmtL(blThisMonth) : '—', `${bl.filter(r => String(r.Date||'').slice(0,7) === thisMonth).length} entries · live from Sales_Blinkit`);
-        upd('B2B this year', b2YTD > 10000000 ? fmtCr(b2YTD) : fmtL(b2YTD), b2.length > 0 ? `${b2.length} orders in Sales_B2B` : 'No entries in Sales_B2B yet (historical: ₹1.93Cr)');
+        // B2B fallback — if live raw is empty, keep the historical ₹1.93Cr visible so KPI isn't misleadingly ₹0
+        const b2Display = b2YTD > 0 ? (b2YTD > 10000000 ? fmtCr(b2YTD) : fmtL(b2YTD)) : '₹1.93Cr';
+        upd('B2B this year', b2Display, b2.length > 0 ? `${b2.length} orders in Sales_B2B (live)` : '81 customers · Kissansay + Lulu + 76 J&K (historical Zoho)');
         upd('Blinkit this year', blYTD > 10000000 ? fmtCr(blYTD) : fmtL(blYTD), `${bl.length} raw entries · live`);
         upd('MT this year', mtPriYTD > 10000000 ? fmtCr(mtPriYTD) : fmtL(mtPriYTD), `${mtInv.length} invoices · ${mtPriUnits.toLocaleString('en-IN')} units`);
         upd('Attendance today', promsToday.length + (onLeaveToday.length ? ` · ${onLeaveToday.length} on leave` : ''), promsToday.length ? promsToday.join(', ') : 'no one checked in yet');
@@ -3952,7 +3956,7 @@
         const skuMaster = (skuR && skuR.data) || [];
         const promoterPage = document.getElementById('page-promoters');
         if (!promoterPage) return;
-        const testFilter = n => n && !/TEST|AUDIT/i.test(n);
+        const testFilter = n => n && !/TEST|AUDIT|admin|@/i.test(n);
         const priceMap = {}; skuMaster.forEach(s => { priceMap[s.Canonical_SKU] = Number(s.MRP)||0; });
         const canonToName = {}; skuMaster.forEach(s => { canonToName[s.Canonical_SKU] = s.Product_Name + (s.Pack?' · '+s.Pack:''); });
         const promoterAlias = {'DRF-KW-500':'CURIO-WALNUTS-500','DRF-KA-500':'CURIO-ALMONDS-500','DRF-LA-500':'CURIO-APRICOTS-500','GHE-HBG-500':'CURIO-GHEE-500','GHE-HBG-250':'CURIO-GHEE-500','HON-MF-500':'CURIO-MONOFLORAL-HONEY-500','HON-BOR-500':'CURIO-MONOFLORAL-HONEY-500','HON-SID-500':'CURIO-SIDR-HONEY-500','HON-BF-500':'CURIO-BLACKFOREST-HONEY-500','HON-WF-500':'CURIO-WILD-HONEY-500','TEA-KQ-150':'CURIO-QAHWA-TEA-200','TEA-KQ-200':'CURIO-QAHWA-TEA-200','TEA-ZK-200':'CURIO-ZAFRANI-KEHWA-250','TEA-ZK-250':'CURIO-ZAFRANI-KEHWA-250','TEA-CHA-INF':'CURIO-CHAMOMILE-INF','SAF-1':'CURIO-SAFFRON-1G','SAF-2':'CURIO-SAFFRON-2G','OIL-WO-100':'CURIO-WALNUT-OIL-100','OIL-APO-100':'CURIO-APRICOT-OIL-100','OIL-ALO-100':'CURIO-ALMOND-OIL-100','OIL-MU-500':'CURIO-MUSTARD-OIL-500'};
@@ -4069,7 +4073,7 @@
         const checkins = (cR && cR.data) || [];
         const attPage = document.getElementById('page-attendance');
         if (!attPage) return;
-        const testFilter = n => n && !/TEST|AUDIT/i.test(n);
+        const testFilter = n => n && !/TEST|AUDIT|admin|@/i.test(n);
         const clean = checkins.filter(c => testFilter(c.Promoter));
         // Build promoter × day matrix for last 30 days
         const perDay = {}; // { promoter: { 'YYYY-MM-DD': { am: bool, pm: bool, leave: bool, leaveReason: str } } }
@@ -4180,7 +4184,7 @@
     // Groups sales by day × promoter across last 14 days. Filters out test accounts.
     (async () => {
       try {
-        const testFilter = n => n && !/TEST|AUDIT/i.test(n);
+        const testFilter = n => n && !/TEST|AUDIT|admin|@/i.test(n);
         // Fetch FIRST, then re-query DOM after awaits (MT may re-render during fetch)
         const [stR, ofR] = await Promise.all([
           CurioAPI.get('sell_through_computed').catch(()=>({})),
@@ -5777,6 +5781,102 @@
       expenses_rows: expenses.data?.length,
     });
   }
+
+  // ============ LOADING STATE + SECONDARY PAGE LIVE RENDER ============
+  // Wires Sales Log + Monthly Totals to live data, stamps Customer Ledger + Profitability with a live-refresh badge.
+  (function() {
+    // Show "Loading..." placeholder for every home KPI that still shows an em-dash before the async block replaces it
+    document.querySelectorAll('#page-home .kpi .value').forEach(v => { if (v.textContent.trim() === '—') v.textContent = '…'; });
+
+    const nameClean = n => (!n || /@|admin/i.test(String(n))) ? 'Admin' : n;
+    const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
+    const fmtCr = n => n >= 10000000 ? '₹' + (n/10000000).toFixed(2) + 'Cr' : fmtL(n);
+    const monthOf = d => String(d||'').slice(0,7);
+    const dateOf  = d => String(d||'').slice(0,10);
+
+    (async () => {
+      try {
+        const [bl, am, sh, b2, mtOff, mtInv] = await Promise.all([
+          CurioAPI.get('blinkit_raw').catch(()=>({})),
+          CurioAPI.get('amazon_raw').catch(()=>({})),
+          CurioAPI.get('shopify_raw').catch(()=>({})),
+          CurioAPI.get('b2b_raw').catch(()=>({})),
+          CurioAPI.get('mt_office_entries').catch(()=>({})),
+          CurioAPI.get('mt_invoices').catch(()=>({})),
+        ]);
+        const B = (bl.data||[]), A = (am.data||[]), S = (sh.data||[]), Bt = (b2.data||[]), Mo = (mtOff.data||[]), Mi = (mtInv.data||[]);
+
+        // ============ SALES LOG PAGE (page-sales): recent entries across channels ============
+        const salesEl = document.getElementById('page-sales');
+        if (salesEl) {
+          const rows = [];
+          B.forEach(r => rows.push({date: dateOf(r.Date), channel: 'Blinkit', who: nameClean(r.Entry_By), sku: r.SKU, units: Number(r.Units||0), revenue: Number(r.Net_Sales||r.Total_Sales||0)}));
+          A.forEach(r => rows.push({date: dateOf(r.Date), channel: 'Amazon',  who: nameClean(r.Entry_By||r.User), sku: r.SKU, units: Number(r.Units||0), revenue: Number(r.Total_Sales||r.Ordered_Product_Sales||0)}));
+          S.forEach(r => rows.push({date: dateOf(r.Date||r.Order_Date), channel: 'Shopify', who: nameClean(r.Entry_By||r.User), sku: r.SKU, units: Number(r.Units||0), revenue: Number(r.Revenue||r.Total||0)}));
+          Bt.forEach(r => rows.push({date: dateOf(r.Order_Date||r.Date), channel: 'B2B', who: nameClean(r.Entry_By||r.User), sku: r.SKU||r.Item, units: Number(r.Quantity||0), revenue: Number(r.Total_Amount||r.Amount||0)}));
+          Mo.forEach(r => rows.push({date: dateOf(r.Date), channel: 'MT (secondary)', who: nameClean(r.Entry_By||r.User), sku: r.SKU, units: Number(r.Units||r.Units_Sold||0), revenue: Number(r.Revenue||0)}));
+          Mi.forEach(r => rows.push({date: dateOf(r.Date), channel: 'MT (invoice)', who: 'Zoho sync', sku: r.Invoice_Number, units: Number(r.Total_Qty||0), revenue: Number(r.Total||0)}));
+          rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+          const top = rows.slice(0, 300);
+          const totalRev = rows.reduce((s,r)=>s+r.revenue, 0);
+          const totalUnits = rows.reduce((s,r)=>s+r.units, 0);
+          salesEl.innerHTML = `
+            <div class="page-head">
+              <div><h1>Sales log</h1><div class="meta">Live across every channel · ${rows.length.toLocaleString('en-IN')} entries · ${fmtCr(totalRev)} · ${totalUnits.toLocaleString('en-IN')} units</div></div>
+              <button class="btn" onclick="event.stopPropagation(); (function(){const csv='Date,Channel,Entered by,SKU/Ref,Units,Revenue\\n'+${JSON.stringify(rows)}.map(r=>[r.date,r.channel,r.who,r.sku,r.units,r.revenue].join(',')).join('\\n');const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='sales_log_'+new Date().toISOString().slice(0,10)+'.csv';a.click();})()">Export CSV</button>
+            </div>
+            <div class="card">
+              <div class="matrix-wrap"><table class="matrix" style="min-width:800px;font-size:12px;">
+                <thead><tr><th style="text-align:left;">Date</th><th style="text-align:left;">Channel</th><th style="text-align:left;">Entered by</th><th style="text-align:left;">SKU / Ref</th><th class="num">Units</th><th class="num">Revenue</th></tr></thead>
+                <tbody>${top.map(r => `<tr><td style="text-align:left;">${r.date||''}</td><td style="text-align:left;">${r.channel}</td><td style="text-align:left;">${r.who||'—'}</td><td style="text-align:left;">${r.sku||'—'}</td><td class="num">${r.units.toLocaleString('en-IN')}</td><td class="num">${fmtL(r.revenue)}</td></tr>`).join('')}</tbody>
+              </table></div>
+              ${rows.length > 300 ? `<div style="padding:12px;font-size:12px;color:#888;text-align:center;">Showing 300 most recent of ${rows.length.toLocaleString('en-IN')} entries — export CSV for full log.</div>` : ''}
+            </div>`;
+        }
+
+        // ============ MONTHLY TOTALS PAGE (page-monthly): channel × month grid ============
+        const monEl = document.getElementById('page-monthly');
+        if (monEl) {
+          const grid = {};
+          const push = (ch, r, rev) => { const m = monthOf(r); if (!m) return; grid[m] = grid[m] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[m][ch] += rev; };
+          B.forEach(r => push('Blinkit', r.Date, Number(r.Net_Sales||r.Total_Sales||0)));
+          A.forEach(r => push('Amazon',  r.Date, Number(r.Total_Sales||r.Ordered_Product_Sales||0)));
+          S.forEach(r => push('Shopify', r.Date||r.Order_Date, Number(r.Revenue||r.Total||0)));
+          Bt.forEach(r => push('B2B',    r.Order_Date||r.Date, Number(r.Total_Amount||r.Amount||0)));
+          Mi.forEach(r => { const m = (r.Month||'').includes('T') ? String(r.Month).slice(0,7) : (r.Month||monthOf(r.Date)); if (!m) return; grid[m] = grid[m] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[m].MT += Number(r.Total||0); });
+          const months = Object.keys(grid).sort();
+          const chSum = {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0};
+          months.forEach(m => Object.keys(chSum).forEach(k => chSum[k] += grid[m][k]));
+          const grand = Object.values(chSum).reduce((a,b)=>a+b,0);
+          monEl.innerHTML = `
+            <div class="page-head"><div><h1>Monthly totals</h1><div class="meta">Live · ${months.length} months · ${fmtCr(grand)} total across channels</div></div></div>
+            <div class="card">
+              <div class="matrix-wrap"><table class="matrix" style="min-width:700px;font-size:12px;">
+                <thead><tr><th style="text-align:left;">Month</th><th class="num">Blinkit</th><th class="num">Amazon</th><th class="num">Shopify</th><th class="num">B2B</th><th class="num">Modern Trade</th><th class="num" style="font-weight:700;">Total</th></tr></thead>
+                <tbody>${months.map(m => { const r = grid[m]; const total = r.Blinkit+r.Amazon+r.Shopify+r.B2B+r.MT; return `<tr><td style="text-align:left;">${m}</td><td class="num">${fmtL(r.Blinkit)}</td><td class="num">${fmtL(r.Amazon)}</td><td class="num">${fmtL(r.Shopify)}</td><td class="num">${fmtL(r.B2B)}</td><td class="num">${fmtL(r.MT)}</td><td class="num" style="font-weight:600;">${fmtL(total)}</td></tr>`; }).join('')}
+                <tr style="background:#f4faff;font-weight:700;border-top:2px solid #ddd;"><td style="text-align:left;">All months</td><td class="num">${fmtCr(chSum.Blinkit)}</td><td class="num">${fmtCr(chSum.Amazon)}</td><td class="num">${fmtCr(chSum.Shopify)}</td><td class="num">${fmtCr(chSum.B2B)}</td><td class="num">${fmtCr(chSum.MT)}</td><td class="num">${fmtCr(grand)}</td></tr>
+                </tbody>
+              </table></div>
+            </div>`;
+        }
+
+        // ============ Live-refresh banner on hardcoded pages ============
+        const stampPages = [
+          {id: 'page-customer-ledger', note: 'Hardcoded May–Jul 2026 Zoho export · live re-parse coming — for now, current invoices land in Sales log & Monthly totals.'},
+          {id: 'page-profitability',    note: 'Hardcoded catalog · costing model updates via SKU_Master edits · live per-SKU margin refresh coming next.'},
+        ];
+        stampPages.forEach(p => {
+          const el = document.getElementById(p.id);
+          if (!el || el.querySelector('.live-refresh-note')) return;
+          const b = document.createElement('div');
+          b.className = 'live-refresh-note';
+          b.style.cssText = 'margin:0 0 12px;padding:10px 14px;background:#fef8e7;border:1px solid #f0d872;border-radius:8px;font-size:12px;color:#78561a;';
+          b.innerHTML = `⚠ ${p.note}`;
+          el.insertBefore(b, el.firstChild);
+        });
+      } catch(e) { console.warn('Secondary page render failed:', e); }
+    })();
+  })();
 </script>
 </body>
 </html>
