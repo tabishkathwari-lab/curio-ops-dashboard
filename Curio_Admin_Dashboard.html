@@ -4581,7 +4581,10 @@
         perProm[p].units += u; perProm[p].revenue += u * (canon ? (priceMap[canon]||0) : 0);
       });
       (mtOfficeEntries||[]).forEach(e => {
-        const by = e.Entry_By || ''; if (!by || by.includes('admin')) return;
+        const rawBy = e.Entry_By || '';
+        // Emails / admin identifiers are backoffice uploads — attribute them to "Admin" instead of leaking the email
+        const by = (!rawBy || /@|admin/i.test(rawBy)) ? 'Admin' : rawBy;
+        if (by === 'Admin') return; // don't count Admin as a promoter in the scorecard
         if (!perProm[by]) perProm[by] = { units: 0, revenue: 0, stores: new Set(), checkins: 0, days: new Set() };
         perProm[by].units += Number(e.Units_Sold)||0; perProm[by].revenue += Number(e.Revenue)||0;
       });
@@ -4591,8 +4594,9 @@
       // Uploads
       const uploads = {};
       (mtOfficeEntries||[]).forEach(e => {
-        const key = (e.Timestamp||'').slice(0, 16) + '|' + (e.Entry_By||'?') + '|' + (e.Store_Code||'?') + '|' + (e.Entry_Method||'?');
-        if (!uploads[key]) uploads[key] = { ts: e.Timestamp, by: e.Entry_By, storeCode: e.Store_Code, method: e.Entry_Method, note: e.Source_Note || e.Note || '', items: 0, units: 0, revenue: 0 };
+        const cleanBy = (!e.Entry_By || /@|admin/i.test(String(e.Entry_By))) ? 'Admin' : e.Entry_By;
+        const key = (e.Timestamp||'').slice(0, 16) + '|' + (cleanBy||'?') + '|' + (e.Store_Code||'?') + '|' + (e.Entry_Method||'?');
+        if (!uploads[key]) uploads[key] = { ts: e.Timestamp, by: cleanBy, storeCode: e.Store_Code, method: e.Entry_Method, note: e.Source_Note || e.Note || '', items: 0, units: 0, revenue: 0 };
         uploads[key].items++;
         uploads[key].units += Number(e.Units_Sold)||0;
         uploads[key].revenue += Number(e.Revenue)||0;
