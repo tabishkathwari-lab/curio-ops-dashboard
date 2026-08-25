@@ -5800,15 +5800,18 @@
 
     (async () => {
       try {
-        const [bl, am, sh, b2, mtOff, mtInv] = await Promise.all([
+        const [bl, am, sh, b2, mtOff, mtInv, blMo, amMo] = await Promise.all([
           CurioAPI.get('blinkit_raw').catch(()=>({})),
           CurioAPI.get('amazon_raw').catch(()=>({})),
           CurioAPI.get('shopify_raw').catch(()=>({})),
           CurioAPI.get('b2b_raw').catch(()=>({})),
           CurioAPI.get('mt_office_entries').catch(()=>({})),
           CurioAPI.get('mt_invoices').catch(()=>({})),
+          CurioAPI.get('blinkit_monthly').catch(()=>({})),
+          CurioAPI.get('amazon_monthly').catch(()=>({})),
         ]);
         const B = (bl.data||[]), A = (am.data||[]), S = (sh.data||[]), Bt = (b2.data||[]), Mo = (mtOff.data||[]), Mi = (mtInv.data||[]);
+        const BMo = (blMo.data||[]), AMo = (amMo.data||[]);
 
         // ============ SALES LOG PAGE (page-sales): recent entries across channels ============
         const salesEl = document.getElementById('page-sales');
@@ -5843,8 +5846,13 @@
         if (monEl) {
           const grid = {};
           const push = (ch, r, rev) => { const m = monthOf(r); if (!m) return; grid[m] = grid[m] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[m][ch] += rev; };
-          B.forEach(r => push('Blinkit', r.Date, Number(r.Net_Sales||r.Total_Sales||0)));
-          A.forEach(r => push('Amazon',  r.Date, Number(r.Total_Sales||r.Ordered_Product_Sales||0)));
+          // Merge historical aggregates FIRST (they cover months where raw data doesn't exist), then let raw data override
+          const seenBlMonth = new Set(), seenAmMonth = new Set();
+          BMo.forEach(m => { const mo = String(m.Month||'').slice(0,7).replace(' (partial)',''); if (mo) { grid[mo] = grid[mo] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[mo].Blinkit = Number(m.Net_Sales||m.Total_Sales||0); seenBlMonth.add(mo); }});
+          AMo.forEach(m => { const mo = String(m.Month||'').slice(0,7).replace(' (partial)',''); if (mo) { grid[mo] = grid[mo] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[mo].Amazon = Number(m.Total_Sales||m.Ordered_Product_Sales||0); seenAmMonth.add(mo); }});
+          // Now overlay raw data for months not in monthly aggregates
+          B.forEach(r => { const mo = monthOf(r.Date); if (mo && !seenBlMonth.has(mo)) push('Blinkit', r.Date, Number(r.Net_Sales||r.Total_Sales||0)); });
+          A.forEach(r => { const mo = monthOf(r.Date); if (mo && !seenAmMonth.has(mo)) push('Amazon',  r.Date, Number(r.Total_Sales||r.Ordered_Product_Sales||0)); });
           S.forEach(r => push('Shopify', r.Date||r.Order_Date, Number(r.Revenue||r.Total||0)));
           Bt.forEach(r => push('B2B',    r.Order_Date||r.Date, Number(r.Total_Amount||r.Amount||0)));
           Mi.forEach(r => { const m = (r.Month||'').includes('T') ? String(r.Month).slice(0,7) : (r.Month||monthOf(r.Date)); if (!m) return; grid[m] = grid[m] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[m].MT += Number(r.Total||0); });
@@ -5863,6 +5871,100 @@
               </table></div>
             </div>`;
         }
+
+        // ============ FACTORY INVENTORY PAGE — live snapshot from backend ============
+        try {
+          const [fin, rawM, btl, lbl, boxM, bc] = await Promise.all([
+            CurioAPI.get('factory_finished_inventory').catch(()=>({})),
+            CurioAPI.get('factory_raw_material').catch(()=>({})),
+            CurioAPI.get('factory_bottles').catch(()=>({})),
+            CurioAPI.get('factory_labels').catch(()=>({})),
+            CurioAPI.get('factory_boxes').catch(()=>({})),
+            CurioAPI.get('factory_batchcodes').catch(()=>({})),
+          ]);
+          const F = (fin.data||[]), Rm = (rawM.data||[]), Bt = (btl.data||[]), Lb = (lbl.data||[]), Bx = (boxM.data||[]), Bc = (bc.data||[]);
+          const invEl = document.getElementById('page-inventory');
+          if (invEl && F.length) {
+            const asOfRaw = F[0]?.As_Of || '';
+            const asOf = String(asOfRaw).slice(0,10);
+            const totalFinished = F.reduce((s,r)=>s+Number(r.Total||0),0);
+            const mrpMap = {}; Bc.forEach(r => { mrpMap[String(r.SKU||'').trim().toLowerCase()] = Number(r.MRP||0); });
+            const invValue = F.reduce((s,r) => {
+              const mrp = mrpMap[String(r.SKU||'').trim().toLowerCase()] || 0;
+              return s + Number(r.Total||0) * mrp;
+            }, 0);
+            const emptyRaw = Rm.filter(r => /nil|^0$|^\.+$/i.test(String(r.Qty_Raw||'').trim())).length;
+            const critFinished = F.filter(r => Number(r.Total||0) < 10).length;
+            const byCategory = {};
+            F.forEach(r => { const c = r.Category||'Other'; if (!byCategory[c]) byCategory[c] = {units:0, skus:0, value:0}; byCategory[c].units += Number(r.Total||0); byCategory[c].skus += 1; byCategory[c].value += Number(r.Total||0) * (mrpMap[String(r.SKU||'').trim().toLowerCase()] || 0); });
+            const fmtL2 = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
+            const liveBlock = document.createElement('div');
+            liveBlock.className = 'live-factory-block';
+            liveBlock.innerHTML = `
+              <div style="padding: 14px 16px; background: linear-gradient(135deg, #eef6ff, #e6f7f2); border: 1px solid #b8dbc9; border-radius: 12px; margin-bottom: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">🟢 Live factory snapshot</div><div style="font-size: 12px; color: #4a6c5a;">As of ${asOf} · pulled live from Google Sheet</div></div>
+                  <div style="text-align: right;"><div style="font-size: 22px; font-weight: 800; color: #14532d;">${fmtL2(invValue)}</div><div style="font-size: 11px; color: #4a6c5a;">Total inventory value @ MRP</div></div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Finished SKUs</div><div style="font-size: 20px; font-weight: 700; color: #1F4E78;">${F.length}</div><div style="font-size: 11px; color: #888;">${totalFinished.toLocaleString('en-IN')} units total</div></div>
+                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Critical finished</div><div style="font-size: 20px; font-weight: 700; color: ${critFinished > 3 ? '#b91c1c' : '#166534'};">${critFinished}</div><div style="font-size: 11px; color: #888;">SKUs < 10 units</div></div>
+                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Raw material lines</div><div style="font-size: 20px; font-weight: 700; color: #1F4E78;">${Rm.length}</div><div style="font-size: 11px; color: #888;">${emptyRaw} lines Nil / 0</div></div>
+                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Packaging pool</div><div style="font-size: 20px; font-weight: 700; color: #1F4E78;">${Bt.length + Lb.length + Bx.length}</div><div style="font-size: 11px; color: #888;">Bottles ${Bt.length} · Labels ${Lb.length} · Boxes ${Bx.length}</div></div>
+                </div>
+              </div>
+              <div class="card" style="margin-bottom: 18px;">
+                <h2>Finished SKU stock by category</h2>
+                <div class="matrix-wrap"><table class="matrix" style="min-width: 700px; font-size: 12px;">
+                  <thead><tr><th style="text-align:left;">Category</th><th class="num">SKUs</th><th class="num">Semi-finished</th><th class="num">Ready</th><th class="num">Total units</th><th class="num">Value @ MRP</th></tr></thead>
+                  <tbody>${Object.entries(byCategory).sort((a,b)=>b[1].value-a[1].value).map(([c, s]) => `<tr><td style="text-align:left;font-weight:600;">${c}</td><td class="num">${s.skus}</td><td class="num">${F.filter(r=>r.Category===c).reduce((x,r)=>x+Number(r.Semi_Finished||0),0)}</td><td class="num">${F.filter(r=>r.Category===c).reduce((x,r)=>x+Number(r.Ready_Stock||0),0)}</td><td class="num" style="font-weight:600;">${s.units.toLocaleString('en-IN')}</td><td class="num">${fmtL2(s.value)}</td></tr>`).join('')}
+                  <tr style="background:#f4faff;font-weight:700;border-top:2px solid #ddd;"><td style="text-align:left;">All categories</td><td class="num">${F.length}</td><td class="num">${F.reduce((s,r)=>s+Number(r.Semi_Finished||0),0)}</td><td class="num">${F.reduce((s,r)=>s+Number(r.Ready_Stock||0),0)}</td><td class="num">${totalFinished.toLocaleString('en-IN')}</td><td class="num">${fmtL2(invValue)}</td></tr>
+                  </tbody>
+                </table></div>
+              </div>
+              <div class="card" style="margin-bottom: 18px;">
+                <h2>Finished SKU · full list <span class="badge ok">Live</span></h2>
+                <div class="matrix-wrap"><table class="matrix" style="min-width: 700px; font-size: 12px;">
+                  <thead><tr><th style="text-align:left;">SKU</th><th style="text-align:left;">Category</th><th class="num">Semi</th><th class="num">Ready</th><th class="num">Total</th><th class="num">MRP</th></tr></thead>
+                  <tbody>${F.slice().sort((a,b)=>Number(b.Total||0)-Number(a.Total||0)).map(r => { const m = mrpMap[String(r.SKU||'').trim().toLowerCase()] || 0; const lowFlag = Number(r.Total||0) < 10; return `<tr style="${lowFlag?'background:#fef2f2;':''}"><td style="text-align:left;">${r.SKU||''}${lowFlag?' <span style="color:#b91c1c;font-size:10px;">⚠</span>':''}</td><td style="text-align:left;">${r.Category||''}</td><td class="num">${r.Semi_Finished||0}</td><td class="num">${r.Ready_Stock||0}</td><td class="num" style="font-weight:600;">${r.Total||0}</td><td class="num">₹${(m||0).toLocaleString('en-IN')}</td></tr>`; }).join('')}</tbody>
+                </table></div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px;">
+                <div class="card">
+                  <h2>Raw materials <span class="badge ok">Live</span></h2>
+                  <div class="matrix-wrap"><table class="matrix" style="font-size: 12px;">
+                    <thead><tr><th style="text-align:left;">Material</th><th style="text-align:left;">Qty</th></tr></thead>
+                    <tbody>${Rm.map(r => { const isNil = /nil|^0$|^\.+$/i.test(String(r.Qty_Raw||'').trim()); return `<tr style="${isNil?'background:#fef2f2;':''}"><td style="text-align:left;">${r.Material||''}${isNil?' <span style="color:#b91c1c;font-size:10px;">⚠</span>':''}</td><td style="text-align:left;">${r.Qty_Raw||''}</td></tr>`; }).join('')}</tbody>
+                  </table></div>
+                </div>
+                <div class="card">
+                  <h2>Packaging inventory <span class="badge ok">Live</span></h2>
+                  <div style="font-size:12px; color: #444; margin-bottom: 8px;"><strong>Bottles + caps (${Bt.length}):</strong></div>
+                  <div class="matrix-wrap" style="max-height: 200px; overflow-y: auto;"><table class="matrix" style="font-size: 11px;">
+                    <thead><tr><th style="text-align:left;">Size</th><th style="text-align:left;">Type</th><th class="num">Qty</th></tr></thead>
+                    <tbody>${Bt.map(r => `<tr><td style="text-align:left;">${r.Size||''}</td><td style="text-align:left;">${r.Type||''}</td><td class="num">${r.Qty||0}</td></tr>`).join('')}</tbody>
+                  </table></div>
+                  <div style="font-size:12px; color: #444; margin: 12px 0 8px;"><strong>Boxes (${Bx.length}):</strong></div>
+                  <div class="matrix-wrap" style="max-height: 180px; overflow-y: auto;"><table class="matrix" style="font-size: 11px;">
+                    <thead><tr><th style="text-align:left;">Box</th><th style="text-align:left;">Qty</th></tr></thead>
+                    <tbody>${Bx.map(r => `<tr><td style="text-align:left;">${r.Box||''}</td><td style="text-align:left;">${r.Qty||''}</td></tr>`).join('')}</tbody>
+                  </table></div>
+                </div>
+              </div>
+              <div class="card" style="margin-bottom: 18px;">
+                <h2>SKU batchcodes + MRP reference <span class="badge ok">Live</span></h2>
+                <div class="matrix-wrap"><table class="matrix" style="min-width: 650px; font-size: 12px;">
+                  <thead><tr><th style="text-align:left;">SKU</th><th style="text-align:left;">Batchcode</th><th class="num">MRP</th><th class="num">USP</th><th style="text-align:left;">Unit</th><th style="text-align:left;">Best before</th></tr></thead>
+                  <tbody>${Bc.map(r => `<tr><td style="text-align:left;">${r.SKU||''}</td><td style="text-align:left; font-family: monospace; font-size: 11px;">${r.Batchcode||''}</td><td class="num">₹${(Number(r.MRP)||0).toLocaleString('en-IN')}</td><td class="num">${r.USP||''}</td><td style="text-align:left;">${r.Unit||''}</td><td style="text-align:left;">${r.Best_Before||''}</td></tr>`).join('')}</tbody>
+                </table></div>
+              </div>
+              <div style="padding: 10px 14px; background: #fef8e7; border: 1px solid #f0d872; border-radius: 8px; font-size: 12px; color: #78561a; margin-bottom: 18px;">⚠ The blocks below are the older hardcoded inventory view — kept for historical reference only. The live snapshot above is the authoritative source.</div>
+            `;
+            const head = invEl.querySelector('.page-head');
+            if (head) head.parentNode.insertBefore(liveBlock, head.nextSibling);
+            else invEl.insertBefore(liveBlock, invEl.firstChild);
+          }
+        } catch(e) { console.warn('Factory inventory live render failed:', e); }
 
         // ============ Live-refresh banner on hardcoded pages ============
         const stampPages = [
