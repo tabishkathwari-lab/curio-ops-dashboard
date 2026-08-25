@@ -390,6 +390,51 @@
 </head>
 <body>
 
+<!-- ============ PASSWORD GATE (client-side, casual protection) ============ -->
+<div id="__pwGate" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0f172a;color:#f1f5f9;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <form id="__pwForm" style="background:#1e293b;padding:32px 36px;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);width:340px;max-width:90vw;text-align:center;">
+    <div style="font-size:32px;margin-bottom:12px;">🔒</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Curio Admin Dashboard</div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:20px;">Enter password to continue</div>
+    <input type="password" id="__pwInput" autofocus autocomplete="current-password" style="width:100%;padding:12px 14px;border:1px solid #334155;background:#0f172a;color:#f1f5f9;border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div id="__pwErr" style="color:#f87171;font-size:12px;margin-top:8px;height:16px;"></div>
+    <button type="submit" style="width:100%;margin-top:12px;padding:12px;background:#2563eb;color:white;border:0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Unlock</button>
+  </form>
+</div>
+<script>
+(function() {
+  const HASH = 'fe0db1f52590b1b9fd222cae1868fac8053db7ef3da52596dc17cf837ad3f379'; // sha256 of the current password
+  const KEY = 'curio_admin_authed_v1';
+  const gate = document.getElementById('__pwGate');
+  if (sessionStorage.getItem(KEY) === '1') { gate.remove(); return; }
+  document.body.style.overflow = 'hidden';
+  async function sha256(s) {
+    const buf = new TextEncoder().encode(s);
+    const h = await crypto.subtle.digest('SHA-256', buf);
+    return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  document.getElementById('__pwForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const val = document.getElementById('__pwInput').value;
+    const err = document.getElementById('__pwErr');
+    err.textContent = '';
+    try {
+      const h = await sha256(val);
+      if (h === HASH) {
+        sessionStorage.setItem(KEY, '1');
+        document.body.style.overflow = '';
+        gate.style.opacity = '0';
+        gate.style.transition = 'opacity 0.3s';
+        setTimeout(() => gate.remove(), 300);
+      } else {
+        err.textContent = 'Incorrect password';
+        document.getElementById('__pwInput').value = '';
+      }
+    } catch (ex) { err.textContent = 'Error: ' + ex.message; }
+  });
+})();
+</script>
+
 <div class="app">
   <!-- SIDEBAR -->
   <div class="sidebar">
