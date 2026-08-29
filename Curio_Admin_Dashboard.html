@@ -3864,7 +3864,22 @@
         if (!el) continue;
         try {
           const r = await CurioAPI.get(cfg.endpoint).catch(() => ({}));
-          const data = (r && r.data) || [];
+          let data = (r && r.data) || [];
+          // Shopify auto-sync writes monthly aggregates to Sales_Shopify_Live — use that when Sales_Shopify is empty
+          if (ch === 'shopify' && data.length === 0) {
+            const liveR = await CurioAPI.get('shopify_live').catch(() => ({}));
+            const liveRows = (liveR && liveR.data) || [];
+            if (liveRows.length > 0) {
+              const totalRev = liveRows.reduce((s,r) => s + (Number(r.Revenue)||0), 0);
+              const totalOrders = liveRows.reduce((s,r) => s + (Number(r.Orders)||0), 0);
+              const totalUnits = liveRows.reduce((s,r) => s + (Number(r.Units)||0), 0);
+              const thisMonthKey = new Date().toISOString().slice(0,7);
+              const thisM = liveRows.find(r => String(r.Month||'').slice(0,7) === thisMonthKey);
+              const lastSync = liveRows[0]?.Synced_At ? new Date(liveRows[0].Synced_At).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '—';
+              el.innerHTML = `📡 <strong>Live · auto-synced from Shopify API</strong> · ${liveRows.length} months · Total ${fmtL(totalRev)} · ${totalOrders} orders · ${totalUnits} units · This month ${thisM ? fmtL(Number(thisM.Revenue||0)) + ' (' + (thisM.Orders||0) + ' orders)' : '—'} · Last sync ${lastSync}`;
+              continue;
+            }
+          }
           if (data.length === 0) {
             el.style.background = 'linear-gradient(135deg,#fef3c7,#fff)';
             el.style.borderColor = '#fde68a'; el.style.color = '#92400e';
@@ -3887,10 +3902,11 @@
     // Wires EVERY home KPI to live data — no more hardcoded values
     (async () => {
       try {
-        const [blR, amR, shR, b2R, mtR, mtInvR, ciR, stkR] = await Promise.all([
+        const [blR, amR, shR, shLiveR, b2R, mtR, mtInvR, ciR, stkR] = await Promise.all([
           CurioAPI.get('blinkit_raw').catch(()=>({})),
           CurioAPI.get('amazon_raw').catch(()=>({})),
           CurioAPI.get('shopify_raw').catch(()=>({})),
+          CurioAPI.get('shopify_live').catch(()=>({})),
           CurioAPI.get('b2b_raw').catch(()=>({})),
           CurioAPI.get('mt_raw').catch(()=>({})),
           CurioAPI.get('mt_invoices').catch(()=>({})),
@@ -3900,6 +3916,7 @@
         const bl = (blR && blR.data) || [];
         const am = (amR && amR.data) || [];
         const sh = (shR && shR.data) || [];
+        const shLive = (shLiveR && shLiveR.data) || []; // monthly aggregate auto-synced from Shopify
         const b2 = (b2R && b2R.data) || [];
         const mt = (mtR && mtR.data) || [];
         const mtInv = (mtInvR && mtInvR.data) || [];
@@ -3928,9 +3945,11 @@
         const amThisMonth = sumBy(am, 'Total_Sales', 'Date', thisMonth);
         const amToday = sumBy(am, 'Total_Sales', 'Date', today);
 
-        // Shopify
-        const shYTD = sumBy(sh, 'Revenue', 'Date');
+        // Shopify — Sales_Shopify (raw daily) is empty; auto-sync writes monthly aggregates to Sales_Shopify_Live
+        const shYTD = sumBy(sh, 'Revenue', 'Date') + shLive.reduce((s,r) => s + Number(r.Revenue||0), 0);
         const shToday = sumBy(sh, 'Revenue', 'Date', today);
+        const shThisMonth = shLive.filter(r => String(r.Month||'').slice(0,7) === thisMonth).reduce((s,r) => s + Number(r.Revenue||0), 0)
+                          + sumBy(sh, 'Revenue', 'Date', thisMonth);
 
         // B2B (uses Order_Date not Date)
         const b2YTD = sumBy(b2, 'Total_Amount', 'Order_Date');
@@ -5845,17 +5864,18 @@
 
     (async () => {
       try {
-        const [bl, am, sh, b2, mtOff, mtInv, blMo, amMo] = await Promise.all([
+        const [bl, am, sh, shLv, b2, mtOff, mtInv, blMo, amMo] = await Promise.all([
           CurioAPI.get('blinkit_raw').catch(()=>({})),
           CurioAPI.get('amazon_raw').catch(()=>({})),
           CurioAPI.get('shopify_raw').catch(()=>({})),
+          CurioAPI.get('shopify_live').catch(()=>({})),
           CurioAPI.get('b2b_raw').catch(()=>({})),
           CurioAPI.get('mt_office_entries').catch(()=>({})),
           CurioAPI.get('mt_invoices').catch(()=>({})),
           CurioAPI.get('blinkit_monthly').catch(()=>({})),
           CurioAPI.get('amazon_monthly').catch(()=>({})),
         ]);
-        const B = (bl.data||[]), A = (am.data||[]), S = (sh.data||[]), Bt = (b2.data||[]), Mo = (mtOff.data||[]), Mi = (mtInv.data||[]);
+        const B = (bl.data||[]), A = (am.data||[]), S = (sh.data||[]), SLv = (shLv.data||[]), Bt = (b2.data||[]), Mo = (mtOff.data||[]), Mi = (mtInv.data||[]);
         const BMo = (blMo.data||[]), AMo = (amMo.data||[]);
 
         // ============ SALES LOG PAGE (page-sales): recent entries across channels ============
@@ -5865,6 +5885,7 @@
           B.forEach(r => rows.push({date: dateOf(r.Date), channel: 'Blinkit', who: nameClean(r.Entry_By), sku: r.SKU, units: Number(r.Units||0), revenue: Number(r.Net_Sales||r.Total_Sales||0)}));
           A.forEach(r => rows.push({date: dateOf(r.Date), channel: 'Amazon',  who: nameClean(r.Entry_By||r.User), sku: r.SKU, units: Number(r.Units||0), revenue: Number(r.Total_Sales||r.Ordered_Product_Sales||0)}));
           S.forEach(r => rows.push({date: dateOf(r.Date||r.Order_Date), channel: 'Shopify', who: nameClean(r.Entry_By||r.User), sku: r.SKU, units: Number(r.Units||0), revenue: Number(r.Revenue||r.Total||0)}));
+          SLv.forEach(r => { const mo = String(r.Month||'').slice(0,7); if (!mo) return; rows.push({date: mo + '-01', channel: 'Shopify (auto-sync)', who: 'Shopify sync', sku: `${r.Orders||0} orders · ${r.Paid_Orders||0} paid · ${r.Pending_Orders||0} pending`, units: Number(r.Units||0), revenue: Number(r.Revenue||0)}); });
           Bt.forEach(r => rows.push({date: dateOf(r.Order_Date||r.Date), channel: 'B2B', who: nameClean(r.Entry_By||r.User), sku: r.SKU||r.Item, units: Number(r.Quantity||0), revenue: Number(r.Total_Amount||r.Amount||0)}));
           Mo.forEach(r => rows.push({date: dateOf(r.Date), channel: 'MT (secondary)', who: nameClean(r.Entry_By||r.User), sku: r.SKU, units: Number(r.Units||r.Units_Sold||0), revenue: Number(r.Revenue||0)}));
           Mi.forEach(r => rows.push({date: dateOf(r.Date), channel: 'MT (invoice)', who: 'Zoho sync', sku: r.Invoice_Number, units: Number(r.Total_Qty||0), revenue: Number(r.Total||0)}));
@@ -5899,6 +5920,9 @@
           B.forEach(r => { const mo = monthOf(r.Date); if (mo && !seenBlMonth.has(mo)) push('Blinkit', r.Date, Number(r.Net_Sales||r.Total_Sales||0)); });
           A.forEach(r => { const mo = monthOf(r.Date); if (mo && !seenAmMonth.has(mo)) push('Amazon',  r.Date, Number(r.Total_Sales||r.Ordered_Product_Sales||0)); });
           S.forEach(r => push('Shopify', r.Date||r.Order_Date, Number(r.Revenue||r.Total||0)));
+          // Shopify auto-sync writes monthly aggregates to Sales_Shopify_Live — use for months not already covered by raw
+          const seenShMonth = new Set(); S.forEach(r => { const m = monthOf(r.Date||r.Order_Date); if (m) seenShMonth.add(m); });
+          SLv.forEach(r => { const m = String(r.Month||'').slice(0,7); if (m && !seenShMonth.has(m)) { grid[m] = grid[m] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[m].Shopify += Number(r.Revenue||0); } });
           Bt.forEach(r => push('B2B',    r.Order_Date||r.Date, Number(r.Total_Amount||r.Amount||0)));
           Mi.forEach(r => { const m = (r.Month||'').includes('T') ? String(r.Month).slice(0,7) : (r.Month||monthOf(r.Date)); if (!m) return; grid[m] = grid[m] || {Blinkit:0,Amazon:0,Shopify:0,B2B:0,MT:0}; grid[m].MT += Number(r.Total||0); });
           const months = Object.keys(grid).sort();
