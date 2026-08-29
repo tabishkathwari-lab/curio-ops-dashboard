@@ -2108,7 +2108,8 @@
 
       <!-- Real monthly trajectory -->
       <div class="card">
-        <h2>Shopify monthly trajectory · full lifetime <span class="badge ok">Real · 33 months</span></h2>
+        <h2>Shopify monthly trajectory · full lifetime <span class="badge ok" id="shopifyTrajBadge">Real · 33 months</span></h2>
+        <div id="shopifyLiveRecent" style="margin: 8px 0 12px; padding: 12px 14px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; font-size: 12px; color: #166534;">Loading recent months from auto-sync…</div>
         <p style="font-size: 12px; color: #666; margin: -6px 0 12px;">The rise and fall. Business launched Nov 2023, peaked Jan-Feb 2024, then stepped down after that. FY27 shows near-total abandonment.</p>
         <div class="matrix-wrap">
           <table class="matrix" style="min-width: 700px; font-size: 12px;">
@@ -3877,6 +3878,32 @@
               const thisM = liveRows.find(r => String(r.Month||'').slice(0,7) === thisMonthKey);
               const lastSync = liveRows[0]?.Synced_At ? new Date(liveRows[0].Synced_At).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '—';
               el.innerHTML = `📡 <strong>Live · auto-synced from Shopify API</strong> · ${liveRows.length} months · Total ${fmtL(totalRev)} · ${totalOrders} orders · ${totalUnits} units · This month ${thisM ? fmtL(Number(thisM.Revenue||0)) + ' (' + (thisM.Orders||0) + ' orders)' : '—'} · Last sync ${lastSync}`;
+              // Also populate the trajectory-recent table so Aug 2026 (and any newer month) shows up
+              const recent = document.getElementById('shopifyLiveRecent');
+              if (recent) {
+                const monthKey = d => new Date(d).toLocaleDateString('en-IN', {year:'numeric', month:'short'});
+                const sorted = liveRows.slice().sort((a,b) => new Date(b.Month) - new Date(a.Month));
+                const rows = sorted.map(r => {
+                  const rev = Number(r.Revenue||0);
+                  const orders = Number(r.Orders||0);
+                  const paid = Number(r.Paid_Orders||0);
+                  const aov = orders > 0 ? Math.round(rev/orders) : 0;
+                  const units = Number(r.Units||0);
+                  return `<tr><td style="text-align:left; font-weight:600;">${monthKey(r.Month)}</td><td class="num">${orders}</td><td class="num">${paid}</td><td class="num">${units}</td><td class="num" style="font-weight:600;">${fmtL(rev)}</td><td class="num">₹${aov.toLocaleString('en-IN')}</td></tr>`;
+                }).join('');
+                recent.innerHTML = `
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div><strong>🟢 Live-synced months from Shopify API</strong> · ${liveRows.length} months · Last sync ${lastSync}</div>
+                    <div style="font-size:11px; color:#4a6c5a;">Overrides the hardcoded table below for these months</div>
+                  </div>
+                  <div style="overflow-x:auto;"><table class="matrix" style="width:100%; min-width:600px; font-size:12px; background:white;">
+                    <thead><tr><th style="text-align:left;">Month</th><th class="num">Orders</th><th class="num">Paid</th><th class="num">Units</th><th class="num">Revenue</th><th class="num">AOV</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                    <tfoot><tr style="background:#f4faff;font-weight:700;border-top:2px solid #ddd;"><td style="text-align:left;">Total (${liveRows.length} months)</td><td class="num">${totalOrders}</td><td class="num">${liveRows.reduce((s,r)=>s+Number(r.Paid_Orders||0),0)}</td><td class="num">${totalUnits}</td><td class="num">${fmtL(totalRev)}</td><td class="num">₹${totalOrders>0?Math.round(totalRev/totalOrders).toLocaleString('en-IN'):0}</td></tr></tfoot>
+                  </table></div>`;
+                const badge = document.getElementById('shopifyTrajBadge');
+                if (badge) badge.textContent = 'Historical + Live sync';
+              }
               continue;
             }
           }
