@@ -4644,15 +4644,28 @@
       });
       const agingTotal = Object.values(aging).reduce((s,b)=>s+b.amount,0);
 
-      // Inventory
-      const inventory = {};
-      (stock||[]).forEach(s => {
+      // Inventory — build from sell_through_computed (all history):
+      // per (Store, SKU): sum Received, sum Units_Sold, take latest Curr_Closing as "on shelf now"
+      const inventory = {};        // { store: { sku: { units, ts, promoter } } } — latest closing only
+      const stockLedger = {};      // { store: { sku: { received, sold, closing, lastTs, lastPromoter } } } — cumulative view
+      (sellThrough||[]).forEach(s => {
         const sn = storeName(s.Store_Code);
         const canon = promoterAlias[s.SKU] || s.SKU;
         if (!inventory[sn]) inventory[sn] = {};
+        if (!stockLedger[sn]) stockLedger[sn] = {};
+        if (!stockLedger[sn][canon]) stockLedger[sn][canon] = { received: 0, sold: 0, closing: 0, lastTs: 0, lastPromoter: '' };
+        const rec = stockLedger[sn][canon];
+        rec.received += Number(s.Received)||0;
+        rec.sold += Number(s.Units_Sold)||0;
+        const t = new Date(s.To_Time || s.Timestamp).getTime();
+        if (t > rec.lastTs) {
+          rec.lastTs = t;
+          rec.closing = Number(s.Curr_Closing)||0;
+          rec.lastPromoter = s.Attributed_Promoter || '';
+        }
+        // inventory[sn][canon] tracks latest closing (used by other views)
         const cur = inventory[sn][canon];
-        const t = new Date(s.Timestamp).getTime();
-        if (!cur || t > cur.ts) inventory[sn][canon] = { units: Number(s.Closing_Stock)||0, ts: t, promoter: s.Promoter };
+        if (!cur || t > cur.ts) inventory[sn][canon] = { units: Number(s.Curr_Closing)||0, ts: t, promoter: s.Attributed_Promoter };
       });
 
       // Promoter performance
@@ -4910,6 +4923,46 @@
 
       // ===== TAB 3: INVENTORY & AUDIT =====
       html += `<div class="mt-tab-view" data-mt-tab-view="inventory" style="display:none;">`;
+
+      // ==== STORE STOCK LEDGER — Received – Sold = On Shelf ====
+      const ledStores = Object.keys(stockLedger).sort();
+      const ledgerRows = [];
+      let ledTotals = { received: 0, sold: 0, closing: 0, value: 0 };
+      ledStores.forEach(sn => {
+        const skus = Object.keys(stockLedger[sn]);
+        skus.forEach(sk => {
+          const rec = stockLedger[sn][sk];
+          const price = priceMap[sk] || 0;
+          const value = rec.closing * price;
+          ledgerRows.push({ store: sn, sku: canonToName[sk] || sk, received: rec.received, sold: rec.sold, closing: rec.closing, value, lastPromoter: rec.lastPromoter, lastTs: rec.lastTs });
+          ledTotals.received += rec.received; ledTotals.sold += rec.sold; ledTotals.closing += rec.closing; ledTotals.value += value;
+        });
+      });
+      ledgerRows.sort((a,b) => b.value - a.value || a.store.localeCompare(b.store));
+
+      html += `<div class="card">
+        <h2>📊 Store-level stock ledger <span class="badge ok">Live from promoter data</span></h2>
+        <p style="font-size:12px; color:#666; margin:-6px 0 12px;">For every store × SKU: <strong>Received</strong> (stock arrived) − <strong>Sold</strong> (units moved) = <strong>On shelf</strong> (latest closing). All numbers accumulated across every promoter check-in. Sortable by clicking any header.</p>
+        ${ledgerRows.length === 0 ? '<div style="padding:24px; text-align:center; color:#999;">No sell-through data yet. Promoters need to record Received / Closing stock via the app.</div>' :
+        `<div class="matrix-wrap" style="max-height: 500px; overflow-y: auto;"><table class="matrix" id="mtStockLedger" style="width:100%; font-size:12px;">
+          <thead><tr>
+            <th style="text-align:left; position:sticky; top:0; background:#fff;">Store</th>
+            <th style="text-align:left; position:sticky; top:0; background:#fff;">SKU</th>
+            <th class="num" style="position:sticky; top:0; background:#fff;">Received</th>
+            <th class="num" style="position:sticky; top:0; background:#fff;">Sold</th>
+            <th class="num" style="position:sticky; top:0; background:#fff;">On shelf</th>
+            <th class="num" style="position:sticky; top:0; background:#fff;">Value @ MRP</th>
+            <th style="position:sticky; top:0; background:#fff;">Last update</th>
+          </tr></thead>
+          <tbody>${ledgerRows.slice(0, 200).map(r => {
+            const oosBg = r.closing === 0 ? 'background:#fee2e2;' : r.closing < 5 ? 'background:#fef3c7;' : '';
+            return `<tr style="${oosBg}"><td style="text-align:left; font-weight:600;">${r.store}</td><td style="text-align:left;">${r.sku}</td><td class="num">${r.received}</td><td class="num" style="color:#166534;">${r.sold}</td><td class="num" style="font-weight:600; color:${r.closing===0?'#991b1b':r.closing<5?'#92400e':'#1F4E78'};">${r.closing}</td><td class="num">${fmtLakh(r.value)}</td><td style="font-size:11px; color:#666;">${r.lastTs ? fmtRelative(new Date(r.lastTs)) : '—'} · ${r.lastPromoter || '—'}</td></tr>`;
+          }).join('')}
+          <tr style="background:#f4faff; font-weight:700; border-top:2px solid #ddd; position:sticky; bottom:0;"><td style="text-align:left;">All (${ledgerRows.length} rows)</td><td>—</td><td class="num">${ledTotals.received.toLocaleString('en-IN')}</td><td class="num">${ledTotals.sold.toLocaleString('en-IN')}</td><td class="num">${ledTotals.closing.toLocaleString('en-IN')}</td><td class="num">${fmtLakh(ledTotals.value)}</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+        ${ledgerRows.length > 200 ? `<div style="padding:8px; font-size:11px; color:#888; text-align:center;">Showing top 200 of ${ledgerRows.length} store×SKU rows by value.</div>` : ''}`}
+      </div>`;
 
       // ==== INVENTORY MATRIX ====
       const invStores = Object.keys(inventory).sort();
