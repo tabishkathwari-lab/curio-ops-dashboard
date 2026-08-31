@@ -3670,16 +3670,18 @@
     // ============ REBUILD BLINKIT INNER CARDS FROM LIVE DATA ============
     // Sales by product, Business metrics, Feeder inventory, Live city coverage
     try {
-      const [rawR2, feederR, cityR, availR] = await Promise.all([
+      const [rawR2, feederR, cityR, availR, metricsR] = await Promise.all([
         CurioAPI.get('blinkit_raw').catch(() => ({})),
         CurioAPI.get('blinkit_feeder').catch(() => ({})),
         CurioAPI.get('blinkit_city').catch(() => ({})),
         CurioAPI.get('blinkit_availability').catch(() => ({})),
+        CurioAPI.get('blinkit_business_metrics_daily').catch(() => ({})),
       ]);
       const raw = (rawR2 && rawR2.data) || [];
       const feeder = (feederR && feederR.data) || [];
       const cityRaw = (cityR && cityR.data) || [];
       const avail = (availR && availR.data) || [];
+      const metricsDaily = (metricsR && metricsR.data) || [];
       const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
       const monLbl = ym => { if (!ym) return '—'; const [y,m] = ym.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m)-1] + " '" + y.slice(2); };
 
@@ -3724,27 +3726,45 @@
             card.innerHTML = `<h2>Business metrics <span class="badge">Live from raw</span></h2><div style="padding:24px; color:#999; text-align:center;">No entries in Sales_Blinkit yet.</div>`;
             return;
           }
+          // Aggregate from Sales_Blinkit (raw) — sales + units
           const byM = {};
           raw.forEach(r => {
             const m = String(r.Date || '').slice(0,7); if (!m) return;
-            if (!byM[m]) byM[m] = { units: 0, sales: 0, net: 0, ad: 0 };
+            if (!byM[m]) byM[m] = { units: 0, sales: 0, net: 0, ad: 0, directAdSales: 0, organicSales: 0, orders: 0, adsUnits: 0 };
             byM[m].units += Number(r.Units) || 0;
             byM[m].sales += Number(r.Total_Sales) || 0;
             byM[m].net += Number(r.Net_Sales) || 0;
             byM[m].ad += Number(r.Ad_Spend) || 0;
           });
+          // ALSO merge from Blinkit_Business_Metrics_Daily — this is where the entry app's Total Spends / Direct Ad Sales / etc. actually land
+          const sumBy = (metricName, month) => metricsDaily.filter(r => r.Metric === metricName && String(r.Date||'').slice(0,7) === month).reduce((s,r) => s + Number(r.Value||0), 0);
+          Object.keys(byM).forEach(m => {
+            const md = { ad: sumBy('totalSpends', m), directAd: sumBy('directAdSales', m), organic: sumBy('organicSales', m), orders: sumBy('netOrder', m), adsUnits: sumBy('adsUnits', m) };
+            if (md.ad > 0) byM[m].ad = md.ad;
+            byM[m].directAdSales = md.directAd;
+            byM[m].organicSales = md.organic;
+            byM[m].orders = md.orders;
+            byM[m].adsUnits = md.adsUnits;
+          });
           const months = Object.keys(byM).sort().slice(-9);
-          card.innerHTML = `<h2>Business metrics <span class="badge ok">Live</span> <span class="badge">TACOS · AOV · organic share · ad efficiency</span></h2>
-            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">All ratios computed from live Sales_Blinkit entries.</p>
+          card.innerHTML = `<h2>Business metrics <span class="badge ok">Live</span> <span class="badge">TACOS · ACOS · ROAS · AOV · organic share</span></h2>
+            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Sales from Sales_Blinkit. Ad spend / direct ad sales / organic sales pulled live from Blinkit_Business_Metrics_Daily (the entry app's 17-metric form).</p>
             <div class="matrix-wrap"><table class="matrix" style="min-width:${200 + months.length*95}px; font-size:11px;">
               <thead><tr><th style="text-align:left; min-width:200px;">Metric</th>${months.map(m => `<th class="num">${monLbl(m)}</th>`).join('')}</tr></thead>
               <tbody>
                 <tr style="background:#fff8e1; font-weight:700;"><td style="text-align:left;">Total Sales (₹)</td>${months.map(m => `<td class="num">${byM[m].sales > 0 ? Math.round(byM[m].sales).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
                 <tr><td style="text-align:left;">Units</td>${months.map(m => `<td class="num">${byM[m].units || '—'}</td>`).join('')}</tr>
                 <tr><td style="text-align:left;">Net Sales (₹)</td>${months.map(m => `<td class="num">${byM[m].net > 0 ? Math.round(byM[m].net).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
-                <tr><td style="text-align:left;">Ad Spend (₹)</td>${months.map(m => `<td class="num">${byM[m].ad > 0 ? Math.round(byM[m].ad).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
-                <tr style="background:#fff8e1;"><td style="text-align:left;">TACOS %</td>${months.map(m => { const t = byM[m].sales > 0 ? (byM[m].ad/byM[m].sales)*100 : 0; return `<td class="num" style="color:${t < 15 ? '#166534' : t < 25 ? '#92400e' : '#dc2626'};">${byM[m].sales > 0 ? t.toFixed(1) + '%' : '—'}</td>`; }).join('')}</tr>
-                <tr style="background:#fff8e1;"><td style="text-align:left;">AOV (₹)</td>${months.map(m => `<td class="num">${byM[m].units > 0 ? Math.round(byM[m].sales/byM[m].units).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
+                <tr><td style="text-align:left;">Net Orders</td>${months.map(m => `<td class="num">${byM[m].orders || '—'}</td>`).join('')}</tr>
+                <tr style="background:#fef3c7;"><td style="text-align:left; font-weight:700;">Ad Spend (₹)</td>${months.map(m => `<td class="num" style="font-weight:600;">${byM[m].ad > 0 ? Math.round(byM[m].ad).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
+                <tr><td style="text-align:left;">Direct Ad Sales (₹)</td>${months.map(m => `<td class="num">${byM[m].directAdSales > 0 ? Math.round(byM[m].directAdSales).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
+                <tr><td style="text-align:left;">Organic Sales (₹)</td>${months.map(m => `<td class="num">${byM[m].organicSales > 0 ? Math.round(byM[m].organicSales).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
+                <tr><td style="text-align:left;">Ads Units</td>${months.map(m => `<td class="num">${byM[m].adsUnits || '—'}</td>`).join('')}</tr>
+                <tr style="background:#dcfce7;"><td style="text-align:left; font-weight:700;">TACOS %</td>${months.map(m => { const base = byM[m].sales || byM[m].net; const t = base > 0 ? (byM[m].ad/base)*100 : 0; return `<td class="num" style="font-weight:600; color:${t === 0 ? '#94a3b8' : t < 10 ? '#166534' : t < 15 ? '#92400e' : '#dc2626'};">${base > 0 && byM[m].ad > 0 ? t.toFixed(1) + '%' : '—'}</td>`; }).join('')}</tr>
+                <tr style="background:#dcfce7;"><td style="text-align:left; font-weight:700;">ACOS %</td>${months.map(m => { const a = byM[m].directAdSales > 0 && byM[m].ad > 0 ? (byM[m].ad/byM[m].directAdSales)*100 : 0; return `<td class="num" style="font-weight:600; color:${a === 0 ? '#94a3b8' : a < 30 ? '#166534' : a < 50 ? '#92400e' : '#dc2626'};">${a > 0 ? a.toFixed(1) + '%' : '—'}</td>`; }).join('')}</tr>
+                <tr style="background:#dcfce7;"><td style="text-align:left; font-weight:700;">ROAS (x)</td>${months.map(m => { const r = byM[m].ad > 0 && byM[m].directAdSales > 0 ? (byM[m].directAdSales/byM[m].ad) : 0; return `<td class="num" style="font-weight:600; color:${r === 0 ? '#94a3b8' : r > 3 ? '#166534' : r > 1.5 ? '#92400e' : '#dc2626'};">${r > 0 ? r.toFixed(2) + 'x' : '—'}</td>`; }).join('')}</tr>
+                <tr><td style="text-align:left;">Organic share %</td>${months.map(m => { const total = byM[m].organicSales + byM[m].directAdSales; return `<td class="num">${total > 0 ? ((byM[m].organicSales/total)*100).toFixed(1) + '%' : '—'}</td>`; }).join('')}</tr>
+                <tr><td style="text-align:left;">AOV (₹)</td>${months.map(m => `<td class="num">${byM[m].orders > 0 ? Math.round(byM[m].net / byM[m].orders).toLocaleString('en-IN') : byM[m].units > 0 ? Math.round(byM[m].sales/byM[m].units).toLocaleString('en-IN') : '—'}</td>`).join('')}</tr>
                 <tr><td style="text-align:left;">Net-to-gross %</td>${months.map(m => `<td class="num">${byM[m].sales > 0 ? ((byM[m].net/byM[m].sales)*100).toFixed(1) + '%' : '—'}</td>`).join('')}</tr>
               </tbody>
             </table></div>`;
