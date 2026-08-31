@@ -292,6 +292,30 @@
       <div class="status-chip" id="statusChip">Not submitted yet</div>
     </div>
 
+    <!-- QUICK AD SPEND & ORDERS — front-and-center so it always gets filled -->
+    <div style="background: linear-gradient(135deg, #fef3c7, #fff); border: 2px solid #fde68a; border-radius: 10px; padding: 14px 16px; margin: 12px 0 20px;">
+      <div style="font-size: 12px; font-weight: 700; color: #78561a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">📊 Daily headline metrics — required (fills TACOS/ACOS/ROAS on dashboard)</div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+        <div>
+          <label style="font-size: 11px; color: #78561a; display: block; margin-bottom: 4px;">Total Ad Spend (₹)</label>
+          <input type="number" id="quickAdSpend" min="0" placeholder="0" style="width: 100%; padding: 8px 10px; border: 1px solid #d6b06a; border-radius: 6px; font-size: 14px; font-weight: 600; box-sizing: border-box;" />
+        </div>
+        <div>
+          <label style="font-size: 11px; color: #78561a; display: block; margin-bottom: 4px;">Direct Ad Sales (₹)</label>
+          <input type="number" id="quickDirectAdSales" min="0" placeholder="0" style="width: 100%; padding: 8px 10px; border: 1px solid #d6b06a; border-radius: 6px; font-size: 14px; font-weight: 600; box-sizing: border-box;" />
+        </div>
+        <div>
+          <label style="font-size: 11px; color: #78561a; display: block; margin-bottom: 4px;">Organic Sales (₹)</label>
+          <input type="number" id="quickOrganicSales" min="0" placeholder="0" style="width: 100%; padding: 8px 10px; border: 1px solid #d6b06a; border-radius: 6px; font-size: 14px; font-weight: 600; box-sizing: border-box;" />
+        </div>
+        <div>
+          <label style="font-size: 11px; color: #78561a; display: block; margin-bottom: 4px;">Total Orders</label>
+          <input type="number" id="quickTotalOrders" min="0" placeholder="0" style="width: 100%; padding: 8px 10px; border: 1px solid #d6b06a; border-radius: 6px; font-size: 14px; font-weight: 600; box-sizing: border-box;" />
+        </div>
+      </div>
+      <div style="font-size: 11px; color: #78561a; margin-top: 8px;">TACOS, ACOS, ROAS are computed automatically from these + Net Sales.</div>
+    </div>
+
     <div class="tabs">
       <button class="tab active" data-tab="paste">📋 Paste from report</button>
       <button class="tab" data-tab="manual">✍️ Enter manually</button>
@@ -900,9 +924,29 @@
       return;
     }
     const dateStr = document.getElementById("dateInp").value;
-    const items = PRODUCTS.filter(p => state.entries[p.key].qty > 0 || state.entries[p.key].amt > 0).map(p => ({
+    // Quick headline metrics — read the prominent inputs and merge into state.metrics + attach ad_spend to first row
+    const quickAd = Number(document.getElementById('quickAdSpend')?.value || 0);
+    const quickDirectAd = Number(document.getElementById('quickDirectAdSales')?.value || 0);
+    const quickOrganic = Number(document.getElementById('quickOrganicSales')?.value || 0);
+    const quickOrders = Number(document.getElementById('quickTotalOrders')?.value || 0);
+    if (quickAd > 0) state.metrics.totalSpends = quickAd;
+    if (quickDirectAd > 0) state.metrics.directAdSales = quickDirectAd;
+    if (quickOrganic > 0) state.metrics.organicSales = quickOrganic;
+    if (quickOrders > 0) state.metrics.netOrder = quickOrders;
+    // Auto-compute derived ratios so the dashboard has ACOS/TACOS/ROAS without the user needing to fill them
+    const totalNet = PRODUCTS.reduce((s, p) => s + state.entries[p.key].amt, 0);
+    if (quickAd > 0 && totalNet > 0) state.metrics.tacos = Number(((quickAd / totalNet) * 100).toFixed(2));
+    if (quickAd > 0 && quickDirectAd > 0) {
+      state.metrics.acos = Number(((quickAd / quickDirectAd) * 100).toFixed(2));
+      state.metrics.totalDirectRoas = Number((quickDirectAd / quickAd).toFixed(2));
+    }
+    if (quickOrders > 0 && totalNet > 0) state.metrics.aov = Math.round(totalNet / quickOrders);
+
+    const items = PRODUCTS.filter(p => state.entries[p.key].qty > 0 || state.entries[p.key].amt > 0).map((p, idx) => ({
       sku: p.name, units: state.entries[p.key].qty,
-      net_sales: state.entries[p.key].amt, total_sales: state.entries[p.key].amt
+      net_sales: state.entries[p.key].amt, total_sales: state.entries[p.key].amt,
+      // Attach TOTAL ad spend to the first SKU row so it lands in Sales_Blinkit's Ad_Spend column — dashboard sums this
+      ad_spend: idx === 0 ? quickAd : 0
     }));
     // Include city breakdown (units + sales), warehouse inventory, and full metrics
     const cityRows = CITIES.filter(c => state.cities[c.name].units > 0 || state.cities[c.name].sales > 0).map(c => ({

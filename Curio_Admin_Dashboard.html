@@ -1184,6 +1184,8 @@
           <button class="btn">Export</button>
         </div>
       </div>
+      <!-- LIVE DATA COMPLETENESS CARD -->
+      <div id="blinkitDataStatus" style="margin-bottom:14px; padding:14px 16px; background:linear-gradient(135deg,#f0f9ff,#fff); border:1px solid #bae6fd; border-radius:10px; font-size:13px; color:#075985;">📊 <strong>Loading current-month status…</strong></div>
 
       <div class="kpi-row" id="blinkitLiveKPIs">
         <!-- Populated live from blinkit_monthly endpoint by refreshBlinkitPage() -->
@@ -6114,6 +6116,90 @@
             else invEl.insertBefore(liveBlock, invEl.firstChild);
           }
         } catch(e) { console.warn('Factory inventory live render failed:', e); }
+
+        // ============ BLINKIT DATA STATUS card ============
+        try {
+          const [blkRaw, blkMonthly, blkMetrics] = await Promise.all([
+            CurioAPI.get('blinkit_raw').catch(()=>({})),
+            CurioAPI.get('blinkit_monthly').catch(()=>({})),
+            CurioAPI.get('blinkit_business_metrics_daily').catch(()=>({})),
+          ]);
+          const rows = (blkRaw.data||[]);
+          const metricsRows = (blkMetrics.data||[]);
+          const statusEl = document.getElementById('blinkitDataStatus');
+          if (statusEl && rows.length) {
+            const now = new Date();
+            const yyyyMm = now.toISOString().slice(0,7);
+            const day = now.getUTCDate();
+            const daysInMonth = new Date(now.getUTCFullYear(), now.getUTCMonth()+1, 0).getUTCDate();
+            const byDate = {};
+            rows.forEach(r => {
+              const d = String(r.Date||'').slice(0,10);
+              if (!byDate[d]) byDate[d] = { units:0, netSales:0, totalSales:0, rows:0, entryBy:new Set() };
+              byDate[d].rows++;
+              byDate[d].units += Number(r.Units||0);
+              byDate[d].netSales += Number(r.Net_Sales||0);
+              byDate[d].totalSales += Number(r.Total_Sales||0);
+              if (r.Entry_By) byDate[d].entryBy.add(r.Entry_By);
+            });
+            const monthDates = Object.keys(byDate).filter(d => d.startsWith(yyyyMm)).sort();
+            const latestDate = Object.keys(byDate).sort().pop();
+            const daysAgo = latestDate ? Math.floor((new Date(now.toISOString().slice(0,10)) - new Date(latestDate)) / 86400000) : '—';
+            const monthRev = monthDates.reduce((s,d) => s + byDate[d].netSales, 0);
+            const monthUnits = monthDates.reduce((s,d) => s + byDate[d].units, 0);
+            const monthlyAggAug = (blkMonthly.data||[]).find(m => String(m.Month||'').startsWith(yyyyMm));
+            // Ad spend: sum from raw sheet's Ad_Spend column (attached to first item by entry app), else fall back to monthly aggregate
+            const rawAdSpendMonth = monthDates.reduce((s,d) => s + rows.filter(r => String(r.Date||'').slice(0,10)===d).reduce((x,r) => x + Number(r.Ad_Spend||0), 0), 0);
+            const adSpendMonth = rawAdSpendMonth > 0 ? rawAdSpendMonth : Number(monthlyAggAug?.Ad_Spend||0);
+            // Pull metrics from Blinkit_Business_Metrics_Daily if entry app filled them
+            const metricsThisMonth = metricsRows.filter(m => String(m.Date||'').slice(0,7) === yyyyMm);
+            const metricSum = k => metricsThisMonth.filter(m => m.Metric === k).reduce((s,m) => s + Number(m.Value||0), 0);
+            const directAdSalesMonth = metricSum('directAdSales');
+            const organicSalesMonth = metricSum('organicSales');
+            // Compute ratios
+            const tacosMonth = monthRev > 0 && adSpendMonth > 0 ? (adSpendMonth/monthRev*100) : 0;
+            const acosMonth = directAdSalesMonth > 0 && adSpendMonth > 0 ? (adSpendMonth/directAdSalesMonth*100) : 0;
+            const roasMonth = adSpendMonth > 0 && directAdSalesMonth > 0 ? (directAdSalesMonth/adSpendMonth) : 0;
+            // Build a mini day-strip so user sees which days are covered / missing
+            const strip = [];
+            for (let d = 1; d <= day; d++) {
+              const dStr = yyyyMm + '-' + String(d).padStart(2,'0');
+              const has = byDate[dStr];
+              const bg = has ? '#22c55e' : (d <= day-2 ? '#dc2626' : '#94a3b8');
+              const title = has ? `${dStr}: ${has.units} u · ₹${has.netSales.toLocaleString('en-IN')}` : `${dStr}: no data`;
+              strip.push(`<div title="${title}" style="width:22px; height:22px; border-radius:4px; background:${bg}; display:inline-block; margin:2px; font-size:9px; color:white; text-align:center; line-height:22px; font-weight:600;">${d}</div>`);
+            }
+            const daysAgoColor = daysAgo === 0 ? '#166534' : daysAgo <= 1 ? '#166534' : daysAgo <= 3 ? '#92400e' : '#991b1b';
+            const daysAgoLabel = daysAgo === 0 ? 'Today ✅' : daysAgo === 1 ? 'Yesterday' : daysAgo + ' days ago';
+            const monthCoveragePct = Math.round((monthDates.length / day) * 100);
+            statusEl.innerHTML = `
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-size:11px; text-transform:uppercase; color:#0369a1; letter-spacing:0.5px; font-weight:700; margin-bottom:4px;">Last data entered</div>
+                  <div style="font-size:20px; font-weight:800; color:${daysAgoColor};">${latestDate || '—'} <span style="font-size:13px; font-weight:600;">(${daysAgoLabel})</span></div>
+                  <div style="font-size:12px; color:#475569; margin-top:2px;">Latest ${byDate[latestDate]?.rows||0} rows · ${[...(byDate[latestDate]?.entryBy||[])].join(', ')||'—'}</div>
+                </div>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-size:11px; text-transform:uppercase; color:#0369a1; letter-spacing:0.5px; font-weight:700; margin-bottom:4px;">Current month · ${yyyyMm}</div>
+                  <div style="font-size:20px; font-weight:800; color:#0f172a;">${monthDates.length}/${day} days <span style="font-size:13px; color:#64748b;">(${monthCoveragePct}%)</span></div>
+                  <div style="font-size:12px; color:#475569; margin-top:2px;">Net ₹${monthRev.toLocaleString('en-IN')} · ${monthUnits} units · Ad spend ${adSpendMonth ? '₹'+adSpendMonth.toLocaleString('en-IN') : '<span style="color:#dc2626;">not entered</span>'}</div>
+                </div>
+              </div>
+              <div style="margin-top:12px; padding:10px 14px; background:#f8fafc; border-radius:8px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
+                <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">TACOS</div><div style="font-size:18px; font-weight:800; color:${tacosMonth ? (tacosMonth<10?'#166534':tacosMonth<15?'#92400e':'#991b1b') : '#94a3b8'};">${tacosMonth ? tacosMonth.toFixed(1)+'%' : '—'}</div></div>
+                <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">ACOS</div><div style="font-size:18px; font-weight:800; color:${acosMonth ? (acosMonth<30?'#166534':acosMonth<50?'#92400e':'#991b1b') : '#94a3b8'};">${acosMonth ? acosMonth.toFixed(1)+'%' : '—'}</div></div>
+                <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">ROAS</div><div style="font-size:18px; font-weight:800; color:${roasMonth ? (roasMonth>3?'#166534':roasMonth>1.5?'#92400e':'#991b1b') : '#94a3b8'};">${roasMonth ? roasMonth.toFixed(2)+'x' : '—'}</div></div>
+                <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">Direct ad sales</div><div style="font-size:18px; font-weight:800; color:#0f172a;">${directAdSalesMonth ? '₹'+directAdSalesMonth.toLocaleString('en-IN') : '—'}</div></div>
+              </div>
+              <div style="margin-top:12px;">
+                <div style="font-size:11px; color:#475569; margin-bottom:4px;">${yyyyMm} — green = entered · red = missing · gray = today/tomorrow</div>
+                <div style="line-height:0;">${strip.join('')}</div>
+              </div>
+              ${daysAgo > 2 ? `<div style="margin-top:10px; padding:8px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; font-size:12px; color:#991b1b;">⚠️ <strong>Data is ${daysAgo} days stale.</strong> Ask Faraaz to enter missing days via <a href="/Curio_Blinkit_Entry.html" style="color:#991b1b; text-decoration:underline;">the entry app</a>.</div>` : ''}
+              ${!adSpendMonth ? `<div style="margin-top:6px; padding:8px 10px; background:#fef3c7; border:1px solid #fde68a; border-radius:6px; font-size:12px; color:#78561a;">⚠️ <strong>Ad spend for ${yyyyMm} not showing.</strong> The entry app's "Total Spends" field is going to a metrics tab that isn't wired to this card. Bulk-upload the month's ad spend directly to Sales_Blinkit_Monthly, or ask me to fix the entry app to save Ad_Spend per row.</div>` : ''}
+            `;
+          }
+        } catch(e) { console.warn('Blinkit status card failed:', e); }
 
         // ============ Live-refresh banner on hardcoded pages ============
         const stampPages = [
