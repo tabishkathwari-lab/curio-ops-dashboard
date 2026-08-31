@@ -1322,6 +1322,12 @@
         </div>
       </div>
 
+      <!-- ===== DAILY SALES — current month · SKU-wise (populated live) ===== -->
+      <div class="card" id="blinkitDailySalesCard">
+        <h2>📅 Daily sales · current month · SKU-wise <span class="badge">Loading…</span></h2>
+        <div style="padding:20px; color:#999; text-align:center;">Aggregating from Sales_Blinkit raw entries…</div>
+      </div>
+
       <!-- SKU × Day/Month grid -->
       <div class="card">
         <h2>Sales by product — Qty and Amount (₹) <span class="badge">Table 1 · 15 products</span></h2>
@@ -3717,6 +3723,85 @@
               <tr>${months.map(_ => '<th class="num">Qty</th><th class="num">₹</th>').join('')}</tr></thead>
               <tbody>${skus.map(sku => `<tr><td style="text-align:left;">${sku}</td>${months.map(m => { const c = bySkuMonth[sku][m]; return `<td class="num">${c ? c.qty : '—'}</td><td class="num">${c && c.rev > 0 ? Math.round(c.rev).toLocaleString('en-IN') : '—'}</td>`; }).join('')}</tr>`).join('')}</tbody>
             </table></div>`;
+          return;
+        }
+
+        // ---- DAILY SALES · current month · SKU × Day matrix ----
+        if (card.id === 'blinkitDailySalesCard') {
+          const now = new Date();
+          const yyyyMm = now.toISOString().slice(0,7);
+          const [y,m] = yyyyMm.split('-');
+          const daysInMonth = new Date(Number(y), Number(m), 0).getDate();
+          const monthRows = raw.filter(r => String(r.Date||'').slice(0,7) === yyyyMm);
+          if (monthRows.length === 0) {
+            card.innerHTML = `<h2>📅 Daily sales · ${yyyyMm} · SKU-wise <span class="badge warn">No data</span></h2><div style="padding:24px; color:#999; text-align:center;">No entries for ${yyyyMm} in Sales_Blinkit yet.</div>`;
+            return;
+          }
+          // Aggregate by SKU × Day
+          const bySkuDay = {};
+          const skuTotals = {};
+          monthRows.forEach(r => {
+            const day = Number(String(r.Date||'').slice(8,10));
+            const sku = r.SKU || 'Unknown';
+            const units = Number(r.Units)||0;
+            const net = Number(r.Net_Sales)||0;
+            if (!bySkuDay[sku]) bySkuDay[sku] = {};
+            if (!bySkuDay[sku][day]) bySkuDay[sku][day] = { units:0, net:0 };
+            bySkuDay[sku][day].units += units;
+            bySkuDay[sku][day].net += net;
+            if (!skuTotals[sku]) skuTotals[sku] = { units:0, net:0 };
+            skuTotals[sku].units += units; skuTotals[sku].net += net;
+          });
+          const skus = Object.keys(bySkuDay).sort((a,b) => skuTotals[b].net - skuTotals[a].net);
+          const daysCovered = [...new Set(monthRows.map(r => Number(String(r.Date||'').slice(8,10))))].sort((a,b)=>a-b);
+          const latestDay = Math.max(...daysCovered);
+          const dayTotals = {};
+          for (let d = 1; d <= daysInMonth; d++) { dayTotals[d] = { units:0, net:0 }; }
+          monthRows.forEach(r => { const d = Number(String(r.Date||'').slice(8,10)); dayTotals[d].units += Number(r.Units)||0; dayTotals[d].net += Number(r.Net_Sales)||0; });
+          const grandUnits = skus.reduce((s,sk) => s+skuTotals[sk].units, 0);
+          const grandNet = skus.reduce((s,sk) => s+skuTotals[sk].net, 0);
+          const fmtNet = n => n === 0 ? '' : n >= 1000 ? Math.round(n/1000)+'k' : String(Math.round(n));
+          // Build header
+          let header = '<tr><th style="text-align:left; position:sticky; left:0; background:#fff; z-index:3; min-width:200px;">SKU</th>';
+          for (let d = 1; d <= daysInMonth; d++) {
+            const hasData = dayTotals[d].units > 0;
+            const isToday = d === now.getDate();
+            const bg = isToday ? '#dbeafe' : hasData ? '#dcfce7' : d < now.getDate() ? '#fee2e2' : '#f4f4f5';
+            header += `<th style="min-width:34px; background:${bg}; font-size:10px; padding:4px 2px;">${d}</th>`;
+          }
+          header += '<th style="min-width:60px; background:#f4faff; font-weight:700; position:sticky; right:0;">Total</th></tr>';
+          // Body rows — units matrix
+          const bodyUnits = skus.map(sku => {
+            let row = `<tr><td style="text-align:left; position:sticky; left:0; background:#fff; z-index:1; font-weight:600; font-size:11px;">${sku.replace('Curio Lifestyle ', '')}</td>`;
+            for (let d = 1; d <= daysInMonth; d++) {
+              const cell = bySkuDay[sku][d];
+              const u = cell ? cell.units : 0;
+              const bg = u > 0 ? (u >= 5 ? '#dcfce7' : '#f0fdf4') : '';
+              row += `<td class="num" style="background:${bg}; font-size:11px; padding:3px 2px;" title="${cell ? '₹'+cell.net.toLocaleString('en-IN') : ''}">${u || ''}</td>`;
+            }
+            row += `<td class="num" style="background:#f4faff; font-weight:700; position:sticky; right:0;">${skuTotals[sku].units}</td>`;
+            return row + '</tr>';
+          }).join('');
+          // Totals row
+          let totalsRow = '<tr style="background:#fff8e1; font-weight:700; border-top:2px solid #ddd;"><td style="text-align:left; position:sticky; left:0; background:#fff8e1;">Daily totals</td>';
+          for (let d = 1; d <= daysInMonth; d++) { totalsRow += `<td class="num" style="font-size:11px; padding:3px 2px;">${dayTotals[d].units || ''}</td>`; }
+          totalsRow += `<td class="num" style="background:#e0f2fe; font-weight:700; position:sticky; right:0;">${grandUnits}</td></tr>`;
+          // Revenue totals row
+          let revRow = '<tr style="background:#fef3c7; font-weight:600;"><td style="text-align:left; position:sticky; left:0; background:#fef3c7;">Daily net sales (₹)</td>';
+          for (let d = 1; d <= daysInMonth; d++) { revRow += `<td class="num" style="font-size:10px; padding:3px 2px; color:${dayTotals[d].net > 0 ? '#166534' : '#94a3b8'};">${fmtNet(dayTotals[d].net)}</td>`; }
+          revRow += `<td class="num" style="background:#fef3c7; font-weight:700; position:sticky; right:0;">${(grandNet/1000).toFixed(0)}k</td></tr>`;
+
+          card.innerHTML = `
+            <h2>📅 Daily sales · ${yyyyMm} · SKU-wise <span class="badge ok">Live · ${monthRows.length} rows · ${daysCovered.length}/${daysInMonth} days</span></h2>
+            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Units sold per SKU per day for the current month. Green cells = data present · red header days = missing · blue header = today. Hover cell to see revenue. Rows sorted by month net.</p>
+            <div class="matrix-wrap" style="overflow-x:auto; max-height:600px;">
+              <table class="matrix" style="min-width:${200 + daysInMonth*36 + 60}px; font-size:11px; width:100%;">
+                <thead style="position:sticky; top:0; background:#fff; z-index:4;">${header}</thead>
+                <tbody>${bodyUnits}${totalsRow}${revRow}</tbody>
+              </table>
+            </div>
+            <div style="margin-top:8px; font-size:11px; color:#64748b;">Latest data: <strong>${yyyyMm}-${String(latestDay).padStart(2,'0')}</strong> · Total this month: <strong>${grandUnits} units · ₹${grandNet.toLocaleString('en-IN')}</strong></div>
+          `;
           return;
         }
 
