@@ -554,6 +554,12 @@
         </div>
       </div>
 
+      <!-- PRIMARY vs SECONDARY sale panel — populated live -->
+      <div class="card" id="primarySecondaryCard" style="margin-bottom:18px; background:linear-gradient(135deg,#fef8e7,#f0f9ff); border-left:4px solid #f59e0b;">
+        <h2>🔄 Primary vs Secondary sales <span class="badge">Loading…</span></h2>
+        <div style="padding:20px; text-align:center; color:#999;">Computing primary (Curio → chains) vs secondary (chains → consumers)…</div>
+      </div>
+
       <div class="grid-2">
         <div class="card">
           <h2>Activity today</h2>
@@ -6191,6 +6197,136 @@
               </table></div>
             </div>`;
         }
+
+        // ============ PRIMARY vs SECONDARY sales — home page card + per-channel strips ============
+        try {
+          const [mtInvR, mtOffR, blkR, amzR, amzMoR, shLvR, b2R] = await Promise.all([
+            CurioAPI.get('mt_invoices').catch(()=>({})),
+            CurioAPI.get('mt_office_entries').catch(()=>({})),
+            CurioAPI.get('blinkit_raw').catch(()=>({})),
+            CurioAPI.get('amazon_raw').catch(()=>({})),
+            CurioAPI.get('amazon_monthly').catch(()=>({})),
+            CurioAPI.get('shopify_live').catch(()=>({})),
+            CurioAPI.get('b2b_raw').catch(()=>({})),
+          ]);
+          const MI = (mtInvR.data||[]), MO = (mtOffR.data||[]), BL = (blkR.data||[]), AM = (amzR.data||[]), AMo = (amzMoR.data||[]), SL = (shLvR.data||[]), B2 = (b2R.data||[]);
+          const nowMo = new Date().toISOString().slice(0,7);
+          const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
+          const monthOf = d => String(d||'').slice(0,7).replace(' (partial)','');
+
+          // PRIMARY = Curio → chain/warehouse (invoices/dispatches)
+          //   • MT primary = Zoho invoices for the 4 MT chains
+          //   • Blinkit primary = Zoho invoices tagged Chain='Blinkit' (currently 0)
+          //   • Amazon primary = Zoho invoices tagged Chain='Amazon' (currently 0)
+          const mtPriYtd = MI.reduce((s,i) => s + Number(i.Total||0), 0);
+          const mtPriMonth = MI.filter(i => { const m = String(i.Month||''); return (m.includes('T') ? m.slice(0,7) : m) === nowMo; }).reduce((s,i) => s + Number(i.Total||0), 0);
+          const blkPriMonth = MI.filter(i => /blinkit/i.test(String(i.Chain||'')) && (String(i.Month||'').slice(0,7) === nowMo)).reduce((s,i) => s + Number(i.Total||0), 0);
+          const amzPriMonth = MI.filter(i => /amazon/i.test(String(i.Chain||'')) && (String(i.Month||'').slice(0,7) === nowMo)).reduce((s,i) => s + Number(i.Total||0), 0);
+          const primaryMonth = mtPriMonth + blkPriMonth + amzPriMonth;
+          const primaryYtd = mtPriYtd;
+
+          // SECONDARY = chain → end consumer (what was actually sold to buyers)
+          //   • MT secondary = office entries (store reports)
+          //   • Blinkit secondary = blinkit_raw (daily consumer orders)
+          //   • Amazon secondary = amazon_raw (consumer sales)
+          const mtSecMonth = MO.filter(r => monthOf(r.Date) === nowMo).reduce((s,r) => s + Number(r.Revenue||0), 0);
+          const mtSecYtd = MO.reduce((s,r) => s + Number(r.Revenue||0), 0);
+          const blkSecMonth = BL.filter(r => monthOf(r.Date) === nowMo).reduce((s,r) => s + Number(r.Net_Sales||r.Total_Sales||0), 0);
+          const blkSecYtd = BL.reduce((s,r) => s + Number(r.Net_Sales||r.Total_Sales||0), 0);
+          const amzSecRawMonth = AM.filter(r => monthOf(r.Date) === nowMo).reduce((s,r) => s + Number(r.Ordered_Product_Sales||r.Total_Sales||0), 0);
+          const amzMoRow = AMo.find(m => String(m.Month||'').startsWith(nowMo));
+          const amzSecMonth = amzSecRawMonth > 0 ? amzSecRawMonth : Number(amzMoRow?.Total_Sales || amzMoRow?.Ordered_Product_Sales || 0);
+          const amzSecYtd = (AM.reduce((s,r) => s + Number(r.Ordered_Product_Sales||r.Total_Sales||0), 0)) + AMo.reduce((s,m) => s + Number(m.Total_Sales||0), 0);
+          const secondaryMonth = mtSecMonth + blkSecMonth + amzSecMonth;
+          const secondaryYtd = mtSecYtd + blkSecYtd + amzSecYtd;
+
+          // DIRECT = Curio sells directly (Shopify + B2B — primary and secondary are the same)
+          const shMonth = SL.filter(m => String(m.Month||'').startsWith(nowMo)).reduce((s,m) => s + Number(m.Revenue||0), 0);
+          const shYtd = SL.reduce((s,m) => s + Number(m.Revenue||0), 0);
+          const b2Month = B2.filter(r => monthOf(r.Order_Date||r.Date) === nowMo).reduce((s,r) => s + Number(r.Total_Amount||r.Amount||0), 0);
+          const b2Ytd = B2.reduce((s,r) => s + Number(r.Total_Amount||r.Amount||0), 0);
+          const directMonth = shMonth + b2Month;
+          const directYtd = shYtd + b2Ytd;
+
+          const monthLbl = new Date().toLocaleDateString('en-IN', {month:'short', year:'numeric'});
+          const gap = primaryMonth - secondaryMonth; // positive = chain built up inventory, negative = chain sold more than received (buffer draw)
+
+          // Home page card
+          const homeCard = document.getElementById('primarySecondaryCard');
+          if (homeCard) {
+            homeCard.innerHTML = `
+              <h2>🔄 Primary vs Secondary sales <span class="badge ok">Live · ${monthLbl}</span></h2>
+              <p style="font-size:12px; color:#666; margin:-6px 0 14px;">
+                <strong>Primary</strong> = Curio → consignment buyer (Zoho invoices to MT chains, Blinkit, Amazon).
+                <strong>Secondary</strong> = consignment buyer → end consumer (store reports + Blinkit consumer orders + Amazon consumer sales).
+                <strong>Direct</strong> = Curio sells directly (Shopify D2C + B2B).
+              </p>
+              <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px;">
+                <div style="background:#f8fafc; padding:14px; border-radius:8px; border-left:4px solid #3b82f6;">
+                  <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#1e40af; font-weight:700;">Primary (this month)</div>
+                  <div style="font-size:22px; font-weight:800; color:#1e40af; margin-top:4px;">${fmtL(primaryMonth)}</div>
+                  <div style="font-size:11px; color:#64748b; margin-top:4px;">MT ${fmtL(mtPriMonth)} · Blinkit ${blkPriMonth>0?fmtL(blkPriMonth):'—'} · Amazon ${amzPriMonth>0?fmtL(amzPriMonth):'—'}</div>
+                  <div style="font-size:11px; color:#94a3b8; margin-top:2px;">YTD ${fmtL(primaryYtd)}</div>
+                </div>
+                <div style="background:#f8fafc; padding:14px; border-radius:8px; border-left:4px solid #16a34a;">
+                  <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#166534; font-weight:700;">Secondary (this month)</div>
+                  <div style="font-size:22px; font-weight:800; color:#166534; margin-top:4px;">${fmtL(secondaryMonth)}</div>
+                  <div style="font-size:11px; color:#64748b; margin-top:4px;">MT ${fmtL(mtSecMonth)} · Blinkit ${fmtL(blkSecMonth)} · Amazon ${fmtL(amzSecMonth)}</div>
+                  <div style="font-size:11px; color:#94a3b8; margin-top:2px;">YTD ${fmtL(secondaryYtd)}</div>
+                </div>
+                <div style="background:#f8fafc; padding:14px; border-radius:8px; border-left:4px solid #a855f7;">
+                  <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#7c3aed; font-weight:700;">Direct (this month)</div>
+                  <div style="font-size:22px; font-weight:800; color:#7c3aed; margin-top:4px;">${fmtL(directMonth)}</div>
+                  <div style="font-size:11px; color:#64748b; margin-top:4px;">Shopify ${fmtL(shMonth)} · B2B ${fmtL(b2Month)}</div>
+                  <div style="font-size:11px; color:#94a3b8; margin-top:2px;">YTD ${fmtL(directYtd)}</div>
+                </div>
+                <div style="background:${gap>=0?'#fef3c7':'#fee2e2'}; padding:14px; border-radius:8px; border-left:4px solid ${gap>=0?'#f59e0b':'#dc2626'};">
+                  <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:${gap>=0?'#92400e':'#991b1b'}; font-weight:700;">Primary − Secondary</div>
+                  <div style="font-size:22px; font-weight:800; color:${gap>=0?'#92400e':'#991b1b'}; margin-top:4px;">${gap>=0?'+':''}${fmtL(gap)}</div>
+                  <div style="font-size:11px; color:#64748b; margin-top:4px;">${gap>0?'Buffer built up at chain':gap<0?'Chain sold more than received (drawing buffer)':'Balanced'}</div>
+                  <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Total this month: ${fmtL(primaryMonth+secondaryMonth+directMonth)}</div>
+                </div>
+              </div>
+              ${(blkPriMonth===0 && amzPriMonth===0) ? `<div style="padding:10px 12px; background:#fef3c7; border:1px solid #fde68a; border-radius:6px; font-size:12px; color:#78561a;">⚠️ <strong>Blinkit and Amazon primary (Curio → warehouse dispatches) not tracked yet.</strong> Upload the Zoho invoices tagged Chain='Blinkit' and Chain='Amazon' to complete the primary picture — currently only MT chains (Modern Bazaar, Landcraft, Pick N Choose, Aap Ka Bazar) have primary invoices in the backend.</div>` : ''}`;
+          }
+
+          // Blinkit page — inject small P vs S strip at the top
+          const blkPage = document.getElementById('page-blinkit');
+          if (blkPage && !document.getElementById('blkPvsSStrip')) {
+            const strip = document.createElement('div');
+            strip.id = 'blkPvsSStrip';
+            strip.style.cssText = 'margin-bottom:14px; padding:14px 16px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; display:grid; grid-template-columns:repeat(3,1fr); gap:14px;';
+            strip.innerHTML = `
+              <div><div style="font-size:11px; color:#0369a1; text-transform:uppercase; font-weight:700;">Primary · ${monthLbl}</div><div style="font-size:20px; font-weight:800; color:#1e40af;">${blkPriMonth>0?fmtL(blkPriMonth):'—'}</div><div style="font-size:11px; color:#64748b;">Curio → Blinkit warehouse (Zoho invoices) · ${blkPriMonth===0?'not tracked yet':''}</div></div>
+              <div><div style="font-size:11px; color:#166534; text-transform:uppercase; font-weight:700;">Secondary · ${monthLbl}</div><div style="font-size:20px; font-weight:800; color:#166534;">${fmtL(blkSecMonth)}</div><div style="font-size:11px; color:#64748b;">Blinkit → end consumer (${BL.filter(r => monthOf(r.Date)===nowMo).length} order-day rows)</div></div>
+              <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">Gap</div><div style="font-size:20px; font-weight:800; color:${blkPriMonth-blkSecMonth>=0?'#92400e':'#991b1b'};">${blkPriMonth===0?'—':(blkPriMonth-blkSecMonth>=0?'+':'')+fmtL(blkPriMonth-blkSecMonth)}</div><div style="font-size:11px; color:#64748b;">${blkPriMonth===0?'Add primary to see':'Buffer at warehouse'}</div></div>`;
+            const head = blkPage.querySelector('.page-head'); if (head) head.parentNode.insertBefore(strip, head.nextSibling);
+          }
+          // Amazon page
+          const amzPage = document.getElementById('page-amazon');
+          if (amzPage && !document.getElementById('amzPvsSStrip')) {
+            const strip = document.createElement('div');
+            strip.id = 'amzPvsSStrip';
+            strip.style.cssText = 'margin-bottom:14px; padding:14px 16px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; display:grid; grid-template-columns:repeat(3,1fr); gap:14px;';
+            strip.innerHTML = `
+              <div><div style="font-size:11px; color:#0369a1; text-transform:uppercase; font-weight:700;">Primary · ${monthLbl}</div><div style="font-size:20px; font-weight:800; color:#1e40af;">${amzPriMonth>0?fmtL(amzPriMonth):'—'}</div><div style="font-size:11px; color:#64748b;">Curio → Amazon FBA (Zoho invoices) · ${amzPriMonth===0?'not tracked yet':''}</div></div>
+              <div><div style="font-size:11px; color:#166534; text-transform:uppercase; font-weight:700;">Secondary · ${monthLbl}</div><div style="font-size:20px; font-weight:800; color:#166534;">${fmtL(amzSecMonth)}</div><div style="font-size:11px; color:#64748b;">Amazon → end consumer</div></div>
+              <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">Gap</div><div style="font-size:20px; font-weight:800; color:${amzPriMonth-amzSecMonth>=0?'#92400e':'#991b1b'};">${amzPriMonth===0?'—':(amzPriMonth-amzSecMonth>=0?'+':'')+fmtL(amzPriMonth-amzSecMonth)}</div><div style="font-size:11px; color:#64748b;">${amzPriMonth===0?'Add primary to see':'Buffer at FBA'}</div></div>`;
+            const head = amzPage.querySelector('.page-head'); if (head) head.parentNode.insertBefore(strip, head.nextSibling);
+          }
+          // MT page
+          const mtPage = document.getElementById('page-mt-overview');
+          if (mtPage && !document.getElementById('mtPvsSStrip')) {
+            const strip = document.createElement('div');
+            strip.id = 'mtPvsSStrip';
+            strip.style.cssText = 'margin-bottom:14px; padding:14px 16px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; display:grid; grid-template-columns:repeat(3,1fr); gap:14px;';
+            strip.innerHTML = `
+              <div><div style="font-size:11px; color:#0369a1; text-transform:uppercase; font-weight:700;">Primary · ${monthLbl}</div><div style="font-size:20px; font-weight:800; color:#1e40af;">${fmtL(mtPriMonth)}</div><div style="font-size:11px; color:#64748b;">${MI.filter(i => String(i.Month||'').slice(0,7)===nowMo).length} Zoho invoices to MT chains</div></div>
+              <div><div style="font-size:11px; color:#166534; text-transform:uppercase; font-weight:700;">Secondary · ${monthLbl}</div><div style="font-size:20px; font-weight:800; color:#166534;">${fmtL(mtSecMonth)}</div><div style="font-size:11px; color:#64748b;">Store reports + promoter counts</div></div>
+              <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">Gap</div><div style="font-size:20px; font-weight:800; color:${mtPriMonth-mtSecMonth>=0?'#92400e':'#991b1b'};">${(mtPriMonth-mtSecMonth>=0?'+':'')+fmtL(mtPriMonth-mtSecMonth)}</div><div style="font-size:11px; color:#64748b;">Buffer at MT stores</div></div>`;
+            const head = mtPage.querySelector('.page-head'); if (head) head.parentNode.insertBefore(strip, head.nextSibling);
+          }
+        } catch(e) { console.warn('Primary/Secondary card failed:', e); }
 
         // ============ FACTORY INVENTORY PAGE — live snapshot from backend ============
         try {
