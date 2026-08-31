@@ -3437,6 +3437,12 @@
 </div>
 
 <script>
+  // Timezone-safe local date helpers (IST). Fixes bug where toISOString() returns
+  // UTC month, so between 12am and 5:30am IST on the 1st, "this month" filters
+  // pick up last month's data. Use these everywhere instead of new Date().toISOString().slice(...)
+  window._ymdLocal = () => { const d = new Date(); const p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+  window._ymLocal = () => window._ymdLocal().slice(0,7);
+
   document.querySelectorAll(".nav-item").forEach(n => {
     n.addEventListener("click", () => {
       const p = n.dataset.page;
@@ -4051,7 +4057,7 @@
               const totalRev = liveRows.reduce((s,r) => s + (Number(r.Revenue)||0), 0);
               const totalOrders = liveRows.reduce((s,r) => s + (Number(r.Orders)||0), 0);
               const totalUnits = liveRows.reduce((s,r) => s + (Number(r.Units)||0), 0);
-              const thisMonthKey = new Date().toISOString().slice(0,7);
+              const thisMonthKey = _ymLocal();
               const thisM = liveRows.find(r => String(r.Month||'').slice(0,7) === thisMonthKey);
               const lastSync = liveRows[0]?.Synced_At ? new Date(liveRows[0].Synced_At).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '—';
               el.innerHTML = `📡 <strong>Live · auto-synced from Shopify API</strong> · ${liveRows.length} months · Total ${fmtL(totalRev)} · ${totalOrders} orders · ${totalUnits} units · This month ${thisM ? fmtL(Number(thisM.Revenue||0)) + ' (' + (thisM.Orders||0) + ' orders)' : '—'} · Last sync ${lastSync}`;
@@ -4090,7 +4096,7 @@
             el.innerHTML = `⚠️ <strong>${ch.charAt(0).toUpperCase()+ch.slice(1)}: 0 entries in Sales_${ch.charAt(0).toUpperCase()+ch.slice(1)}</strong> — the numbers below are hardcoded / manually-loaded historical data. Enter via the ${ch} entry app to populate this page live.`;
             continue;
           }
-          const today = new Date().toISOString().slice(0,10);
+          const today = _ymdLocal();
           const week = new Date(Date.now() - 7*86400000).toISOString().slice(0,10);
           const totalRev = data.reduce((s,r) => s + (Number(r[cfg.rev])||0), 0);
           const weekRev = data.filter(r => String(r[cfg.date]||'').slice(0,10) >= week).reduce((s,r) => s + (Number(r[cfg.rev])||0), 0);
@@ -4127,7 +4133,7 @@
         const ci = (ciR && ciR.data) || [];
         const stk = (stkR && stkR.data) || [];
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = _ymdLocal();
         const thisMonth = today.slice(0, 7);
         const fmtCr = n => '₹' + (n/10000000).toFixed(2) + 'Cr';
         const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
@@ -4363,7 +4369,7 @@
           if (!perDay[p][d].latest || t > perDay[p][d].latest) perDay[p][d].latest = t;
         });
         const promoters = Object.keys(perDay).sort();
-        const today = new Date().toISOString().slice(0,10);
+        const today = _ymdLocal();
         // Days: last 30 days
         const days = [];
         for (let i = 29; i >= 0; i--) days.push(new Date(Date.now() - i*86400000).toISOString().slice(0,10));
@@ -4493,7 +4499,7 @@
         const promoters = Object.keys(trend).sort();
         const fmtDay = ymd => { const d = new Date(ymd); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); };
         const fmtDow = ymd => { const d = new Date(ymd); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]; };
-        const today = new Date().toISOString().slice(0,10);
+        const today = _ymdLocal();
         const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
         const card = document.createElement('div');
         card.className = 'card';
@@ -4546,7 +4552,7 @@
         'OIL-WO-100':'CURIO-WALNUT-OIL-100','OIL-APO-100':'CURIO-APRICOT-OIL-100',
         'OIL-ALO-100':'CURIO-ALMOND-OIL-100','OIL-MU-500':'CURIO-MUSTARD-OIL-500',
       };
-      const today = new Date().toISOString().slice(0,10);
+      const today = _ymdLocal();
       let mtSellRev = 0, mtSellUnits = 0;
       (sellThrough||[]).forEach(r => {
         if (String(r.To_Time||'').slice(0,10) !== today) return;
@@ -4755,7 +4761,7 @@
       const storeInfo = window._storeNameMap || {};
       const storeName = c => storeInfo[c] || c;
       const storeChain = c => (window._storeToChain||{})[c] || '—';
-      const thisMonth = new Date().toISOString().slice(0,7);
+      const thisMonth = _ymLocal();
 
       // ==== AGGREGATIONS ====
       const invById = {}; mtInvoices.forEach(i => { invById[i.Invoice_Number] = i; });
@@ -5343,7 +5349,7 @@
     const blob = new Blob([csvParts.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `Curio_${pageName}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `Curio_${pageName}_${_ymdLocal()}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(a.href);
   };
@@ -5568,7 +5574,7 @@
     for (const b of batches) {
       const res = await CurioAPI.submit('mt_office_entry', 'admin_csv_upload', {
         date: b.date, store_code: b.store_code, store_name: b.store_code,
-        entry_method: 'csv_upload', note: b.notes.join(' | ') || `CSV upload ${new Date().toISOString().slice(0,10)}`,
+        entry_method: 'csv_upload', note: b.notes.join(' | ') || `CSV upload ${_ymdLocal()}`,
         items: b.items
       });
       if (res.ok) ok++; else fail++;
@@ -5611,7 +5617,7 @@
         <div style="display:flex; gap:8px; margin-top:16px; justify-content:flex-end;"><button class="btn-ghost" onclick="closeMtModal()">Cancel</button><button class="btn-primary" onclick="submitMtSku()">Save SKU</button></div>
         <div style="margin-top:10px; padding:10px 12px; background:#fef3c7; color:#78350f; border-radius:6px; font-size:11px;">Note: this adds to SKU_Master. Cross-channel aliases (Blinkit product ID, Amazon ASIN etc.) can be added later via the alias flow.</div>`;
     } else if (kind === 'salesEntry') {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = _ymdLocal();
       inner.style.maxWidth = '640px';
       inner.innerHTML = `<h3>📝 Enter store sales</h3>
         <div style="padding:8px 12px; background:#f0f7ff; color:#1e3a5f; border-radius:6px; font-size:12px; margin-bottom:12px;">One entry = one store × one date. Add as many SKU rows as needed. Posts to Sales_MT sheet.</div>
@@ -6153,7 +6159,7 @@
           salesEl.innerHTML = `
             <div class="page-head">
               <div><h1>Sales log</h1><div class="meta">Live across every channel · ${rows.length.toLocaleString('en-IN')} entries · ${fmtCr(totalRev)} · ${totalUnits.toLocaleString('en-IN')} units</div></div>
-              <button class="btn" onclick="event.stopPropagation(); (function(){const csv='Date,Channel,Entered by,SKU/Ref,Units,Revenue\\n'+${JSON.stringify(rows)}.map(r=>[r.date,r.channel,r.who,r.sku,r.units,r.revenue].join(',')).join('\\n');const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='sales_log_'+new Date().toISOString().slice(0,10)+'.csv';a.click();})()">Export CSV</button>
+              <button class="btn" onclick="event.stopPropagation(); (function(){const csv='Date,Channel,Entered by,SKU/Ref,Units,Revenue\\n'+${JSON.stringify(rows)}.map(r=>[r.date,r.channel,r.who,r.sku,r.units,r.revenue].join(',')).join('\\n');const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='sales_log_'+_ymdLocal()+'.csv';a.click();})()">Export CSV</button>
             </div>
             <div class="card">
               <div class="matrix-wrap"><table class="matrix" style="min-width:800px;font-size:12px;">
@@ -6210,7 +6216,7 @@
             CurioAPI.get('b2b_raw').catch(()=>({})),
           ]);
           const MI = (mtInvR.data||[]), MO = (mtOffR.data||[]), BL = (blkR.data||[]), AM = (amzR.data||[]), AMo = (amzMoR.data||[]), SL = (shLvR.data||[]), B2 = (b2R.data||[]);
-          const nowMo = new Date().toISOString().slice(0,7);
+          const nowMo = _ymLocal();
           const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
           const monthOf = d => String(d||'').slice(0,7).replace(' (partial)','');
 
