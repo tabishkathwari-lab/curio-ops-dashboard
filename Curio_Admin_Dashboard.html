@@ -1195,9 +1195,9 @@
         <div class="kpi"><div class="label">Growth</div><div class="value">…</div><div class="sub">Loading</div></div>
       </div>
 
-      <!-- ===== BLINKIT COVERAGE SNAPSHOT (from Aug 14 SKU × City × Darkstore file) ===== -->
-      <div class="card" style="border-left: 4px solid #FF9800; background:#fffbf0;">
-        <h2>🎯 Coverage snapshot · 14-Aug-2026 <span class="badge">Source: SKU Live City & Darkstore Coverage</span></h2>
+      <!-- ===== BLINKIT COVERAGE SNAPSHOT — populated live from Blinkit_Availability ===== -->
+      <div class="card" id="blinkitCoverageCard" style="border-left: 4px solid #FF9800; background:#fffbf0;">
+        <h2 id="blinkitCoverageTitle">🎯 Coverage snapshot · Loading… <span class="badge">Source: Blinkit_Availability (live)</span></h2>
         <p style="font-size: 12px; color: #666; margin: -6px 0 12px;">All 15 SKUs are now live on Blinkit — up from just 3 last month. 4 SKUs are still at Level 2 (only 3 cities each) and are the biggest expansion opportunity.</p>
 
         <div class="kpi-row" style="margin-bottom: 14px;">
@@ -3717,6 +3717,70 @@
               <tr>${months.map(_ => '<th class="num">Qty</th><th class="num">₹</th>').join('')}</tr></thead>
               <tbody>${skus.map(sku => `<tr><td style="text-align:left;">${sku}</td>${months.map(m => { const c = bySkuMonth[sku][m]; return `<td class="num">${c ? c.qty : '—'}</td><td class="num">${c && c.rev > 0 ? Math.round(c.rev).toLocaleString('en-IN') : '—'}</td>`; }).join('')}</tr>`).join('')}</tbody>
             </table></div>`;
+          return;
+        }
+
+        // ---- COVERAGE SNAPSHOT — full live rewrite from Blinkit_Availability ----
+        if (/Coverage snapshot/i.test(title) && card.id === 'blinkitCoverageCard') {
+          if (avail.length === 0) {
+            card.innerHTML = `<h2>🎯 Coverage snapshot <span class="badge">Live</span></h2><div style="padding:24px; color:#999; text-align:center;">No entries in Blinkit_Availability yet.</div>`;
+            return;
+          }
+          const uploadedAt = avail[0].Uploaded_At || avail[0].uploaded_at || '';
+          const upDate = new Date(uploadedAt);
+          const daysAgo = Math.floor((Date.now() - upDate.getTime()) / 86400000);
+          const upBy = avail[0].Uploaded_By || avail[0].uploaded_by || '—';
+          const upDateStr = isNaN(upDate) ? '—' : upDate.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+          const staleColor = daysAgo <= 2 ? '#166534' : daysAgo <= 7 ? '#92400e' : '#991b1b';
+          const staleLabel = daysAgo <= 1 ? 'fresh' : daysAgo + ' days ago';
+
+          // Aggregate by SKU
+          const bySku = {};
+          const cityByDS = {};
+          avail.forEach(r => {
+            const skuKey = r.SKU_Key || r.sku_key;
+            const skuName = r.SKU_Name || r.sku_name || skuKey;
+            const city = r.City || r.city;
+            const ds = Number(r.Darkstores || r.darkstores || 0);
+            if (!bySku[skuKey]) bySku[skuKey] = { name: skuName, cities: new Set(), darkstores: 0 };
+            if (ds > 0) { bySku[skuKey].cities.add(city); bySku[skuKey].darkstores += ds; }
+            if (!cityByDS[city]) cityByDS[city] = { totalDs: 0, skus: new Set(), cityTotalDs: Number(r.City_Total_DS || r.city_total_ds || 0) };
+            if (ds > 0) { cityByDS[city].skus.add(skuKey); cityByDS[city].totalDs += ds; }
+          });
+          const skusLive = Object.values(bySku).filter(s => s.cities.size > 0).length;
+          const citiesLive = Object.keys(cityByDS).filter(c => cityByDS[c].totalDs > 0).length;
+          const totalDsSlots = avail.reduce((s,r) => s + Number(r.Darkstores || r.darkstores || 0), 0);
+          const skuList = Object.entries(bySku).map(([k,v]) => ({ key:k, name:v.name, cities:v.cities.size, darkstores:v.darkstores })).sort((a,b) => b.darkstores - a.darkstores);
+          const cityList = Object.entries(cityByDS).map(([c,v]) => ({ city:c, totalDs:v.totalDs, skus:v.skus.size, cityCap:v.cityTotalDs })).filter(x => x.totalDs > 0).sort((a,b) => b.totalDs - a.totalDs).slice(0, 15);
+          const maxDs = cityList[0]?.totalDs || 1;
+          const widest = skuList[0];
+
+          card.innerHTML = `
+            <h2>🎯 Coverage snapshot · <span style="color:${staleColor};">${upDateStr}</span> <span class="badge ok">Live from Blinkit_Availability</span></h2>
+            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Uploaded ${staleLabel} by ${upBy} · ${avail.length.toLocaleString('en-IN')} city × SKU records${daysAgo > 7 ? ' <span style="color:#991b1b; font-weight:600;">⚠️ Data is stale — Faraaz should re-upload the latest Blinkit coverage export</span>' : ''}</p>
+            <div class="kpi-row" style="margin-bottom:14px;">
+              <div class="kpi"><div class="label">SKUs live</div><div class="value">${skusLive} / ${Object.keys(bySku).length}</div><div class="sub">Catalog reach on Blinkit</div></div>
+              <div class="kpi"><div class="label">Cities live</div><div class="value">${citiesLive}</div><div class="sub">Distinct cities with ≥1 SKU</div></div>
+              <div class="kpi"><div class="label">Total darkstore slots</div><div class="value">${totalDsSlots.toLocaleString('en-IN')}</div><div class="sub">Sum of SKU × store combinations</div></div>
+              <div class="kpi"><div class="label">Widest reach</div><div class="value" style="font-size:14px;">${widest?.name?.replace('Curio Lifestyle ', '') || '—'}</div><div class="sub">${widest?.cities || 0} cities · ${widest?.darkstores || 0} darkstores</div></div>
+            </div>
+            <div class="grid-2" style="margin-top:8px;">
+              <div>
+                <h3 style="font-size:13px; margin:12px 0 6px;">SKU coverage · sorted by darkstores</h3>
+                <table style="font-size:12px;">
+                  <thead><tr><th style="text-align:left;">SKU</th><th class="num">Cities</th><th class="num">Darkstores</th></tr></thead>
+                  <tbody>${skuList.map(s => { const tier = s.cities >= 50 ? 'ok' : s.cities >= 10 ? '' : 'warn'; return `<tr${tier==='warn'?' style="background:#fef3c7;"':tier==='ok'?' style="background:#dcfce7;"':''}><td>${s.name.replace('Curio Lifestyle ', '')}</td><td class="num">${s.cities}</td><td class="num" style="font-weight:600;">${s.darkstores}</td></tr>`; }).join('')}</tbody>
+                </table>
+              </div>
+              <div>
+                <h3 style="font-size:13px; margin:12px 0 6px;">Top cities · by total darkstore density</h3>
+                <table style="font-size:12px;">
+                  <thead><tr><th style="text-align:left;">City</th><th class="num">Total DS</th><th class="num">SKUs</th><th>Bar</th></tr></thead>
+                  <tbody>${cityList.map(c => `<tr><td>${c.city}</td><td class="num" style="font-weight:600;">${c.totalDs.toLocaleString('en-IN')}</td><td class="num">${c.skus}</td><td><span class="bar" style="display:inline-block; height:8px; width:${Math.max(4, Math.round(c.totalDs/maxDs*100))}px; background:${c.totalDs>=200?'#f59e0b':'#5E8E3E'};"></span></td></tr>`).join('')}</tbody>
+                </table>
+              </div>
+            </div>
+          `;
           return;
         }
 
