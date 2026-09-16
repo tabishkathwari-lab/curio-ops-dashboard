@@ -286,7 +286,7 @@
 
     <div class="date-bar">
       <label>Reporting date</label>
-      <input type="date" id="dateInp" />
+      <input type="date" id="dateInp" required />
       <label>·</label>
       <div style="font-size: 13px; color: #666;">Blinkit report received via <select style="padding: 6px 10px; border-radius: 6px; border: 1px solid #ddd; font-size: 13px; background: #fff;"><option>Email</option><option>Seller Portal export</option><option>WhatsApp</option></select></div>
       <div class="status-chip" id="statusChip">Not submitted yet</div>
@@ -837,6 +837,29 @@
     document.getElementById("saveDate").textContent = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   });
 
+  // --- Force conscious date selection (backdating is common — do NOT default to today) ---
+  // Leaves the input empty and paints it red until a date is picked; blocks submit if still blank.
+  (function highlightDateUntilPicked(){
+    const inp = document.getElementById("dateInp");
+    if (!inp) return;
+    const paint = () => {
+      if (!inp.value) {
+        inp.style.border = '2px solid #dc2626';
+        inp.style.background = '#fef2f2';
+        inp.style.boxShadow = '0 0 0 3px rgba(220,38,38,0.15)';
+        inp.setAttribute('title', 'Pick the sales date — do NOT leave blank. Backdate is fine, but blank rows land in the sheet with no date.');
+      } else {
+        inp.style.border = '';
+        inp.style.background = '';
+        inp.style.boxShadow = '';
+        inp.removeAttribute('title');
+      }
+    };
+    inp.addEventListener('input', paint);
+    inp.addEventListener('change', paint);
+    paint();
+  })();
+
   // Tabs
   document.querySelectorAll(".tab").forEach(t => {
     t.addEventListener("click", () => {
@@ -924,6 +947,12 @@
       return;
     }
     const dateStr = document.getElementById("dateInp").value;
+    if (!dateStr) {
+      alert("⚠️ Please select a date at the top of the form before submitting.\n\nThis prevents rows from being saved with a blank Date.");
+      document.getElementById("dateInp").focus();
+      document.getElementById("dateInp").scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
     // Quick headline metrics — read the prominent inputs and merge into state.metrics + attach ad_spend to first row
     const quickAd = Number(document.getElementById('quickAdSpend')?.value || 0);
     const quickDirectAd = Number(document.getElementById('quickDirectAdSales')?.value || 0);
