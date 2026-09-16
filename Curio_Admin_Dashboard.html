@@ -501,64 +501,76 @@
         <button class="btn">Export report</button>
       </div>
 
-      <div class="kpi-row">
-        <div class="kpi">
-          <div class="label">Check-ins today</div>
-          <div class="value">—</div>
-          <div class="sub">Updates as promoters check in via the app</div>
+      <!-- Today's operations pulse — kept small, not the main event -->
+      <div class="kpi-row" style="grid-template-columns:repeat(5,1fr);">
+        <div class="kpi"><div class="label">Check-ins today</div><div class="value">—</div><div class="sub">Promoters checked in</div></div>
+        <div class="kpi"><div class="label">Units sold today</div><div class="value">—</div><div class="sub">Across all channels</div></div>
+        <div class="kpi"><div class="label">Revenue today</div><div class="value">—</div><div class="sub">All channel entries</div></div>
+        <div class="kpi"><div class="label">Attendance today</div><div class="value">—</div><div class="sub">Promoters on shift</div></div>
+        <div class="kpi"><div class="label">Out of stock alerts</div><div class="value">—</div><div class="sub">Store × SKU pairs</div></div>
+      </div>
+
+      <!-- SALES FRAMEWORK PANEL — the main event -->
+      <div class="card" id="salesFrameworkCard" style="margin-bottom:20px; padding:0; overflow:hidden;">
+        <div style="padding:20px 24px 16px; background:linear-gradient(90deg,#f8fafc,#fff); border-bottom:1px solid #e5e7eb;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div>
+              <h2 style="margin:0; font-size:20px;">💰 Sales · Primary + Secondary</h2>
+              <div style="font-size:12px; color:#64748b; margin-top:2px;" id="sfPeriodLabel">Loading…</div>
+            </div>
+            <div class="sf-toggle" id="sfToggle" style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:10px;">
+              <button data-fy="FY27" class="sf-btn active">FY27</button>
+              <button data-fy="FY26" class="sf-btn">FY26</button>
+              <button data-fy="FY25" class="sf-btn">FY25</button>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+            <div style="background:#eff6ff; border-left:4px solid #1e40af; padding:12px 14px; border-radius:8px;">
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:#1e40af;">🟦 Primary total</div>
+              <div style="font-size:28px; font-weight:800; color:#1e40af; margin-top:4px; line-height:1;" id="sfPrimaryTotal">—</div>
+              <div style="font-size:11px; color:#475569; margin-top:6px;">Curio invoiced revenue (Zoho)</div>
+            </div>
+            <div style="background:#f0fdf4; border-left:4px solid #166534; padding:12px 14px; border-radius:8px;">
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:#166534;">🟩 Secondary total</div>
+              <div style="font-size:28px; font-weight:800; color:#166534; margin-top:4px; line-height:1;" id="sfSecondaryTotal">—</div>
+              <div style="font-size:11px; color:#475569; margin-top:6px;">Reached end consumer (portals)</div>
+            </div>
+            <div style="background:#fef8e7; border-left:4px solid #b45309; padding:12px 14px; border-radius:8px;">
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:#92400e;">🟨 Buffer (Primary − Secondary)</div>
+              <div style="font-size:28px; font-weight:800; color:#92400e; margin-top:4px; line-height:1;" id="sfGap">—</div>
+              <div style="font-size:11px; color:#475569; margin-top:6px;">Stock sitting at chain warehouses</div>
+            </div>
+          </div>
         </div>
-        <div class="kpi">
-          <div class="label">Units sold today</div>
-          <div class="value">—</div>
-          <div class="sub">From today's entry-app submissions</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Revenue today</div>
-          <div class="value">—</div>
-          <div class="sub">From today's entry-app submissions</div>
-        </div>
-        <div class="kpi">
-          <div class="label">MT this month</div>
-          <div class="value">—</div>
-          <div class="sub">Populates from store reports + promoter submissions</div>
-        </div>
-        <div class="kpi" style="background: linear-gradient(135deg, #fff8e1, #fff); border-color: #fde68a;">
-          <div class="label">⚡ Blinkit this month</div>
-          <div class="value">—</div>
-          <div class="sub">Populates from daily Blinkit entries</div>
-        </div>
-        <div class="kpi" style="background: linear-gradient(135deg, #f3e8ff, #fff); border-color: #a78bfa;">
-          <div class="label">💼 B2B this year (real)</div>
-          <div class="value">₹1.93Cr</div>
-          <div class="sub">81 customers · Kissansay + Lulu + 76 J&amp;K</div>
-        </div>
-        <div class="kpi" style="background: linear-gradient(135deg, #fef3c7, #fff); border-color: #f59e0b;">
-          <div class="label">⚡ Blinkit primary (real)</div>
-          <div class="value">—</div>
-          <div class="sub">Curio → Blinkit warehouse (Zoho invoices)</div>
-        </div>
-        <div class="kpi" style="background: linear-gradient(135deg, #dbeafe, #fff); border-color: #1e40af;">
-          <div class="label">🏬 MT this year (real)</div>
-          <div class="value">…</div>
-          <div class="sub">Loading from Zoho invoices</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Attendance today</div>
-          <div class="value">—</div>
-          <div class="sub">Updates when promoters check in</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Out of stock alerts</div>
-          <div class="value">—</div>
-          <div class="sub">Flags from stock reports</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0;">
+          <div style="padding:18px 24px; border-right:1px solid #e5e7eb;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div style="font-size:13px; font-weight:700; color:#1e40af;">🟦 PRIMARY · by channel</div>
+              <div style="font-size:10px; color:#64748b;">Curio → Buyer · invoice booked</div>
+            </div>
+            <div id="sfPrimaryList"></div>
+          </div>
+          <div style="padding:18px 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div style="font-size:13px; font-weight:700; color:#166534;">🟩 SECONDARY · by channel</div>
+              <div style="font-size:10px; color:#64748b;">Product → Consumer · sell-through</div>
+            </div>
+            <div id="sfSecondaryList"></div>
+          </div>
         </div>
       </div>
 
-      <!-- PRIMARY vs SECONDARY sale panel — populated live -->
-      <div class="card" id="primarySecondaryCard" style="margin-bottom:18px; background:linear-gradient(135deg,#fef8e7,#f0f9ff); border-left:4px solid #f59e0b;">
-        <h2>🔄 Primary vs Secondary sales <span class="badge">Loading…</span></h2>
-        <div style="padding:20px; text-align:center; color:#999;">Computing primary (Curio → chains) vs secondary (chains → consumers)…</div>
-      </div>
+      <style>
+        .sf-btn{padding:7px 14px; border:none; background:transparent; border-radius:7px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; color:#64748b; transition:all 0.12s;}
+        .sf-btn:hover{background:#e2e8f0; color:#0f172a;}
+        .sf-btn.active{background:#1F4E78; color:#fff;}
+        .sf-row{display:flex; align-items:center; padding:9px 0; border-bottom:1px solid #f1f5f9; font-size:13px;}
+        .sf-row:last-child{border-bottom:none;}
+        .sf-row .sf-name{flex:1; font-weight:600; color:#0f172a;}
+        .sf-row .sf-amt{font-weight:700; color:#0f172a; font-variant-numeric:tabular-nums; margin-left:12px;}
+        .sf-row .sf-meta{font-size:11px; color:#64748b; margin-left:12px;}
+        .sf-empty{padding:14px 0; color:#94a3b8; font-size:12px; font-style:italic; text-align:center;}
+      </style>
 
       <div class="grid-2">
         <div class="card">
@@ -6546,6 +6558,106 @@
       } catch(e) { console.warn('Secondary page render failed:', e); }
     })();
   })();
+</script>
+
+<!-- === SALES FRAMEWORK panel (Primary + Secondary + FY toggle) === -->
+<script>
+(async () => {
+  if (typeof CurioAPI === 'undefined') return;
+  const FY = {
+    FY27: {start:'2026-04-01', end:'2027-03-31', label:'FY27 · 1 Apr 2026 → 31 Mar 2027'},
+    FY26: {start:'2025-04-01', end:'2026-03-31', label:'FY26 · 1 Apr 2025 → 31 Mar 2026'},
+    FY25: {start:'2024-04-01', end:'2025-03-31', label:'FY25 · 1 Apr 2024 → 31 Mar 2025'},
+  };
+  const fmtL = n => !n ? '₹0' : n>=10000000 ? '₹'+(n/10000000).toFixed(2)+'Cr' : n>=100000 ? '₹'+(n/100000).toFixed(2)+'L' : '₹'+Math.round(n).toLocaleString('en-IN');
+  const toIso = v => { if(!v) return null; const s=String(v); if(s.includes('T')) return s.slice(0,10); const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){let y=m[3]; if(y.length===2) y='20'+y; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;} return s.slice(0,10); };
+
+  let RAW = null;
+  async function load() {
+    const [mi, bl, mo, sh, b2, am, amo] = await Promise.all([
+      CurioAPI.get('mt_invoices').catch(()=>({})),
+      CurioAPI.get('blinkit_raw').catch(()=>({})),
+      CurioAPI.get('mt_office_entries').catch(()=>({})),
+      CurioAPI.get('shopify_live').catch(()=>({})),
+      CurioAPI.get('b2b_raw').catch(()=>({})),
+      CurioAPI.get('amazon_raw').catch(()=>({})),
+      CurioAPI.get('amazon_monthly').catch(()=>({})),
+    ]);
+    RAW = {mi:mi.data||[], bl:bl.data||[], mo:mo.data||[], sh:sh.data||[], b2:b2.data||[], am:am.data||[], amo:amo.data||[]};
+  }
+
+  function compute(fyKey) {
+    const {start, end} = FY[fyKey];
+    const inFy = d => d && d>=start && d<=end;
+    const primary = {}, secondary = {};
+    const acc = (obj, key, amt) => obj[key] = (obj[key]||0) + Number(amt||0);
+
+    // PRIMARY = Zoho invoices, split by chain. Direct sellers (B2B/Shopify) also count as primary (Curio invoiced)
+    RAW.mi.forEach(i => { const d = toIso(i.Month) || toIso(i.Date); if(inFy(d)) acc(primary, i.Chain||'Other', i.Total); });
+    RAW.sh.forEach(x => { const d = toIso(x.Month || x.Date); if(inFy(d)) acc(primary, 'Shopify D2C', x.Revenue); });
+    RAW.b2.forEach(x => { const d = toIso(x.Order_Date || x.Date); if(inFy(d)) acc(primary, 'B2B (Kissansay, Lulu, J&K)', x.Total_Amount || x.Amount); });
+
+    // SECONDARY = product reached consumer. Blinkit portal, MT tracker, Amazon reports. Plus Shopify/B2B (which are secondary by nature since they go straight to consumer)
+    RAW.bl.forEach(x => { const d = toIso(x.Date); if(inFy(d)) acc(secondary, 'Blinkit portal', x.Net_Sales || x.Total_Sales); });
+    RAW.mo.forEach(x => { const d = toIso(x.Date); if(inFy(d)) acc(secondary, 'Modern Trade tracker', x.Revenue); });
+    RAW.am.forEach(x => { const d = toIso(x.Date); if(inFy(d)) acc(secondary, 'Amazon consumer', x.Ordered_Product_Sales || x.Total_Sales); });
+    RAW.amo.forEach(x => { const d = toIso(x.Month); if(inFy(d) && !secondary['Amazon consumer']) acc(secondary, 'Amazon consumer (monthly)', x.Ordered_Product_Sales || x.Total_Sales); });
+    RAW.sh.forEach(x => { const d = toIso(x.Month || x.Date); if(inFy(d)) acc(secondary, 'Shopify D2C', x.Revenue); });
+    RAW.b2.forEach(x => { const d = toIso(x.Order_Date || x.Date); if(inFy(d)) acc(secondary, 'B2B (Kissansay, Lulu, J&K)', x.Total_Amount || x.Amount); });
+
+    return {primary, secondary};
+  }
+
+  function renderList(el, obj, colorClass) {
+    const entries = Object.entries(obj).sort((a,b) => b[1]-a[1]);
+    if (!entries.length || entries.every(([,v]) => !v)) {
+      el.innerHTML = '<div class="sf-empty">No data loaded for this period yet</div>';
+      return;
+    }
+    const total = entries.reduce((s,[,v]) => s+v, 0);
+    el.innerHTML = entries.map(([k,v]) => {
+      const pct = total ? (v/total*100).toFixed(0) : 0;
+      const barPct = total ? Math.round(v/Math.max(...entries.map(e=>e[1]))*100) : 0;
+      const zero = !v;
+      return `<div class="sf-row">
+        <div style="width:110px; height:4px; border-radius:99px; background:#e5e7eb; margin-right:12px; overflow:hidden;"><div style="width:${barPct}%; height:100%; background:${colorClass==='primary'?'#1e40af':'#166534'};"></div></div>
+        <div class="sf-name">${k}</div>
+        <div class="sf-amt" style="${zero?'color:#dc2626':''}">${zero?'₹0 ⚠':fmtL(v)}</div>
+        <div class="sf-meta">${pct}%</div>
+      </div>`;
+    }).join('');
+  }
+
+  function render(fyKey) {
+    const {primary, secondary} = compute(fyKey);
+    const pTot = Object.values(primary).reduce((s,v)=>s+v,0);
+    const sTot = Object.values(secondary).reduce((s,v)=>s+v,0);
+    const gap = pTot - sTot;
+    document.getElementById('sfPeriodLabel').textContent = FY[fyKey].label;
+    document.getElementById('sfPrimaryTotal').textContent = fmtL(pTot);
+    document.getElementById('sfSecondaryTotal').textContent = fmtL(sTot);
+    document.getElementById('sfGap').textContent = (gap>=0?'+':'') + fmtL(gap);
+    renderList(document.getElementById('sfPrimaryList'), primary, 'primary');
+    renderList(document.getElementById('sfSecondaryList'), secondary, 'secondary');
+  }
+
+  document.querySelectorAll('#sfToggle .sf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#sfToggle .sf-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render(btn.dataset.fy);
+    });
+  });
+
+  try {
+    await load();
+    render('FY27');
+  } catch (e) {
+    console.warn('Sales framework panel load failed:', e);
+    document.getElementById('sfPrimaryList').innerHTML = '<div class="sf-empty">Backend unreachable — try refresh</div>';
+    document.getElementById('sfSecondaryList').innerHTML = '<div class="sf-empty">Backend unreachable — try refresh</div>';
+  }
+})();
 </script>
 </body>
 </html>
