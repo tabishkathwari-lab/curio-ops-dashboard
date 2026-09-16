@@ -6659,5 +6659,151 @@
   }
 })();
 </script>
+
+<!-- === CHANNEL PAGES: Primary + Secondary panel (same framework applied per channel) === -->
+<script>
+(async () => {
+  if (typeof CurioAPI === 'undefined') return;
+  const FY = {
+    FY27: {start:'2026-04-01', end:'2027-03-31', label:'FY27 · 1 Apr 2026 → 31 Mar 2027'},
+    FY26: {start:'2025-04-01', end:'2026-03-31', label:'FY26 · 1 Apr 2025 → 31 Mar 2026'},
+    FY25: {start:'2024-04-01', end:'2025-03-31', label:'FY25 · 1 Apr 2024 → 31 Mar 2025'},
+  };
+  const fmtL = n => !n ? '₹0' : n>=10000000 ? '₹'+(n/10000000).toFixed(2)+'Cr' : n>=100000 ? '₹'+(n/100000).toFixed(2)+'L' : '₹'+Math.round(n).toLocaleString('en-IN');
+  const toIso = v => { if(!v) return null; const s=String(v); if(s.includes('T')) return s.slice(0,10); const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){let y=m[3]; if(y.length===2) y='20'+y; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;} return s.slice(0,10); };
+
+  const CHANNELS = {
+    blinkit: { pageId:'page-blinkit', title:'⚡ Blinkit · Primary + Secondary', primaryLabel:'Curio → Blinkit warehouse (Zoho invoices)', secondaryLabel:'Blinkit → end consumer (portal orders)', primaryFilter: i => /blinkit/i.test(String(i.Chain||'')), primarySource:'mi', secondarySource:'bl', type:'consignment' },
+    amazon: { pageId:'page-amazon', title:'📦 Amazon · Primary + Secondary', primaryLabel:'Curio → Amazon FBA (Zoho invoices)', secondaryLabel:'Amazon → end consumer (order reports)', primaryFilter: i => /amazon/i.test(String(i.Chain||'')), primarySource:'mi', secondarySource:'am', type:'consignment' },
+    mt: { pageId:'page-mt-overview', title:'🏬 Modern Trade · Primary + Secondary', primaryLabel:'Curio → MT chains (Zoho invoices)', secondaryLabel:'MT chains → end consumer (promoter tracker)', primaryFilter: i => !/blinkit|amazon/i.test(String(i.Chain||'')), primarySource:'mi', secondarySource:'mo', type:'consignment' },
+    shopify: { pageId:'page-shopify', title:'🛒 Shopify D2C · Direct sales', primaryLabel:'Curio → end consumer (website orders — invoiced and delivered directly)', secondaryLabel:'', primaryFilter:null, primarySource:'sh', secondarySource:'sh', type:'direct' },
+    b2b: { pageId:'page-b2b', title:'💼 B2B · Direct sales', primaryLabel:'Curio → bulk buyers (Kissansay, Lulu, J&K — invoiced and delivered directly)', secondaryLabel:'', primaryFilter:null, primarySource:'b2', secondarySource:'b2', type:'direct' },
+  };
+
+  let RAW = null;
+  async function load() {
+    const [mi, bl, mo, sh, b2, am] = await Promise.all([
+      CurioAPI.get('mt_invoices').catch(()=>({})),
+      CurioAPI.get('blinkit_raw').catch(()=>({})),
+      CurioAPI.get('mt_office_entries').catch(()=>({})),
+      CurioAPI.get('shopify_live').catch(()=>({})),
+      CurioAPI.get('b2b_raw').catch(()=>({})),
+      CurioAPI.get('amazon_raw').catch(()=>({})),
+    ]);
+    RAW = {mi:mi.data||[], bl:bl.data||[], mo:mo.data||[], sh:sh.data||[], b2:b2.data||[], am:am.data||[]};
+  }
+
+  function computeChannel(cfg, fyKey) {
+    const {start, end} = FY[fyKey];
+    const inFy = d => d && d>=start && d<=end;
+    let pT=0, pC=0, sT=0, sC=0;
+    const pByMo={}, sByMo={};
+    if (cfg.primarySource === 'mi') {
+      RAW.mi.forEach(i => { const d=toIso(i.Month)||toIso(i.Date); if(!inFy(d)) return; if(cfg.primaryFilter && !cfg.primaryFilter(i)) return; const amt=Number(i.Total||0); pT+=amt; pC++; const m=d.slice(0,7); pByMo[m]=(pByMo[m]||0)+amt; });
+    } else if (cfg.primarySource === 'sh') {
+      RAW.sh.forEach(x => { const d=toIso(x.Month||x.Date); if(inFy(d)){ const amt=Number(x.Revenue||0); pT+=amt; pC++; const m=d.slice(0,7); pByMo[m]=(pByMo[m]||0)+amt; }});
+    } else if (cfg.primarySource === 'b2') {
+      RAW.b2.forEach(x => { const d=toIso(x.Order_Date||x.Date); if(inFy(d)){ const amt=Number(x.Total_Amount||x.Amount||0); pT+=amt; pC++; const m=d.slice(0,7); pByMo[m]=(pByMo[m]||0)+amt; }});
+    }
+    if (cfg.secondarySource === 'bl') {
+      RAW.bl.forEach(r => { const d=toIso(r.Date); if(inFy(d)){ const amt=Number(r.Net_Sales||r.Total_Sales||0); sT+=amt; sC++; const m=d.slice(0,7); sByMo[m]=(sByMo[m]||0)+amt; }});
+    } else if (cfg.secondarySource === 'mo') {
+      RAW.mo.forEach(r => { const d=toIso(r.Date); if(inFy(d)){ const amt=Number(r.Revenue||0); sT+=amt; sC++; const m=d.slice(0,7); sByMo[m]=(sByMo[m]||0)+amt; }});
+    } else if (cfg.secondarySource === 'am') {
+      RAW.am.forEach(r => { const d=toIso(r.Date); if(inFy(d)){ const amt=Number(r.Ordered_Product_Sales||r.Total_Sales||0); sT+=amt; sC++; const m=d.slice(0,7); sByMo[m]=(sByMo[m]||0)+amt; }});
+    } else if (cfg.type === 'direct') {
+      sT = pT; sC = pC; Object.assign(sByMo, pByMo);
+    }
+    return {pT, pC, sT, sC, pByMo, sByMo};
+  }
+
+  function renderPanel(cfg) {
+    const page = document.getElementById(cfg.pageId);
+    if (!page) return;
+    if (page.querySelector('.ch-ps-panel')) return;
+    const panel = document.createElement('div');
+    panel.className = 'ch-ps-panel card';
+    panel.style.cssText = 'margin-bottom:18px; padding:0; overflow:hidden;';
+    const isDirect = cfg.type === 'direct';
+    panel.innerHTML = `
+      <div style="padding:18px 22px 14px; background:linear-gradient(90deg,#f8fafc,#fff); border-bottom:1px solid #e5e7eb;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h2 style="margin:0; font-size:17px;">${cfg.title}</h2>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;" data-role="periodLabel">Loading…</div>
+          </div>
+          <div class="ch-fy-toggle" style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:9px;">
+            <button data-fy="FY27" class="ch-fy-btn active">FY27</button>
+            <button data-fy="FY26" class="ch-fy-btn">FY26</button>
+            <button data-fy="FY25" class="ch-fy-btn">FY25</button>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:${isDirect?'1fr':'1fr 1fr 1fr'}; gap:10px;">
+          <div style="background:#eff6ff; border-left:3px solid #1e40af; padding:10px 12px; border-radius:6px;">
+            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:#1e40af;">🟦 ${isDirect?'Direct Sales':'Primary Total'}</div>
+            <div style="font-size:22px; font-weight:800; color:#1e40af; margin-top:2px; line-height:1;" data-role="primaryTotal">—</div>
+            <div style="font-size:10px; color:#475569; margin-top:3px;">${cfg.primaryLabel}</div>
+          </div>
+          ${isDirect ? '' : `
+          <div style="background:#f0fdf4; border-left:3px solid #166534; padding:10px 12px; border-radius:6px;">
+            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:#166534;">🟩 Secondary Total</div>
+            <div style="font-size:22px; font-weight:800; color:#166534; margin-top:2px; line-height:1;" data-role="secondaryTotal">—</div>
+            <div style="font-size:10px; color:#475569; margin-top:3px;">${cfg.secondaryLabel}</div>
+          </div>
+          <div style="background:#fef8e7; border-left:3px solid #b45309; padding:10px 12px; border-radius:6px;">
+            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:#92400e;">🟨 Buffer (P − S)</div>
+            <div style="font-size:22px; font-weight:800; color:#92400e; margin-top:2px; line-height:1;" data-role="gapTotal">—</div>
+            <div style="font-size:10px; color:#475569; margin-top:3px;">Stock at chain warehouse</div>
+          </div>
+          `}
+        </div>
+      </div>
+      <div style="padding:14px 22px; display:grid; grid-template-columns:${isDirect?'1fr':'1fr 1fr'}; gap:20px;">
+        <div>
+          <div style="font-size:12px; font-weight:700; color:#1e40af; margin-bottom:8px;">🟦 ${isDirect?'Direct':'Primary'} · month-wise</div>
+          <div data-role="primaryMonthList"></div>
+        </div>
+        ${isDirect ? '' : `<div>
+          <div style="font-size:12px; font-weight:700; color:#166534; margin-bottom:8px;">🟩 Secondary · month-wise</div>
+          <div data-role="secondaryMonthList"></div>
+        </div>`}
+      </div>
+    `;
+    const head = page.querySelector('.page-head');
+    if (head && head.parentNode) head.parentNode.insertBefore(panel, head.nextSibling);
+    else page.insertBefore(panel, page.firstChild);
+
+    function renderMonthList(el, byMo, colorClass) {
+      const entries = Object.entries(byMo).sort((a,b)=>a[0].localeCompare(b[0]));
+      if (!entries.length) { el.innerHTML = '<div style="font-size:12px; color:#94a3b8; font-style:italic; padding:8px 0;">No data yet</div>'; return; }
+      const max = Math.max(...entries.map(e=>e[1]));
+      const monthName = m => { const [y,mo]=m.split('-'); const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[Number(mo)-1]+" '"+y.slice(2); };
+      el.innerHTML = entries.map(([m,v])=>{ const bw=max>0?Math.round(v/max*100):0; return `<div style="display:flex; align-items:center; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:12px;"><div style="width:80px; color:#0f172a; font-weight:600;">${monthName(m)}</div><div style="flex:1; height:5px; border-radius:99px; background:#e5e7eb; margin:0 12px; overflow:hidden;"><div style="width:${bw}%; height:100%; background:${colorClass==='primary'?'#1e40af':'#166534'};"></div></div><div style="font-weight:700; font-variant-numeric:tabular-nums; color:#0f172a;">${fmtL(v)}</div></div>`; }).join('');
+    }
+
+    function render(fyKey) {
+      const d = computeChannel(cfg, fyKey);
+      panel.querySelector('[data-role="periodLabel"]').textContent = FY[fyKey].label;
+      panel.querySelector('[data-role="primaryTotal"]').textContent = fmtL(d.pT);
+      const st = panel.querySelector('[data-role="secondaryTotal"]'); if (st) st.textContent = fmtL(d.sT);
+      const gap = panel.querySelector('[data-role="gapTotal"]'); if (gap) { const g=d.pT-d.sT; gap.textContent = (g>=0?'+':'') + fmtL(g); }
+      renderMonthList(panel.querySelector('[data-role="primaryMonthList"]'), d.pByMo, 'primary');
+      const sl = panel.querySelector('[data-role="secondaryMonthList"]'); if (sl) renderMonthList(sl, d.sByMo, 'secondary');
+    }
+
+    panel.querySelectorAll('.ch-fy-btn').forEach(btn => { btn.addEventListener('click', () => { panel.querySelectorAll('.ch-fy-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); render(btn.dataset.fy); }); });
+    render('FY27');
+  }
+
+  try { await load(); Object.values(CHANNELS).forEach(cfg => renderPanel(cfg)); }
+  catch (e) { console.warn('Channel P+S panel render failed:', e); }
+})();
+</script>
+
+<style>
+.ch-fy-btn{padding:5px 10px; border:none; background:transparent; border-radius:6px; cursor:pointer; font-size:11px; font-weight:600; font-family:inherit; color:#64748b; transition:all 0.12s;}
+.ch-fy-btn:hover{background:#e2e8f0; color:#0f172a;}
+.ch-fy-btn.active{background:#1F4E78; color:#fff;}
+</style>
 </body>
 </html>
