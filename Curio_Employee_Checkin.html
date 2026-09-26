@@ -65,6 +65,8 @@
   .dir-btn .icon { font-size: 28px; }
   .dir-btn.active { border-color: var(--brand); background: #eff6ff; color: var(--brand); }
   .dir-btn.out.active { border-color: #16a34a; background: #f0fdf4; color: #166534; }
+  .dir-btn.alt { padding: 12px 8px; font-size: 13px; }
+  .dir-btn.alt.active { border-color: #b45309; background: #fef8e7; color: #92400e; }
   .status-row { display: flex; align-items: center; gap: 10px; padding: 12px; background: #f1f5f9; border-radius: 10px; font-size: 13px; }
   .status-row .dot { width: 10px; height: 10px; border-radius: 99px; background: var(--muted); flex-shrink: 0; }
   .status-row .dot.ok { background: var(--ok); }
@@ -138,12 +140,13 @@
   <div class="card">
     <h2>Direction</h2>
     <div class="dir-row">
-      <button class="dir-btn in" id="btnIn" data-dir="IN">
-        <span class="icon">🟢</span><span>Check IN</span>
-      </button>
-      <button class="dir-btn out" id="btnOut" data-dir="OUT">
-        <span class="icon">🔴</span><span>Check OUT</span>
-      </button>
+      <button class="dir-btn in" id="btnIn" data-dir="IN"><span>Check IN</span></button>
+      <button class="dir-btn out" id="btnOut" data-dir="OUT"><span>Check OUT</span></button>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:8px;">
+      <button class="dir-btn alt" data-dir="HALF_DAY">Half day</button>
+      <button class="dir-btn alt" data-dir="LEAVE">Leave</button>
+      <button class="dir-btn alt" data-dir="WFH_DAY">WFH today</button>
     </div>
   </div>
 
@@ -250,6 +253,16 @@ document.querySelectorAll('.dir-btn').forEach(b => {
     document.querySelectorAll('.dir-btn').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
     state.direction = b.dataset.dir;
+    // For leave/half-day/wfh-day, hide GPS+selfie requirements
+    const isLeave = ['HALF_DAY','LEAVE','WFH_DAY'].includes(state.direction);
+    const cams = document.querySelectorAll('#gpsStatus, #photoStatus, #cameraWrap, #previewWrap, #startCamWrap');
+    cams.forEach(el => el.style.display = isLeave ? 'none' : '');
+    // Re-show as needed
+    if (!isLeave) {
+      document.getElementById('gpsStatus').style.display = 'flex';
+      document.getElementById('photoStatus').style.display = 'flex';
+      if (!state.photoBase64) document.getElementById('startCamWrap').style.display = 'block';
+    }
     refreshSubmit();
   });
 });
@@ -328,7 +341,9 @@ $('btnRetake').addEventListener('click', () => {
 
 // ===== SUBMIT GATE =====
 function refreshSubmit() {
-  const ok = state.emp && state.direction && state.photoBase64 && (state.emp.wfh || state.gps);
+  if (!state.emp || !state.direction) { $('submitBtn').disabled = true; return; }
+  const isLeave = ['HALF_DAY','LEAVE','WFH_DAY'].includes(state.direction);
+  const ok = isLeave ? true : (state.photoBase64 && (state.emp.wfh || state.gps));
   $('submitBtn').disabled = !ok;
 }
 
@@ -370,6 +385,9 @@ function showSuccess(msg) {
   else if (msg.includes('LATE')) { badgeClass = 'late'; badgeText = 'Late'; }
   else if (msg.includes('OUT_OF_ZONE')) { badgeClass = 'oz'; badgeText = 'Out of zone'; }
   else if (msg.includes('WFH')) { badgeClass = 'wfh'; badgeText = 'WFH'; }
+  else if (state.direction === 'HALF_DAY') { badgeClass = 'late'; badgeText = 'Half day'; }
+  else if (state.direction === 'LEAVE') { badgeClass = 'oz'; badgeText = 'On leave'; }
+  else if (state.direction === 'WFH_DAY') { badgeClass = 'wfh'; badgeText = 'WFH today'; }
   else if (state.direction === 'OUT') { badgeClass = ''; badgeText = 'Check-OUT logged'; }
   $('main').innerHTML = `
     <div class="success-screen">

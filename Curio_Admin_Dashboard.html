@@ -6856,6 +6856,8 @@
     VERY_LATE:{bg:'#fee2e2', fg:'#991b1b', bd:'#dc2626', label:'Very late'},
     OUT_OF_ZONE:{bg:'#fee2e2', fg:'#991b1b', bd:'#dc2626', label:'Out of zone'},
     WFH:     {bg:'#f3e8ff', fg:'#6b21a8', bd:'#a855f7', label:'WFH'},
+    HALF_DAY:{bg:'#fef8e7', fg:'#92400e', bd:'#b45309', label:'Half day'},
+    LEAVE:   {bg:'#fee2e2', fg:'#991b1b', bd:'#dc2626', label:'Leave'},
     PRESENT: {bg:'#eff6ff', fg:'#1e40af', bd:'#3b82f6', label:'Present'}
   }[s] || {bg:'#f1f5f9', fg:'#64748b', bd:'#94a3b8', label: s || '—'});
 
@@ -6863,30 +6865,31 @@
     if (!LOCATIONS.employees) { panel.querySelector('[data-role="content"]').innerHTML = '<div style="color:#94a3b8; padding:12px;">Backend unreachable</div>'; return; }
     const today = todayIso();
     const todayRows = ATTENDANCE.filter(r => toIso(r.Date) === today);
-    // Group by emp: latest IN and latest OUT
+    // Group by emp: latest IN-equivalent (IN/HALF_DAY/LEAVE/WFH_DAY) and latest OUT
     const byEmp = {};
     todayRows.forEach(r => {
       const id = r.Emp_ID;
       if (!byEmp[id]) byEmp[id] = { IN: null, OUT: null };
       const bucket = r.Direction === 'OUT' ? 'OUT' : 'IN';
-      // Keep latest timestamp
       if (!byEmp[id][bucket] || new Date(r.Timestamp) > new Date(byEmp[id][bucket].Timestamp)) {
         byEmp[id][bucket] = r;
       }
     });
 
     // Summary counts
-    const counts = { checked_in: 0, on_time: 0, late: 0, very_late: 0, out_of_zone: 0, wfh: 0, absent: 0, checked_out: 0 };
+    const counts = { marked: 0, on_time: 0, late: 0, very_late: 0, wfh: 0, half_day: 0, leave: 0, absent: 0, checked_out: 0 };
     LOCATIONS.employees.forEach(e => {
       const rec = byEmp[e.emp_id];
       if (rec && rec.IN) {
-        counts.checked_in++;
+        counts.marked++;
         const s = rec.IN.Status;
         if (s === 'ON_TIME') counts.on_time++;
         else if (s === 'LATE') counts.late++;
         else if (s === 'VERY_LATE') counts.very_late++;
-        else if (s === 'OUT_OF_ZONE') counts.out_of_zone++;
+        else if (s === 'OUT_OF_ZONE') counts.very_late++; // treated as very-late for the summary
         else if (s === 'WFH') counts.wfh++;
+        else if (s === 'HALF_DAY') counts.half_day++;
+        else if (s === 'LEAVE') counts.leave++;
         if (rec.OUT) counts.checked_out++;
       } else {
         counts.absent++;
@@ -6904,11 +6907,13 @@
       </div>`;
     const kpiRow = `
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
-        ${kpiCard('Checked in', counts.checked_in + '/' + LOCATIONS.employees.length, '#1e40af', '#eff6ff')}
+        ${kpiCard('Marked', counts.marked + '/' + LOCATIONS.employees.length, '#1e40af', '#eff6ff')}
         ${kpiCard('On time', counts.on_time, '#166534', '#f0fdf4')}
         ${kpiCard('Late', counts.late, '#92400e', '#fef3c7')}
         ${kpiCard('Very late', counts.very_late, '#991b1b', '#fee2e2')}
         ${kpiCard('WFH', counts.wfh, '#6b21a8', '#f3e8ff')}
+        ${kpiCard('Half day', counts.half_day, '#b45309', '#fef8e7')}
+        ${kpiCard('Leave', counts.leave, '#991b1b', '#fee2e2')}
         ${kpiCard('Absent', counts.absent, '#dc2626', '#fee2e2')}
         ${kpiCard('Checked out', counts.checked_out, '#475569', '#f1f5f9')}
       </div>`;
@@ -6964,18 +6969,25 @@
       const d = toIso(r.Date);
       return d && d.startsWith(ym) && r.Direction === 'IN';
     });
-    // Aggregate per employee: total days, on_time, late, very_late, absent (working days minus present)
+    // Aggregate per employee — half-days count 0.5, leave/wfh_day count full
     const byEmp = {};
-    LOCATIONS.employees.forEach(e => { byEmp[e.emp_id] = { days: new Set(), on_time:0, late:0, very_late:0, out_of_zone:0, wfh:0, lateness_sum:0 }; });
+    LOCATIONS.employees.forEach(e => { byEmp[e.emp_id] = { day_score: 0, days: new Set(), on_time:0, late:0, very_late:0, out_of_zone:0, wfh:0, half_day:0, leave:0, lateness_sum:0 }; });
     rows.forEach(r => {
       const b = byEmp[r.Emp_ID]; if (!b) return;
-      b.days.add(toIso(r.Date));
-      if (r.Status === 'ON_TIME') b.on_time++;
-      else if (r.Status === 'LATE') b.late++;
-      else if (r.Status === 'VERY_LATE') b.very_late++;
-      else if (r.Status === 'OUT_OF_ZONE') b.out_of_zone++;
-      else if (r.Status === 'WFH') b.wfh++;
-      b.lateness_sum += Number(r.Lateness_Min || 0);
+      const day = toIso(r.Date);
+      const st = r.Status;
+      if (st === 'HALF_DAY') { b.half_day++; b.day_score += 0.5; b.days.add(day); }
+      else if (st === 'LEAVE') { b.leave++; /* leave doesn't count as present */ }
+      else { // regular check-in
+        b.days.add(day);
+        b.day_score += 1;
+        if (st === 'ON_TIME') b.on_time++;
+        else if (st === 'LATE') b.late++;
+        else if (st === 'VERY_LATE') b.very_late++;
+        else if (st === 'OUT_OF_ZONE') b.out_of_zone++;
+        else if (st === 'WFH') b.wfh++;
+        b.lateness_sum += Number(r.Lateness_Min || 0);
+      }
     });
 
     const daysElapsed = new Date().getDate();
@@ -6983,13 +6995,15 @@
 
     const rowHtml = LOCATIONS.employees.map(e => {
       const b = byEmp[e.emp_id];
-      const daysPresent = b.days.size;
-      const attRate = daysElapsed > 0 ? Math.round(daysPresent / daysElapsed * 100) : 0;
-      const punctRate = daysPresent > 0 ? Math.round(b.on_time / daysPresent * 100) : 0;
+      const dayScore = b.day_score;
+      const attRate = daysElapsed > 0 ? Math.round(dayScore / daysElapsed * 100) : 0;
+      const punctBase = b.on_time + b.late + b.very_late + b.out_of_zone;
+      const punctRate = punctBase > 0 ? Math.round(b.on_time / punctBase * 100) : 0;
       const avgLateness = b.late + b.very_late > 0 ? Math.round(b.lateness_sum / (b.late + b.very_late)) : 0;
+      const leaveInfo = (b.half_day || b.leave) ? `<div style="font-size:11px; color:#94a3b8;">${b.half_day?`${b.half_day} half-day${b.half_day>1?'s':''} · `:''}${b.leave?`${b.leave} leave${b.leave>1?'s':''}`:''}</div>` : '';
       return `<tr>
         <td style="padding:10px 8px;"><b>${e.name}</b><div style="font-size:11px; color:#94a3b8;">${e.role}${e.wfh?' · WFH':''}</div></td>
-        <td style="padding:10px 8px; font-weight:700; color:${attRate>=90?'#166534':attRate>=70?'#92400e':'#dc2626'};">${daysPresent}/${daysElapsed}<div style="font-size:11px; font-weight:400; color:#94a3b8;">${attRate}% attendance</div></td>
+        <td style="padding:10px 8px; font-weight:700; color:${attRate>=90?'#166534':attRate>=70?'#92400e':'#dc2626'};">${dayScore}/${daysElapsed}<div style="font-size:11px; font-weight:400; color:#94a3b8;">${attRate}% attendance</div>${leaveInfo}</td>
         <td style="padding:10px 8px;"><span style="color:#166534;">${b.on_time}</span> on-time · <span style="color:#92400e;">${b.late}</span> late · <span style="color:#991b1b;">${b.very_late}</span> very late${b.wfh?` · <span style="color:#6b21a8;">${b.wfh}</span> WFH`:''}</td>
         <td style="padding:10px 8px; font-weight:600; color:${punctRate>=80?'#166534':punctRate>=50?'#92400e':'#dc2626'};">${punctRate}%</td>
         <td style="padding:10px 8px; color:${avgLateness>15?'#dc2626':'#475569'};">${avgLateness>0?`+${avgLateness} min`:'—'}</td>
