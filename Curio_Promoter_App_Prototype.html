@@ -602,73 +602,74 @@
   ];
   // Flat list used elsewhere in the app
   const STORES = STORE_CHAINS.flatMap(c => c.stores.map(s => ({ ...s, chain: c.chain })));
-  // Real SKU catalog — 31 SKUs across 6 categories (Profitability Analysis Curio.xlsx — authoritative)
+  // SKU catalog: names and pack sizes follow the Curio SKU master (26 Sep 2026); `sku` is the SKU master code.
+  // `code` is the ID stored in Log_Promoter_Stock. It is kept unchanged so stock history and sell-through stay continuous.
   const CATEGORIES = [
     {
       name: "Cold Pressed Oils",
       icon: "🫒",
       skus: [
-        { name: "Walnut Oil",   size: "100 ml", code: "OIL-WO-100",  mrp: 1200, cop: 186 },
-        { name: "Walnut Oil",   size: "250 ml", code: "OIL-WO-250",  mrp: 3000, cop: 331 },
-        { name: "Apricot Oil",  size: "100 ml", code: "OIL-APO-100", mrp: 1200, cop: 186 },
-        { name: "Apricot Oil",  size: "250 ml", code: "OIL-APO-250", mrp: 3000, cop: 331 },
-        { name: "Almond Oil",   size: "100 ml", code: "OIL-ALO-100", mrp: 1155, cop: 134 },
-        { name: "Almond Oil",   size: "250 ml", code: "OIL-ALO-250", mrp: 2800, cop: 201 },
-        { name: "Mustard Oil",  size: "500 ml", code: "OIL-MO-500",  mrp: 430,  cop: 196 }
+        { name: "Cold Wood Pressed Walnut Oil", size: "100 ml", code: "OIL-WO-100", sku: "WLOIL-100",  mrp: 1200, cop: 186 },
+        { name: "Cold Wood Pressed Walnut Oil", size: "250 ml", code: "OIL-WO-250", sku: "WLOIL-250",  mrp: 3000, cop: 331 },
+        { name: "Cold Wood Pressed Sweet Apricot Oil", size: "100 ml", code: "OIL-APO-100", sku: "APOIL-100", mrp: 1200, cop: 186 },
+        { name: "Cold Wood Pressed Sweet Apricot Oil", size: "250 ml", code: "OIL-APO-250", sku: "APOIL-250", mrp: 3000, cop: 331 },
+        { name: "Cold Wood Pressed Sweet Almond Oil", size: "100 ml", code: "OIL-ALO-100", sku: "ALOIL-100", mrp: 1155, cop: 134 },
+        { name: "Cold Wood Pressed Sweet Almond Oil", size: "250 ml", code: "OIL-ALO-250", sku: "ALOIL-250", mrp: 2800, cop: 201 },
+        { name: "Cold Wood Pressed Mustard Oil", size: "500 ml", code: "OIL-MO-500", sku: "BMOIL-500",  mrp: 430,  cop: 196 }
       ]
     },
     {
       name: "Dry Fruits",
       icon: "🌰",
       skus: [
-        { name: "Walnuts",         size: "250 g", code: "DRF-KW-250",  mrp: 700,  cop: 317 },
-        { name: "Walnuts",         size: "500 g", code: "DRF-KW-500",  mrp: 1200, cop: 587 },
-        { name: "Walnuts",         size: "1 kg",  code: "DRF-KW-1000", mrp: 2300, cop: 1062 },
-        { name: "Almond",          size: "250 g", code: "DRF-KA-250",  mrp: 750,  cop: 350 },
-        { name: "Almond",          size: "500 g", code: "DRF-KA-500",  mrp: 1300, cop: 587 },
-        { name: "Almond",          size: "1 kg",  code: "DRF-KA-1000", mrp: 2500, cop: 1062 },
-        { name: "Apricot",         size: "250 g", code: "DRF-LA-250",  mrp: 600,  cop: 287 },
-        { name: "Apricot",         size: "500 g", code: "DRF-LA-500",  mrp: 1150, cop: 462 },
-        { name: "Apricot",         size: "1 kg",  code: "DRF-LA-1000", mrp: 2300, cop: 812 }
+        { name: "Kashmir Walnut Kernels", size: "250 g", code: "DRF-KW-250", sku: "KHWL-250G",  mrp: 700,  cop: 317 },
+        { name: "Kashmir Walnut Kernels", size: "500 g", code: "DRF-KW-500", sku: "KHWL-500G",  mrp: 1200, cop: 587 },
+        { name: "Kashmir Walnut Kernels", size: "1 kg", code: "DRF-KW-1000", sku: "KHWL-1000G", mrp: 2300, cop: 1062 },
+        { name: "Kashmir Sweet Almond Kernels", size: "250 g", code: "DRF-KA-250", sku: "KHAL-250G",  mrp: 750,  cop: 350 },
+        { name: "Kashmir Sweet Almond Kernels", size: "500 g", code: "DRF-KA-500", sku: "KHAL-500G",  mrp: 1300, cop: 587 },
+        { name: "Kashmir Sweet Almond Kernels", size: "1 kg", code: "DRF-KA-1000", sku: "KHAL-1000G", mrp: 2500, cop: 1062 },
+        { name: "Ladakh Apricots", size: "250 g", code: "DRF-LA-250", sku: "LDAP-250G",  mrp: 600,  cop: 287 },
+        { name: "Ladakh Apricots", size: "500 g", code: "DRF-LA-500", sku: "LDAP-500G",  mrp: 1150, cop: 462 },
+        { name: "Ladakh Apricots", size: "1 kg", code: "DRF-LA-1000", sku: "LDAP-1000G", mrp: 2300, cop: 812 }
       ]
     },
     {
       name: "Saffron",
       icon: "🌸",
       skus: [
-        { name: "Kashmir Saffron Mogra A+", size: "1 g", code: "SAF-MGA-1", mrp: 545,  cop: 299 },
-        { name: "Kashmir Saffron Mogra A+", size: "2 g", code: "SAF-MGA-2", mrp: 1100, cop: 535 }
+        { name: "Kashmir Saffron", size: "1 g", code: "SAF-MGA-1", sku: "KHSF-1G", mrp: 545,  cop: 299 },
+        { name: "Kashmir Saffron", size: "2 g", code: "SAF-MGA-2", sku: "KHSF-2G", mrp: 1100, cop: 535 }
       ]
     },
     {
       name: "Ghee",
       icon: "🧈",
       skus: [
-        { name: "Himalayan Badri Cow Ghee", size: "250 ml", code: "GHE-HBG-250", mrp: 800,  cop: 329 },
-        { name: "Himalayan Badri Cow Ghee", size: "500 ml", code: "GHE-HBG-500", mrp: 1400, cop: 541 }
+        { name: "Himalayan Badri Cow Ghee (old stock)", size: "250 ml", code: "GHE-HBG-250", sku: "", mrp: 800,  cop: 329 },
+        { name: "Himalayan Badri Cow Ghee", size: "500 ml", code: "GHE-HBG-500", sku: "HBCG-500", mrp: 1400, cop: 541 }
       ]
     },
     {
       name: "Artisanal Honey",
       icon: "🍯",
       skus: [
-        { name: "Multi-Floral Honey",       size: "250 g", code: "HON-MF-250",  mrp: 350,  cop: 171 },
-        { name: "Multi-Floral Honey",       size: "500 g", code: "HON-MF-500",  mrp: 650,  cop: 221 },
-        { name: "Mono-Floral Borage",       size: "250 g", code: "HON-BOR-250", mrp: 375,  cop: 171 },
-        { name: "Mono-Floral Borage",       size: "500 g", code: "HON-BOR-500", mrp: 750,  cop: 221 },
-        { name: "Mono-Floral Sidr",         size: "250 g", code: "HON-SID-250", mrp: 700,  cop: 196 },
-        { name: "Mono-Floral Sidr",         size: "500 g", code: "HON-SID-500", mrp: 1400, cop: 271 },
-        { name: "Multifloral Black Forest", size: "250 g", code: "HON-BF-250",  mrp: 600,  cop: 196 },
-        { name: "Multifloral Black Forest", size: "500 g", code: "HON-BF-500",  mrp: 1100, cop: 271 }
+        { name: "Raw Multifloral Honey (old stock)", size: "250 g", code: "HON-MF-250", sku: "",  mrp: 350,  cop: 171 },
+        { name: "Raw Multifloral Honey", size: "500 g", code: "HON-MF-500", sku: "MULH-500",  mrp: 650,  cop: 221 },
+        { name: "Raw Monofloral Borage Honey (old stock)", size: "250 g", code: "HON-BOR-250", sku: "", mrp: 375,  cop: 171 },
+        { name: "Raw Monofloral Borage Honey", size: "500 g", code: "HON-BOR-500", sku: "SOLH-500", mrp: 750,  cop: 221 },
+        { name: "Raw Monofloral Sidr Honey (old stock)", size: "250 g", code: "HON-SID-250", sku: "", mrp: 700,  cop: 196 },
+        { name: "Raw Monofloral Sidr Honey", size: "500 g", code: "HON-SID-500", sku: "SDHN-500", mrp: 1400, cop: 271 },
+        { name: "Raw Multifloral Black Forest Honey (old stock)", size: "250 g", code: "HON-BF-250", sku: "",  mrp: 600,  cop: 196 },
+        { name: "Raw Multifloral Black Forest Honey", size: "500 g", code: "HON-BF-500", sku: "BLFHN-500",  mrp: 1100, cop: 271 }
       ]
     },
     {
       name: "Tea & Infusions",
       icon: "🍵",
       skus: [
-        { name: "Kashmir Qahwa",           size: "150 g", code: "TEA-KQ-150", mrp: 550, cop: 238 },
-        { name: "Zafrani Kehwa",           size: "200 g", code: "TEA-ZK-200", mrp: 550, cop: 206 },
-        { name: "Himalayan Chamomile Tea", size: "50 g",  code: "TEA-HC-50",  mrp: 550, cop: 188 }
+        { name: "Kashmir Qahwa", size: "200 g", code: "TEA-KQ-150", sku: "KHQH-200G", mrp: 550, cop: 238 },
+        { name: "Kashmir Zafrani Kehwa", size: "250 g", code: "TEA-ZK-200", sku: "ZFKH-250G", mrp: 550, cop: 206 },
+        { name: "Himalayan Chamomile Tea", size: "60 g", code: "TEA-HC-50", sku: "HCT-60G",  mrp: 550, cop: 188 }
       ]
     }
   ];
@@ -833,17 +834,7 @@
   });
 
   // ==== TODAY'S SALES WIDGET — fetch sell-through for this promoter today ====
-  const promoterSkuMap = {
-    'DRF-KW-500':'CURIO-WALNUTS-500','DRF-KA-500':'CURIO-ALMONDS-500','DRF-LA-500':'CURIO-APRICOTS-500',
-    'GHE-HBG-500':'CURIO-GHEE-500','GHE-HBG-250':'CURIO-GHEE-500',
-    'HON-MF-500':'CURIO-MONOFLORAL-HONEY-500','HON-BOR-500':'CURIO-MONOFLORAL-HONEY-500',
-    'HON-SID-500':'CURIO-SIDR-HONEY-500','HON-BF-500':'CURIO-BLACKFOREST-HONEY-500','HON-WF-500':'CURIO-WILD-HONEY-500',
-    'TEA-KQ-150':'CURIO-QAHWA-TEA-200','TEA-KQ-200':'CURIO-QAHWA-TEA-200',
-    'TEA-ZK-200':'CURIO-ZAFRANI-KEHWA-250','TEA-ZK-250':'CURIO-ZAFRANI-KEHWA-250',
-    'TEA-CHA-INF':'CURIO-CHAMOMILE-INF','SAF-1':'CURIO-SAFFRON-1G','SAF-2':'CURIO-SAFFRON-2G',
-    'OIL-WO-100':'CURIO-WALNUT-OIL-100','OIL-APO-100':'CURIO-APRICOT-OIL-100',
-    'OIL-ALO-100':'CURIO-ALMOND-OIL-100','OIL-MU-500':'CURIO-MUSTARD-OIL-500',
-  };
+  const promoterSkuMap = {'OIL-WO-100':'CURIO-WALNUT-OIL-100','OIL-WO-250':'CURIO-WALNUT-OIL-250','OIL-APO-100':'CURIO-APRICOT-OIL-100','OIL-APO-250':'CURIO-APRICOT-OIL-250','OIL-ALO-100':'CURIO-ALMOND-OIL-100','OIL-ALO-250':'CURIO-ALMOND-OIL-250','OIL-MO-500':'CURIO-MUSTARD-OIL-500','OIL-MU-500':'CURIO-MUSTARD-OIL-500','DRF-KW-250':'CURIO-WALNUTS-250','DRF-KW-500':'CURIO-WALNUTS-500','DRF-KW-1000':'CURIO-WALNUTS-1000','DRF-KA-250':'CURIO-ALMONDS-250','DRF-KA-500':'CURIO-ALMONDS-500','DRF-KA-1000':'CURIO-ALMONDS-1000','DRF-LA-250':'CURIO-APRICOTS-250','DRF-LA-500':'CURIO-APRICOTS-500','DRF-LA-1000':'CURIO-APRICOTS-1000','SAF-MGA-1':'CURIO-SAFFRON-1G','SAF-1':'CURIO-SAFFRON-1G','SAF-MGA-2':'CURIO-SAFFRON-2G','SAF-2':'CURIO-SAFFRON-2G','GHE-HBG-500':'CURIO-GHEE-500','GHE-HBG-250':'CURIO-GHEE-500','HON-MF-500':'CURIO-WILD-HONEY-500','HON-WF-500':'CURIO-WILD-HONEY-500','HON-BOR-500':'CURIO-MONOFLORAL-HONEY-500','HON-SID-500':'CURIO-SIDR-HONEY-500','HON-BF-500':'CURIO-BLACKFOREST-HONEY-500','TEA-KQ-150':'CURIO-QAHWA-TEA-200','TEA-KQ-200':'CURIO-QAHWA-TEA-200','TEA-ZK-200':'CURIO-ZAFRANI-KEHWA-250','TEA-ZK-250':'CURIO-ZAFRANI-KEHWA-250','TEA-HC-50':'CURIO-CHAMOMILE-INF','TEA-CHA-INF':'CURIO-CHAMOMILE-INF','WLOIL-100':'CURIO-WALNUT-OIL-100','WLOIL-250':'CURIO-WALNUT-OIL-250','APOIL-100':'CURIO-APRICOT-OIL-100','APOIL-250':'CURIO-APRICOT-OIL-250','ALOIL-100':'CURIO-ALMOND-OIL-100','ALOIL-250':'CURIO-ALMOND-OIL-250','BMOIL-500':'CURIO-MUSTARD-OIL-500','KHWL-250G':'CURIO-WALNUTS-250','KHWL-500G':'CURIO-WALNUTS-500','KHWL-1000G':'CURIO-WALNUTS-1000','KHAL-250G':'CURIO-ALMONDS-250','KHAL-500G':'CURIO-ALMONDS-500','KHAL-1000G':'CURIO-ALMONDS-1000','LDAP-250G':'CURIO-APRICOTS-250','LDAP-500G':'CURIO-APRICOTS-500','LDAP-1000G':'CURIO-APRICOTS-1000','KHSF-1G':'CURIO-SAFFRON-1G','KHSF-2G':'CURIO-SAFFRON-2G','HBCG-500':'CURIO-GHEE-500','MULH-500':'CURIO-WILD-HONEY-500','SOLH-500':'CURIO-MONOFLORAL-HONEY-500','SDHN-500':'CURIO-SIDR-HONEY-500','BLFHN-500':'CURIO-BLACKFOREST-HONEY-500','KHQH-200G':'CURIO-QAHWA-TEA-200','ZFKH-250G':'CURIO-ZAFRANI-KEHWA-250','HCT-60G':'CURIO-CHAMOMILE-INF'};
   async function refreshSalesToday() {
     if (typeof CurioAPI === 'undefined' || !state.promoter) return;
     try {
