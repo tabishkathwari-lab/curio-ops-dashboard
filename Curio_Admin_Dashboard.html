@@ -6813,11 +6813,13 @@
   const page = document.getElementById('page-attendance');
   if (!page) return;
 
-  // Panel skeleton — built once, re-injected on every page render
+  // Panel skeleton — built once, re-injected on every page render.
+  // NOTE: intentionally NOT using class "card" — a later promoter render targets
+  // "#page-attendance .card" with querySelector and would overwrite our panel's innerHTML.
   const panel = document.createElement('div');
   panel.id = 'team-attendance-panel';
-  panel.className = 'card';
-  panel.style.cssText = 'margin: 0 0 18px; padding: 0; overflow: hidden; border-top: 4px solid #1F4E78;';
+  panel.className = 'team-att-card';
+  panel.style.cssText = 'background: white; border-radius: 14px; border: 1px solid #e5e7eb; margin: 0 0 18px; padding: 0; overflow: hidden; border-top: 4px solid #1F4E78; box-shadow: 0 1px 3px rgba(0,0,0,0.03);';
   panel.innerHTML = `
     <div style="padding:16px 20px; background:linear-gradient(90deg,#eff6ff,#fff); border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <div>
