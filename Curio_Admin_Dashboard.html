@@ -6813,8 +6813,9 @@
   const page = document.getElementById('page-attendance');
   if (!page) return;
 
-  // Panel skeleton
+  // Panel skeleton — built once, re-injected on every page render
   const panel = document.createElement('div');
+  panel.id = 'team-attendance-panel';
   panel.className = 'card';
   panel.style.cssText = 'margin: 0 0 18px; padding: 0; overflow: hidden; border-top: 4px solid #1F4E78;';
   panel.innerHTML = `
@@ -6830,13 +6831,21 @@
     </div>
     <div style="padding:14px 20px;" data-role="content">Loading team attendance…</div>
   `;
-  // Insert at top of page-attendance
-  const head = page.querySelector('.page-head');
-  if (head && head.parentNode) head.parentNode.insertBefore(panel, head.nextSibling);
-  else page.insertBefore(panel, page.firstChild);
+  // (Insertion + re-injection handled by the observer below)
 
   const fmtL = n => !n ? '₹0' : n>=10000000 ? '₹'+(n/10000000).toFixed(2)+'Cr' : n>=100000 ? '₹'+(n/100000).toFixed(2)+'L' : '₹'+Math.round(n).toLocaleString('en-IN');
   const toIso = v => { if(!v) return null; const s=String(v); if(s.includes('T')) return s.slice(0,10); return s.slice(0,10); };
+  // Sheets returns Time cells as a 1899-12-30T… ISO string; extract HH:MM in IST
+  const fmtTime = v => {
+    if (!v) return '';
+    const s = String(v);
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+      try { return new Date(s).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Kolkata'}); }
+      catch(e){}
+    }
+    if (/^\d{1,2}:\d{2}/.test(s)) return s.slice(0,5);
+    return s;
+  };
   const todayIso = () => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; };
   const monthIso = () => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; };
 
@@ -6930,8 +6939,8 @@
         </tr>`;
       }
       const s = statusColor(rec.IN.Status);
-      const inTime = rec.IN.Time || '';
-      const outTime = rec.OUT ? rec.OUT.Time : '';
+      const inTime = fmtTime(rec.IN.Time);
+      const outTime = rec.OUT ? fmtTime(rec.OUT.Time) : '';
       const lateness = rec.IN.Lateness_Min;
       return `<tr>
         <td style="padding:10px 8px;"><b>${e.name}</b><div style="font-size:11px; color:#94a3b8;">${e.role}${e.wfh?' · WFH':''}</div></td>
@@ -7035,8 +7044,23 @@
     });
   });
 
-  try { await load(); renderToday(); }
-  catch (e) { panel.querySelector('[data-role="content"]').innerHTML = '<div style="color:#dc2626; padding:12px;">Load failed: '+e.message+'</div>'; }
+  // Injector: put the panel at the top of #page-attendance, avoiding duplicates
+  function inject() {
+    if (document.getElementById('team-attendance-panel')) return; // already there
+    const head = page.querySelector('.page-head');
+    if (head && head.parentNode) head.parentNode.insertBefore(panel, head.nextSibling);
+    else page.insertBefore(panel, page.firstChild);
+  }
+
+  // The promoter renderer replaces #page-attendance innerHTML which strips our panel.
+  // Watch the page for child-list changes and re-inject whenever we're evicted.
+  const observer = new MutationObserver(() => {
+    if (!document.getElementById('team-attendance-panel')) inject();
+  });
+  observer.observe(page, { childList: true, subtree: false });
+
+  try { await load(); inject(); renderToday(); }
+  catch (e) { panel.querySelector('[data-role="content"]').innerHTML = '<div style="color:#dc2626; padding:12px;">Load failed: '+e.message+'</div>'; inject(); }
 })();
 </script>
 
