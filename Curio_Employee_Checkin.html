@@ -243,6 +243,14 @@ function onEmpChange() {
   $('empInfo').innerHTML = site
     ? `Expected site: <b>${site.name}</b> · Geofence: ${state.config.default_radius_m}m`
     : `<b>Work from home</b> · No location or timing check`;
+  // Hide WFH-today button for factory-only staff (can_wfh === false)
+  const wfhBtn = document.querySelector('.dir-btn[data-dir="WFH_DAY"]');
+  if (wfhBtn) wfhBtn.style.display = (state.emp.can_wfh === false) ? 'none' : '';
+  // If they had WFH_DAY selected but it's now hidden, clear the direction
+  if (state.direction === 'WFH_DAY' && state.emp.can_wfh === false) {
+    state.direction = null;
+    document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+  }
   refreshSubmit();
 }
 $('empSelect').addEventListener('change', onEmpChange);
