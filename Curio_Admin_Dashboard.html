@@ -848,7 +848,7 @@
       <div class="page-head">
         <div>
           <h1>🏭 Factory Inventory</h1>
-          <div class="meta">Himlahar Harvests Pvt Ltd · Total stock ₹32.77L (as of 17 Jul 2026)</div>
+          <div class="meta">Himlahar Harvests Pvt Ltd · loading live factory stock…</div>
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn ghost">Upload stock take (CSV)</button>
@@ -6394,7 +6394,7 @@
             liveBlock.innerHTML = `
               <div style="padding: 14px 16px; background: linear-gradient(135deg, #eef6ff, #e6f7f2); border: 1px solid #b8dbc9; border-radius: 12px; margin-bottom: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">🟢 Live factory snapshot</div><div style="font-size: 12px; color: #4a6c5a;">As of ${asOf} · pulled live from Google Sheet</div></div>
+                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">🟢 Live factory snapshot</div><div style="font-size: 12px; color: #4a6c5a;">Updated ${String(asOfRaw)} · from the factory day sheet, refreshed every 30 minutes</div></div>
                   <div style="text-align: right;"><div style="font-size: 22px; font-weight: 800; color: #14532d;">${fmtL2(invValue)}</div><div style="font-size: 11px; color: #4a6c5a;">Total inventory value @ MRP</div></div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
@@ -6449,11 +6449,15 @@
                   <tbody>${Bc.map(r => `<tr><td style="text-align:left;">${r.SKU||''}</td><td style="text-align:left; font-family: monospace; font-size: 11px;">${r.Batchcode||''}</td><td class="num">₹${(Number(r.MRP)||0).toLocaleString('en-IN')}</td><td class="num">${r.USP||''}</td><td style="text-align:left;">${r.Unit||''}</td><td style="text-align:left;">${r.Best_Before||''}</td></tr>`).join('')}</tbody>
                 </table></div>
               </div>
-              <div style="padding: 10px 14px; background: #fef8e7; border: 1px solid #f0d872; border-radius: 8px; font-size: 12px; color: #78561a; margin-bottom: 18px;">⚠ The blocks below are the older hardcoded inventory view — kept for historical reference only. The live snapshot above is the authoritative source.</div>
             `;
             const head = invEl.querySelector('.page-head');
             if (head) head.parentNode.insertBefore(liveBlock, head.nextSibling);
             else invEl.insertBefore(liveBlock, invEl.firstChild);
+            // live data replaces the old 17 Jul statement: update the header and hide the static blocks
+            const metaEl = head && head.querySelector('.meta');
+            if (metaEl) metaEl.textContent = 'Himlahar Harvests Pvt Ltd · Finished goods ' + fmtL2(invValue) + ' at MRP · live from the factory day sheet, updated ' + String(asOfRaw);
+            let oldEl = liveBlock.nextElementSibling;
+            while (oldEl) { const nxt = oldEl.nextElementSibling; oldEl.style.display = 'none'; oldEl = nxt; }
           }
         } catch(e) { console.warn('Factory inventory live render failed:', e); }
 
