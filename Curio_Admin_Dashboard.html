@@ -2432,14 +2432,48 @@
     <div class="page" id="page-customer-ledger">
       <div class="page-head">
         <div>
+          <div class="eyebrow">Customer Ledger · Live from Zoho</div>
           <h1>Customer Ledger</h1>
-          <div class="meta">Real data from Zoho · Dec 2025 – Jul 2026 YTD · Kashmir traders and Blinkit consolidated</div>
+          <div class="meta" id="clLiveMeta">Loading live Zoho invoices…</div>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button class="btn ghost">Filter</button>
+          <button class="btn ghost" id="btnClRefresh">Refresh from Zoho</button>
           <button class="btn">Export</button>
         </div>
       </div>
+
+      <!-- Live Zoho Customer Ledger -->
+      <div id="customerLedgerLive" style="margin-bottom:28px;">
+        <div class="kpi-row">
+          <div class="kpi"><div class="label">Total invoiced</div><div class="value" id="clTotalInv">—</div><div class="sub" id="clTotalInvSub">—</div></div>
+          <div class="kpi"><div class="label">Unique customers</div><div class="value" id="clTotalCust">—</div><div class="sub">from Zoho Books</div></div>
+          <div class="kpi"><div class="label">Outstanding balance</div><div class="value" id="clTotalBal">—</div><div class="sub down" id="clTotalBalSub">—</div></div>
+          <div class="kpi"><div class="label">This month</div><div class="value" id="clThisMonth">—</div><div class="sub" id="clThisMonthSub">—</div></div>
+        </div>
+
+        <div class="card">
+          <h2>Top customers · by revenue <span class="badge" id="clCustCount"></span></h2>
+          <div style="max-height:420px; overflow:auto; margin:0 -24px;">
+            <table id="clCustTable">
+              <thead><tr><th>Customer</th><th class="num">Invoices</th><th class="num">Total</th><th class="num">Outstanding</th><th>Last invoice</th><th>Status</th></tr></thead>
+              <tbody id="clCustBody"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading from Zoho…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Recent invoices <span class="badge" id="clInvCount"></span></h2>
+          <div style="max-height:400px; overflow:auto; margin:0 -24px;">
+            <table id="clInvTable">
+              <thead><tr><th>Invoice #</th><th>Customer</th><th>Date</th><th>Due date</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th></tr></thead>
+              <tbody id="clInvBody"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading from Zoho…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <hr class="gold-rule" style="margin:32px 0;">
+      <div class="eyebrow" style="margin-bottom:16px;">Legacy snapshot (May – Jul 2026)</div>
 
       <div style="padding: 14px 16px; background: #f0f7ff; border-radius: 10px; font-size: 12px; color: var(--brand-500); margin-bottom: 20px;">
         <strong>Full YTD from Zoho Books — 114 customers, ₹3.44Cr net revenue.</strong> Blinkit &amp; Kissansay together = 77% of business. 44 J&amp;K/Kashmir traders form a real distribution network worth ₹23.3L. D2C individuals surprisingly meaningful at ₹13.6L across 41 buyers.
@@ -7316,17 +7350,102 @@
     const invEl = document.getElementById('page-inventory');
     if (invEl && invEl.classList.contains('active')) fetchZoho();
   }
+
+  // ============ CUSTOMER LEDGER (live Zoho invoices) ============
+  async function fetchZohoCustomerLedger() {
+    try {
+      const r = await fetch(EXEC + '?q=zoho_invoices').then(x=>x.json());
+      const invoices = r?.data?.invoices || [];
+      renderCustomerLedger(invoices);
+    } catch(e) { console.error('CL fetch failed', e); }
+  }
+
+  function renderCustomerLedger(invoices) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const totalInv = invoices.reduce((s,i) => s + (+i.total||0), 0);
+    const totalBal = invoices.reduce((s,i) => s + (+i.balance||0), 0);
+    const custMap = {};
+    invoices.forEach(i => {
+      const c = i.customer_name || 'Unknown';
+      if (!custMap[c]) custMap[c] = { count: 0, total: 0, balance: 0, lastDate: '', lastStatus: '' };
+      custMap[c].count++;
+      custMap[c].total += (+i.total || 0);
+      custMap[c].balance += (+i.balance || 0);
+      const d = String(i.date||'').slice(0,10);
+      if (d > custMap[c].lastDate) { custMap[c].lastDate = d; custMap[c].lastStatus = i.status || ''; }
+    });
+    const custs = Object.entries(custMap).map(([name, s]) => ({ name, ...s }));
+    custs.sort((a,b) => b.total - a.total);
+
+    // This month calc
+    const now = new Date();
+    const monthPrefix = now.toISOString().slice(0, 7);
+    const thisMonthInvs = invoices.filter(i => String(i.date||'').slice(0,7) === monthPrefix);
+    const thisMonthRev = thisMonthInvs.reduce((s,i) => s + (+i.total||0), 0);
+
+    set('clTotalInv', fmtMoney(totalInv));
+    set('clTotalInvSub', invoices.length + ' invoices');
+    set('clTotalCust', custs.length);
+    set('clTotalBal', fmtMoney(totalBal));
+    set('clTotalBalSub', invoices.filter(i => (+i.balance||0) > 0).length + ' with balance');
+    set('clThisMonth', fmtMoney(thisMonthRev));
+    set('clThisMonthSub', thisMonthInvs.length + ' invoices in ' + now.toLocaleString('en-IN', {month:'short', year:'numeric'}));
+    set('clCustCount', custs.length + ' customers');
+    set('clInvCount', invoices.length + ' invoices');
+
+    const custBody = document.getElementById('clCustBody');
+    if (custBody) {
+      custBody.innerHTML = custs.slice(0, 50).map(c => {
+        const stCls = c.balance > 0 ? 'warn' : 'ok';
+        const stLabel = c.balance > 0 ? 'Open balance' : 'Paid';
+        return `<tr><td style="padding-left:24px">${esc(c.name)}</td><td class="num">${c.count}</td><td class="num" style="font-weight:600">${fmtMoney(c.total)}</td><td class="num" style="color:${c.balance>0?'var(--danger-700)':'var(--text-secondary)'}">${fmtMoney(c.balance)}</td><td>${c.lastDate}</td><td>${badge(stLabel, stCls)}</td></tr>`;
+      }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">No customers.</td></tr>';
+    }
+
+    const sortedInvs = [...invoices].sort((a,b) => String(b.date||'').localeCompare(String(a.date||'')));
+    const invBody = document.getElementById('clInvBody');
+    if (invBody) {
+      invBody.innerHTML = sortedInvs.slice(0, 100).map(i => {
+        const st = String(i.status||'').toLowerCase();
+        const stCls = /paid|closed/i.test(st) ? 'ok' : /overdue/i.test(st) ? 'danger' : /sent|open|partially/i.test(st) ? 'warn' : '';
+        return `<tr><td style="padding-left:24px;font-family:var(--font-mono);font-size:12px">${esc(i.invoice_number)}</td><td>${esc(i.customer_name)}</td><td>${fmtDate(i.date)}</td><td>${fmtDate(i.due_date)}</td><td class="num">${fmtMoney(i.total)}</td><td class="num" style="color:${(+i.balance||0)>0?'var(--danger-700)':'var(--text-secondary)'}">${fmtMoney(i.balance)}</td><td>${badge(st.replace(/_/g,' '), stCls)}</td></tr>`;
+      }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-secondary);">No invoices.</td></tr>';
+    }
+
+    const el = document.getElementById('clLiveMeta');
+    if (el) el.textContent = 'Live from Zoho Books · ' + invoices.length + ' invoices · ' + fmtMoney(totalInv) + ' lifetime · last sync ' + new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short'});
+  }
+
+  function tryLoadCustomerLedger() {
+    const el = document.getElementById('page-customer-ledger');
+    if (el && el.classList.contains('active')) fetchZohoCustomerLedger();
+  }
   // Load on nav click
   document.querySelectorAll('.nav-item').forEach(el => {
     const dp = el.getAttribute('data-page');
     if (dp === 'inventory' || dp === 'dispatches') {
       el.addEventListener('click', () => setTimeout(fetchZoho, 100));
+    } else if (dp === 'customer-ledger') {
+      el.addEventListener('click', () => setTimeout(fetchZohoCustomerLedger, 100));
+    }
+  });
+  // Hook customer-ledger refresh button
+  document.addEventListener('click', e => {
+    if (e.target.id === 'btnClRefresh') {
+      e.target.disabled = true;
+      e.target.textContent = 'Syncing…';
+      fetch(EXEC + '?q=sync_zoho_all').then(r=>r.json()).then(() => fetchZohoCustomerLedger()).finally(() => {
+        e.target.disabled = false;
+        e.target.textContent = 'Refresh from Zoho';
+      });
     }
   });
   // Initial load if page is already active
   setTimeout(tryLoad, 1000);
+  setTimeout(tryLoadCustomerLedger, 1000);
   // Also try to prefetch after 2s regardless
   setTimeout(fetchZoho, 2000);
+  setTimeout(fetchZohoCustomerLedger, 2500);
 })();
 </script>
 </body>
