@@ -509,8 +509,7 @@
 
     <div class="nav-section-label">Field ops</div>
     <div class="nav-item" data-page="attendance"><span class="icon">📅</span>Attendance</div>
-    <div class="nav-item" data-page="checkins"><span class="icon">📍</span>Check-ins</div>
-    <div class="nav-item" data-page="photos"><span class="icon">📷</span>Photos</div>
+    <div class="nav-item" data-page="photos"><span class="icon">📷</span>Shelf photos</div>
 
     <div class="nav-section-label">Reports</div>
     <div class="nav-item" data-page="sales"><span class="icon">💰</span>Sales log</div>
@@ -4511,7 +4510,7 @@
         });
 
         let html = `<div class="page-head">
-          <div><h1>Attendance</h1><div class="meta">Live from Log_Promoter_Checkins · ${clean.length} check-ins across ${promoters.length} promoters</div></div>
+          <div><div class="eyebrow">Team · Live GPS attendance</div><h1>Attendance</h1><div class="meta">Everyone · ${promoters.length} promoters (field) + factory + office staff · ${clean.length} promoter check-ins · <strong>Factory + office staff shown at the top</strong></div></div>
         </div>`;
 
         // TODAY'S STATUS CARD
@@ -6305,7 +6304,7 @@
             <div class="card">
               <div class="matrix-wrap"><table class="matrix" style="min-width:700px;font-size:12px;">
                 <thead><tr><th style="text-align:left;">Month</th><th class="num">Blinkit</th><th class="num">Amazon</th><th class="num">Shopify</th><th class="num">B2B</th><th class="num">Modern Trade</th><th class="num" style="font-weight:700;">Total</th></tr></thead>
-                <tbody>${months.map(m => { const r = grid[m]; const total = r.Blinkit+r.Amazon+r.Shopify+r.B2B+r.MT; return `<tr><td style="text-align:left;">${m}</td><td class="num">${fmtL(r.Blinkit)}</td><td class="num">${fmtL(r.Amazon)}</td><td class="num">${fmtL(r.Shopify)}</td><td class="num">${fmtL(r.B2B)}</td><td class="num">${fmtL(r.MT)}</td><td class="num" style="font-weight:600;">${fmtL(total)}</td></tr>`; }).join('')}
+                <tbody>${months.map(m => { const r = grid[m]; const total = r.Blinkit+r.Amazon+r.Shopify+r.B2B+r.MT; const parts = m.split('-'); const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const label = parts.length===2 ? (mNames[Number(parts[1])-1] + ' ' + parts[0]) : m; return `<tr><td style="text-align:left;">${label}</td><td class="num">${fmtL(r.Blinkit)}</td><td class="num">${fmtL(r.Amazon)}</td><td class="num">${fmtL(r.Shopify)}</td><td class="num">${fmtL(r.B2B)}</td><td class="num">${fmtL(r.MT)}</td><td class="num" style="font-weight:600;">${fmtL(total)}</td></tr>`; }).join('')}
                 <tr style="background:#f4faff;font-weight:700;border-top:2px solid #ddd;"><td style="text-align:left;">All months</td><td class="num">${fmtCr(chSum.Blinkit)}</td><td class="num">${fmtCr(chSum.Amazon)}</td><td class="num">${fmtCr(chSum.Shopify)}</td><td class="num">${fmtCr(chSum.B2B)}</td><td class="num">${fmtCr(chSum.MT)}</td><td class="num">${fmtCr(grand)}</td></tr>
                 </tbody>
               </table></div>
@@ -6912,19 +6911,20 @@
   const panel = document.createElement('div');
   panel.id = 'team-attendance-panel';
   panel.className = 'team-att-card';
-  panel.style.cssText = 'background: white; border-radius: 14px; border: 1px solid #e5e7eb; margin: 0 0 18px; padding: 0; overflow: hidden; border-top: 4px solid var(--brand-500); box-shadow: 0 1px 3px rgba(0,0,0,0.03);';
+  panel.style.cssText = 'background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-subtle); margin: 0 0 20px; padding: 0; overflow: hidden;';
   panel.innerHTML = `
-    <div style="padding:16px 20px; background:linear-gradient(90deg,#eff6ff,#fff); border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+    <div style="padding:18px 24px; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
       <div>
-        <h2 style="margin:0; font-size:17px;">👥 Team attendance · today</h2>
-        <div style="font-size:11px; color:#64748b; margin-top:2px;" data-role="periodLabel">Loading…</div>
+        <div style="font-size:12px; font-weight:600; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-text); margin-bottom:4px;">Office &amp; factory staff</div>
+        <h2 style="margin:0; font-size:18px; font-weight:500;">Team attendance · today</h2>
+        <div style="font-size:13px; color:var(--text-secondary); margin-top:4px;" data-role="periodLabel">Loading…</div>
       </div>
-      <div style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:9px;">
+      <div style="display:flex; gap:4px; background:var(--bg-subtle); padding:4px; border-radius:10px;">
         <button class="ea-view-btn active" data-view="today">Today</button>
         <button class="ea-view-btn" data-view="month">This month</button>
       </div>
     </div>
-    <div style="padding:14px 20px;" data-role="content">Loading team attendance…</div>
+    <div style="padding:16px 24px;" data-role="content">Loading team attendance…</div>
   `;
   // (Insertion + re-injection handled by the observer below)
 
