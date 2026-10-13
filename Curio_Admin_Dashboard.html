@@ -1239,19 +1239,39 @@
     <div class="page" id="page-dispatches">
       <div class="page-head">
         <div>
-          <h1>🚚 Dispatches &amp; Invoices</h1>
-          <div class="meta">All shipments out of the factory · Every channel · With invoice archive</div>
+          <div class="eyebrow">Dispatches &amp; Invoices · Live from Zoho</div>
+          <h1>Dispatches &amp; Invoices</h1>
+          <div class="meta" id="dispLastSynced">Himlahar Harvests Pvt Ltd · Loading from Zoho…</div>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button class="btn ghost">Upload invoice</button>
-          <button class="btn">+ Log dispatch</button>
+          <button class="btn ghost" id="btnDispRefresh">Refresh from Zoho</button>
         </div>
       </div>
+
+      <div class="kpi-row">
+        <div class="kpi"><div class="label">Open sales orders</div><div class="value" id="dkOpenSo">—</div><div class="sub" id="dkOpenSoSub">to dispatch</div></div>
+        <div class="kpi"><div class="label">Open purchase orders</div><div class="value" id="dkOpenPo">—</div><div class="sub" id="dkOpenPoSub">to receive</div></div>
+        <div class="kpi"><div class="label">Awaiting dispatch value</div><div class="value" id="dkSoValue">—</div><div class="sub">pipeline</div></div>
+        <div class="kpi"><div class="label">Awaiting receipt value</div><div class="value" id="dkPoValue">—</div><div class="sub">committed spend</div></div>
+      </div>
+
       <div class="card">
-        <div style="padding: 60px 24px; text-align: center; color: #999;">
-          <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
-          <div style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 6px;">No data yet</div>
-          <div style="font-size: 12px;">This section populates as data flows in via the entry apps.</div>
+        <h2>Sales orders · dispatches pipeline <span class="badge" id="dSoCount"></span></h2>
+        <div style="max-height:420px; overflow:auto; margin:0 -24px;">
+          <table id="dispSoTable">
+            <thead><tr><th>SO #</th><th>Customer</th><th>Date</th><th>Shipment</th><th class="num">Qty</th><th class="num">Shipped</th><th class="num">Total</th><th>Status</th></tr></thead>
+            <tbody id="dispSoBody"><tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading from Zoho…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Purchase orders · incoming shipments <span class="badge" id="dPoCount"></span></h2>
+        <div style="max-height:420px; overflow:auto; margin:0 -24px;">
+          <table id="dispPoTable">
+            <thead><tr><th>PO #</th><th>Vendor</th><th>Date</th><th>Delivery</th><th class="num">Qty due</th><th class="num">Received</th><th class="num">Total</th><th>Status</th></tr></thead>
+            <tbody id="dispPoBody"><tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading from Zoho…</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -7170,12 +7190,19 @@
         fetch(EXEC + '?q=zoho_pos').then(r=>r.json()),
         fetch(EXEC + '?q=zoho_sos').then(r=>r.json())
       ]);
-      renderStock(items?.data?.items || []);
-      renderPos(pos?.data?.pos || []);
-      renderSos(sos?.data?.sos || []);
+      const itemsArr = items?.data?.items || [];
+      const posArr = pos?.data?.pos || [];
+      const sosArr = sos?.data?.sos || [];
+      renderStock(itemsArr);
+      renderPos(posArr);
+      renderSos(sosArr);
+      renderDispatches(posArr, sosArr);
       const ts = new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short'});
+      const stamp = 'Himlahar Harvests Pvt Ltd · Live from Zoho · ' + ts;
       const el = document.getElementById('zohoLastSynced');
-      if (el) el.textContent = 'Himlahar Harvests Pvt Ltd · Live from Zoho · ' + ts;
+      if (el) el.textContent = stamp;
+      const el2 = document.getElementById('dispLastSynced');
+      if (el2) el2.textContent = stamp;
     } catch(e) {
       console.error('Zoho fetch failed', e);
       const el = document.getElementById('zohoLastSynced');
@@ -7243,9 +7270,47 @@
     }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary)">No open sales orders.</td></tr>';
   }
 
+  function renderDispatches(pos, sos) {
+    const openSo = sos.filter(s => !['cancelled','closed','void'].includes(String(s.status||'').toLowerCase()));
+    const openPo = pos.filter(p => !['cancelled','closed','received'].includes(String(p.status||'').toLowerCase()));
+    const soValue = openSo.reduce((s,o) => s + (+o.total||0), 0);
+    const poValue = openPo.reduce((s,o) => s + (+o.total||0), 0);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('dkOpenSo', openSo.length);
+    set('dkOpenSoSub', sos.length + ' SOs total in Zoho');
+    set('dkOpenPo', openPo.length);
+    set('dkOpenPoSub', pos.length + ' POs total in Zoho');
+    set('dkSoValue', fmtMoney(soValue));
+    set('dkPoValue', fmtMoney(poValue));
+    set('dSoCount', openSo.length + ' open');
+    set('dPoCount', openPo.length + ' open');
+
+    openSo.sort((a,b) => String(a.shipment_date||'').localeCompare(String(b.shipment_date||'')));
+    const soBody = document.getElementById('dispSoBody');
+    if (soBody) {
+      soBody.innerHTML = openSo.map(s => {
+        const st = String(s.status||'').replace(/_/g,' ');
+        const stCls = /invoic|ship/i.test(st) ? 'ok' : /pending|draft/i.test(st) ? 'warn' : '';
+        return `<tr><td style="padding-left:24px;font-family:var(--font-mono);font-size:12px">${esc(s.so_number)}</td><td>${esc(s.customer_name)}</td><td>${fmtDate(s.date)}</td><td>${fmtDate(s.shipment_date)}</td><td class="num">${(+s.total_qty||0).toLocaleString('en-IN')}</td><td class="num">${(+s.qty_shipped||0).toLocaleString('en-IN')}</td><td class="num">${fmtMoney(s.total)}</td><td>${badge(st, stCls)}</td></tr>`;
+      }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-secondary);">No open sales orders in Zoho.</td></tr>';
+    }
+    openPo.sort((a,b) => String(a.delivery_date||'').localeCompare(String(b.delivery_date||'')));
+    const today = new Date().toISOString().slice(0,10);
+    const poBody = document.getElementById('dispPoBody');
+    if (poBody) {
+      poBody.innerHTML = openPo.map(p => {
+        const dd = fmtDate(p.delivery_date);
+        const overdue = dd && dd < today;
+        const st = String(p.status||'').replace(/_/g,' ');
+        const stCls = /approv|received/i.test(st) ? 'ok' : /pending|draft/i.test(st) ? 'warn' : '';
+        return `<tr><td style="padding-left:24px;font-family:var(--font-mono);font-size:12px">${esc(p.po_number)}</td><td>${esc(p.vendor_name)}</td><td>${fmtDate(p.date)}</td><td style="color:${overdue?'var(--danger-700)':'inherit'}">${dd}${overdue?' ⚠':''}</td><td class="num">${(+p.total_ordered_qty||0).toLocaleString('en-IN')}</td><td class="num">${(+p.qty_received||0).toLocaleString('en-IN')}</td><td class="num">${fmtMoney(p.total)}</td><td>${badge(st, stCls)}</td></tr>`;
+      }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-secondary);">No open purchase orders in Zoho.</td></tr>';
+    }
+  }
+
   // Hook refresh button
   document.addEventListener('click', e => {
-    if (e.target.id === 'btnZohoRefresh') {
+    if (e.target.id === 'btnZohoRefresh' || e.target.id === 'btnDispRefresh') {
       e.target.disabled = true;
       e.target.textContent = 'Syncing from Zoho…';
       fetch(EXEC + '?q=sync_zoho_all').then(r=>r.json()).then(() => {
@@ -7264,8 +7329,9 @@
   }
   // Load on nav click
   document.querySelectorAll('.nav-item').forEach(el => {
-    if (el.getAttribute('data-page') === 'inventory') {
-      el.addEventListener('click', () => setTimeout(tryLoad, 100));
+    const dp = el.getAttribute('data-page');
+    if (dp === 'inventory' || dp === 'dispatches') {
+      el.addEventListener('click', () => setTimeout(fetchZoho, 100));
     }
   });
   // Initial load if page is already active
