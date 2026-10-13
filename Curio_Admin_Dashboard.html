@@ -884,14 +884,61 @@
     <div class="page" id="page-inventory">
       <div class="page-head">
         <div>
-          <h1>🏭 Factory Inventory</h1>
-          <div class="meta">Himlahar Harvests Pvt Ltd · Total stock ₹32.77L (as of 17 Jul 2026)</div>
+          <div class="eyebrow">Inventory · Live from Zoho</div>
+          <h1>Factory Inventory</h1>
+          <div class="meta" id="zohoLastSynced">Himlahar Harvests Pvt Ltd · Loading from Zoho…</div>
         </div>
         <div style="display: flex; gap: 8px;">
+          <button class="btn ghost" id="btnZohoRefresh">Refresh from Zoho</button>
           <button class="btn ghost">Upload stock take (CSV)</button>
           <button class="btn">+ Log production batch</button>
         </div>
       </div>
+
+      <!-- Zoho Live Section -->
+      <div id="zohoLiveSection" style="margin-bottom:28px;">
+        <div class="kpi-row">
+          <div class="kpi"><div class="label">Items tracked</div><div class="value" id="zkTracked">—</div><div class="sub" id="zkTrackedSub">from Zoho Inventory</div></div>
+          <div class="kpi"><div class="label">Out of stock</div><div class="value" id="zkOut">—</div><div class="sub down" id="zkOutSub">need reorder</div></div>
+          <div class="kpi"><div class="label">Open POs (purchases in pipeline)</div><div class="value" id="zkPos">—</div><div class="sub" id="zkPosSub">—</div></div>
+          <div class="kpi"><div class="label">Open SOs (dispatches)</div><div class="value" id="zkSos">—</div><div class="sub" id="zkSosSub">—</div></div>
+        </div>
+
+        <div class="card">
+          <h2>Stock on hand · tracked items <span class="badge" id="zTrackedCount"></span></h2>
+          <div style="max-height:420px; overflow:auto; margin:0 -24px;">
+            <table id="zohoStockTable">
+              <thead><tr>
+                <th>Item</th><th>SKU</th><th>Unit</th><th class="num">On hand</th><th class="num">Reorder lvl</th><th>Status</th>
+              </tr></thead>
+              <tbody id="zohoStockBody"><tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-secondary);">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
+          <div class="card">
+            <h2>Purchases in pipeline <span class="badge" id="zPoCount"></span></h2>
+            <div style="max-height:360px; overflow:auto; margin:0 -24px;">
+              <table id="zohoPosTable">
+                <thead><tr><th>PO #</th><th>Vendor</th><th>Delivery</th><th class="num">Qty due</th><th class="num">Total</th><th>Status</th></tr></thead>
+                <tbody id="zohoPosBody"><tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-secondary);">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Dispatches (sales orders) <span class="badge" id="zSoCount"></span></h2>
+            <div style="max-height:360px; overflow:auto; margin:0 -24px;">
+              <table id="zohoSosTable">
+                <thead><tr><th>SO #</th><th>Customer</th><th>Shipment</th><th class="num">Qty</th><th class="num">Total</th><th>Status</th></tr></thead>
+                <tbody id="zohoSosBody"><tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-secondary);">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <hr class="gold-rule" style="margin:32px 0;">
+      <div class="eyebrow" style="margin-bottom:16px;">Legacy stock view (static)</div>
 
       <div class="kpi-row">
         <div class="kpi">
@@ -7107,5 +7154,125 @@
 .ea-view-btn:hover{background:#e2e8f0; color:#0f172a;}
 .ea-view-btn.active{background:var(--brand-500); color:#fff;}
 </style>
+<script>
+// ============ ZOHO LIVE INVENTORY + POS + SOS ============
+(function(){
+  const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+  const fmtMoney = v => { if (!v) return '₹0'; v = +v; if (v >= 1e7) return '₹' + (v/1e7).toFixed(2) + 'Cr'; if (v >= 1e5) return '₹' + (v/1e5).toFixed(2) + 'L'; return '₹' + v.toLocaleString('en-IN', {maximumFractionDigits:0}); };
+  const fmtDate = v => { if (!v) return ''; const s = String(v).slice(0,10); return s; };
+  const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const badge = (txt, cls) => `<span class="badge ${cls||''}">${esc(txt)}</span>`;
+
+  async function fetchZoho() {
+    try {
+      const [items, pos, sos] = await Promise.all([
+        fetch(EXEC + '?q=zoho_items').then(r=>r.json()),
+        fetch(EXEC + '?q=zoho_pos').then(r=>r.json()),
+        fetch(EXEC + '?q=zoho_sos').then(r=>r.json())
+      ]);
+      renderStock(items?.data?.items || []);
+      renderPos(pos?.data?.pos || []);
+      renderSos(sos?.data?.sos || []);
+      const ts = new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short'});
+      const el = document.getElementById('zohoLastSynced');
+      if (el) el.textContent = 'Himlahar Harvests Pvt Ltd · Live from Zoho · ' + ts;
+    } catch(e) {
+      console.error('Zoho fetch failed', e);
+      const el = document.getElementById('zohoLastSynced');
+      if (el) el.textContent = 'Failed to load from Zoho. Check backend deployment.';
+    }
+  }
+
+  function renderStock(items) {
+    const tracked = items.filter(it => it.track_inventory === true || it.track_inventory === 'TRUE' || it.item_type === 'inventory');
+    const out = tracked.filter(it => (+it.stock_on_hand || 0) <= 0);
+    const low = tracked.filter(it => {
+      const soh = +it.stock_on_hand || 0;
+      const rl = +it.reorder_level || 0;
+      return rl > 0 && soh > 0 && soh <= rl;
+    });
+    document.getElementById('zkTracked').textContent = tracked.length;
+    document.getElementById('zkTrackedSub').textContent = items.length + ' total items in Zoho';
+    document.getElementById('zkOut').textContent = out.length;
+    document.getElementById('zkOutSub').textContent = low.length + ' low stock';
+    document.getElementById('zTrackedCount').textContent = tracked.length + ' items';
+    // Sort by stock_on_hand asc (lowest first)
+    tracked.sort((a,b) => (+a.stock_on_hand||0) - (+b.stock_on_hand||0));
+    const body = document.getElementById('zohoStockBody');
+    body.innerHTML = tracked.slice(0, 100).map(it => {
+      const soh = +it.stock_on_hand || 0;
+      const rl = +it.reorder_level || 0;
+      let status = badge('OK', 'ok');
+      if (soh <= 0) status = badge('Out of stock', 'danger');
+      else if (rl > 0 && soh <= rl) status = badge('Low', 'warn');
+      return `<tr><td style="padding-left:24px">${esc(it.name)}</td><td style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary)">${esc(it.sku)}</td><td>${esc(it.unit)}</td><td class="num" style="font-weight:600">${soh.toLocaleString('en-IN')}</td><td class="num">${rl || '—'}</td><td>${status}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary)">No tracked items.</td></tr>';
+  }
+
+  function renderPos(pos) {
+    const open = pos.filter(p => !['cancelled','closed','received'].includes(String(p.status||'').toLowerCase()));
+    const totalValue = open.reduce((s,p) => s + (+p.total || 0), 0);
+    document.getElementById('zkPos').textContent = open.length;
+    document.getElementById('zkPosSub').textContent = fmtMoney(totalValue) + ' committed';
+    document.getElementById('zPoCount').textContent = open.length + ' open';
+    // Sort by delivery_date asc
+    open.sort((a,b) => String(a.delivery_date||'').localeCompare(String(b.delivery_date||'')));
+    const today = new Date().toISOString().slice(0,10);
+    const body = document.getElementById('zohoPosBody');
+    body.innerHTML = open.slice(0, 50).map(p => {
+      const dd = fmtDate(p.delivery_date);
+      const overdue = dd && dd < today;
+      const statusLabel = String(p.status||'').replace(/_/g,' ');
+      const stCls = /approv/i.test(statusLabel) ? 'ok' : /pending/i.test(statusLabel) ? 'warn' : '';
+      return `<tr><td style="padding-left:24px;font-family:var(--font-mono);font-size:12px">${esc(p.po_number)}</td><td>${esc(p.vendor_name)}</td><td style="color:${overdue?'var(--danger-700)':'inherit'}">${dd}${overdue?' ⚠':''}</td><td class="num">${(+p.total_ordered_qty||0).toLocaleString('en-IN')}</td><td class="num">${fmtMoney(p.total)}</td><td>${badge(statusLabel, stCls)}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary)">No open POs.</td></tr>';
+  }
+
+  function renderSos(sos) {
+    const open = sos.filter(s => !['cancelled','closed','void'].includes(String(s.status||'').toLowerCase()));
+    const totalValue = open.reduce((s,o) => s + (+o.total || 0), 0);
+    document.getElementById('zkSos').textContent = open.length;
+    document.getElementById('zkSosSub').textContent = fmtMoney(totalValue) + ' in dispatch pipeline';
+    document.getElementById('zSoCount').textContent = open.length + ' open';
+    open.sort((a,b) => String(a.shipment_date||'').localeCompare(String(b.shipment_date||'')));
+    const body = document.getElementById('zohoSosBody');
+    body.innerHTML = open.slice(0, 50).map(s => {
+      const statusLabel = String(s.status||'').replace(/_/g,' ');
+      const stCls = /invoic|ship/i.test(statusLabel) ? 'ok' : /pending|draft/i.test(statusLabel) ? 'warn' : '';
+      return `<tr><td style="padding-left:24px;font-family:var(--font-mono);font-size:12px">${esc(s.so_number)}</td><td>${esc(s.customer_name)}</td><td>${fmtDate(s.shipment_date)}</td><td class="num">${(+s.total_qty||0).toLocaleString('en-IN')}</td><td class="num">${fmtMoney(s.total)}</td><td>${badge(statusLabel, stCls)}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary)">No open sales orders.</td></tr>';
+  }
+
+  // Hook refresh button
+  document.addEventListener('click', e => {
+    if (e.target.id === 'btnZohoRefresh') {
+      e.target.disabled = true;
+      e.target.textContent = 'Syncing from Zoho…';
+      fetch(EXEC + '?q=sync_zoho_all').then(r=>r.json()).then(() => {
+        return fetchZoho();
+      }).finally(() => {
+        e.target.disabled = false;
+        e.target.textContent = 'Refresh from Zoho';
+      });
+    }
+  });
+
+  // Fetch when inventory page becomes active
+  function tryLoad() {
+    const invEl = document.getElementById('page-inventory');
+    if (invEl && invEl.classList.contains('active')) fetchZoho();
+  }
+  // Load on nav click
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if (el.getAttribute('data-page') === 'inventory') {
+      el.addEventListener('click', () => setTimeout(tryLoad, 100));
+    }
+  });
+  // Initial load if page is already active
+  setTimeout(tryLoad, 1000);
+  // Also try to prefetch after 2s regardless
+  setTimeout(fetchZoho, 2000);
+})();
+</script>
 </body>
 </html>
