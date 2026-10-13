@@ -100,44 +100,54 @@
   .page.active > *:nth-child(5) { animation-delay: 160ms; }
   .app { display: flex; min-height: 100vh; }
 
-  /* Sidebar — Stone theme: white with gold hairline */
+  /* Sidebar — Navy ground with Champagne accents (hybrid: dark sidebar + light main) */
   .sidebar {
-    width: 248px; color: var(--sidebar-text);
+    --sb-text: #b2b4b8;
+    --sb-heading: var(--stone);
+    --sb-label: var(--champagne);
+    --sb-active: var(--champagne);
+    --sb-hover: rgba(239, 239, 234, 0.04);
+    width: 248px; color: var(--sb-text);
     padding: 24px 0 32px; flex-shrink: 0;
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
-    background: var(--sidebar-bg);
-    border-right: 1px solid var(--border-subtle);
+    background: var(--ink);
+    border-right: 1px solid rgba(239, 239, 234, 0.06);
   }
   .brand {
-    padding: 0 20px 20px; border-bottom: 1px solid var(--gold-line);
+    padding: 0 20px 20px; border-bottom: 1px solid var(--champagne);
     margin-bottom: 8px;
   }
-  .brand h1 { color: var(--sidebar-heading); font-size: 15px; margin: 0; font-weight: 500; letter-spacing: 0; }
-  .brand p { color: var(--sidebar-text); font-size: 11px; margin: 4px 0 0; font-weight: 400; }
+  .brand img { filter: none; }
+  .brand h1 { color: var(--sb-heading); font-size: 15px; margin: 0; font-weight: 500; letter-spacing: 0; }
+  .brand p { color: var(--sb-text); font-size: 11px; margin: 4px 0 0; font-weight: 400; }
   .nav-section-label {
-    color: var(--sidebar-label); font-size: 12px; text-transform: uppercase;
-    letter-spacing: 0.28em; padding: 18px 20px 8px; font-weight: 600;
+    color: var(--sb-label); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.24em; padding: 20px 20px 8px; font-weight: 600;
   }
   .nav-item {
     display: flex; align-items: center; gap: 11px;
-    padding: 8px 20px; color: var(--sidebar-text); cursor: pointer;
+    padding: 8px 20px; color: var(--sb-text); cursor: pointer;
     font-size: 14px; font-weight: 500;
     border-left: 2px solid transparent;
     text-decoration: none;
     transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
     letter-spacing: 0;
   }
-  .nav-item:hover { background: var(--bg-hover); color: var(--sidebar-text-hover); }
+  .nav-item:hover { background: var(--sb-hover); color: var(--stone); }
   .nav-item:active { transform: scale(0.99); }
-  .nav-item.active { background: transparent; color: var(--sidebar-heading); border-left-color: var(--sidebar-active); font-weight: 600; }
+  .nav-item.active { background: rgba(198, 163, 110, 0.08); color: var(--champagne); border-left-color: var(--sb-active); font-weight: 600; }
   .nav-item .icon { font-size: 15px; width: 20px; text-align: center; opacity: 0.85; display: none; }
   .nav-item .badge {
-    margin-left: auto; background: var(--bg-subtle); color: var(--text-secondary);
+    margin-left: auto; background: rgba(239, 239, 234, 0.08); color: var(--sb-text);
     font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600;
     letter-spacing: 0;
   }
-  .nav-item .badge.warn { background: var(--warn-100); color: var(--warn-800); }
-  .nav-item .badge.danger { background: var(--danger-100); color: var(--danger-800); }
+  .nav-item .badge.warn { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+  .nav-item .badge.danger { background: rgba(239, 68, 68, 0.2); color: #fecaca; }
+  .nav-item .badge.ok { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+  /* Sidebar scrollbar */
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(239, 239, 234, 0.1); border-radius: 3px; border: 0; }
 
   /* Main */
   .main { flex: 1; padding: 32px 40px; overflow-x: auto; min-width: 0; }
@@ -475,11 +485,11 @@
 <div class="app">
   <!-- SIDEBAR -->
   <div class="sidebar">
-    <div class="brand" style="padding:4px 20px 20px;">
-      <img src="/curio-lifestyle-champagne.png" alt="curio lifestyle" style="width:128px; height:auto; display:block; margin:8px 0 10px;">
-      <hr style="border:0; border-top:1px solid var(--gold-line); margin:0 0 12px; width:48px;">
-      <div style="font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--sidebar-label); margin-bottom:2px;">Himlahar Harvests</div>
-      <div style="font-size:10px; color:var(--sidebar-text); font-weight:400;">Private Limited · Ops Dashboard</div>
+    <div class="brand" style="padding:8px 20px 20px;">
+      <img src="/curio-lifestyle-champagne.png" alt="curio lifestyle" style="width:140px; height:auto; display:block; margin:4px 0 14px;">
+      <hr style="border:0; border-top:1px solid var(--champagne); margin:0 0 12px; width:52px;">
+      <div style="font-size:11px; font-weight:600; letter-spacing:0.18em; text-transform:uppercase; color:var(--champagne); margin-bottom:3px;">Himlahar Harvests</div>
+      <div style="font-size:10px; color:#b2b4b8; font-weight:400; letter-spacing:0.02em;">Private Limited · Ops Dashboard</div>
     </div>
 
     <div class="nav-section-label">Overview</div>
@@ -3573,32 +3583,9 @@
     });
   });
 
-  // ============ KPI number-counter animation ============
-  function animateKPIs() {
-    const kpiValues = document.querySelectorAll(".page.active .kpi .value");
-    kpiValues.forEach(el => {
-      if (el.dataset.animated === "1") return; // don't re-animate
-      const raw = el.textContent.trim();
-      const match = raw.match(/^(₹?)(-?[\d,\.]+)([A-Za-z%]*)(.*)$/);
-      if (!match) return;
-      const prefix = match[1], numStr = match[2], suffix = match[3], rest = match[4] || "";
-      const target = parseFloat(numStr.replace(/,/g, ""));
-      if (!isFinite(target)) return;
-      const decimals = (numStr.split(".")[1] || "").length;
-      const dur = 700; const start = performance.now();
-      const ease = (t) => 1 - Math.pow(1 - t, 3);
-      function step(now) {
-        const t = Math.min(1, (now - start) / dur);
-        const v = target * ease(t);
-        const fmt = decimals > 0 ? v.toFixed(decimals) : Math.round(v).toLocaleString('en-IN');
-        el.textContent = prefix + fmt + suffix + rest;
-        if (t < 1) requestAnimationFrame(step);
-        else el.dataset.animated = "1";
-      }
-      el.textContent = prefix + (decimals > 0 ? "0.00" : "0") + suffix + rest;
-      requestAnimationFrame(step);
-    });
-  }
+  // ============ KPI counter animation (disabled — was stuck at 0 on nav-triggered pages) ============
+  // The brand voice prefers quiet, considered motion. Final values show immediately.
+  function animateKPIs() { /* intentionally no-op */ }
   window.addEventListener("load", animateKPIs);
 
   // Finance channel tabs
