@@ -1310,7 +1310,7 @@
       <div class="page-head">
         <div>
           <h1>Blinkit</h1>
-          <div class="meta" id="blkMeta">Quick commerce · Loading live inventory + coverage from Blinkit Seller Hub…</div>
+          <div class="meta">Quick commerce · 12 SKUs active · 45 live cities · 262 of 339 darkstores holding stock · Portal snapshot 14 Oct 2026</div>
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn ghost">Paste today's report</button>
@@ -1320,45 +1320,93 @@
       <!-- LIVE DATA COMPLETENESS CARD -->
       <div id="blinkitDataStatus" style="margin-bottom:14px; padding:14px 16px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:10px; font-size:13px; color:var(--text-secondary);"><strong>Loading current-month status…</strong></div>
 
-      <!-- LIVE FROM BLINKIT SELLER HUB · populated weekly via the sync bookmarklet -->
+      <!-- BLINKIT PORTAL SNAPSHOT · pulled from Seller Hub on 14 Oct 2026 -->
       <div class="card">
-        <h2>Live from Blinkit Seller Hub <span class="badge" id="blkLiveStatus">Loading…</span></h2>
-        <div id="blkLiveSyncBanner" style="padding:14px 16px; background:var(--warn-50); border:1px solid var(--warn-200); border-radius:10px; margin-bottom:16px; display:none;">
-          <strong style="color:var(--warn-800);">No Blinkit sync yet.</strong> Open <a href="/blinkit_sync_bookmarklet.html" target="_blank" style="color:var(--brand-500); font-weight:600;">the install page</a> to add the bookmarklet, then click it once a week while on seller.blinkit.com to refresh inventory + coverage.
-        </div>
+        <div class="eyebrow" style="margin-bottom:6px;">Portal snapshot · 14 Oct 2026</div>
+        <h2>Live from Blinkit Seller Hub <span class="badge">Snapshot</span></h2>
+        <div class="meta" style="margin-bottom:16px; color:var(--text-secondary);">Pulled directly from seller.blinkit.com on 14 Oct 2026. Sales are entered manually via the Blinkit entry app.</div>
 
         <div class="kpi-row">
-          <div class="kpi"><div class="label">Active SKUs on Blinkit</div><div class="value" id="blkLiveSkuCount">—</div><div class="sub" id="blkLiveSkuSub">from live inventory</div></div>
-          <div class="kpi"><div class="label">Sellable stock (total)</div><div class="value" id="blkLiveStock">—</div><div class="sub" id="blkLiveStockSub">darkstore + warehouse</div></div>
-          <div class="kpi"><div class="label">Live cities</div><div class="value" id="blkLiveCities">—</div><div class="sub" id="blkLiveCitiesSub">from coverage</div></div>
-          <div class="kpi"><div class="label">Live darkstores (holding stock)</div><div class="value" id="blkLiveDS">—</div><div class="sub" id="blkLiveDSSub">—</div></div>
+          <div class="kpi"><div class="label">Active SKUs on Blinkit</div><div class="value">12</div><div class="sub">10 flagged "Low Inventory"</div></div>
+          <div class="kpi"><div class="label">Sellable stock (total)</div><div class="value">2,746</div><div class="sub">Dark 2,254 · WH 168 · Transit 324</div></div>
+          <div class="kpi"><div class="label">Live cities</div><div class="value">45</div><div class="sub">of 200 checked (top metros all covered)</div></div>
+          <div class="kpi"><div class="label">Darkstores holding stock</div><div class="value">262</div><div class="sub">77 empty of 339 approved · 77%</div></div>
         </div>
+      </div>
+
+      <!-- Unsellable alert -->
+      <div class="card" style="border-left: 4px solid var(--danger-500);">
+        <h2 style="color: var(--danger-800);">Unsellable stock at Blinkit · needs recovery</h2>
+        <div class="meta" style="margin-bottom:16px;">1,007 units in various unsellable states. Highest-impact items first.</div>
+        <table>
+          <thead><tr><th>Reason</th><th class="num">Units</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td style="padding-left:24px"><strong>Lost at Blinkit</strong></td><td class="num" style="font-weight:600; color:var(--danger-700);">448</td><td>Raise reconciliation with Blinkit — money they owe</td></tr>
+            <tr><td style="padding-left:24px"><strong>Near expiry</strong></td><td class="num" style="font-weight:600; color:var(--warn-800);">400</td><td>Rotate or discount — Ladakh Apricots 151, Kashmir Almonds 111</td></tr>
+            <tr><td style="padding-left:24px">Expired</td><td class="num">159</td><td>Write off</td></tr>
+            <tr><td style="padding-left:24px">Customer returned + damaged + recall-in-progress</td><td class="num">—</td><td>Review per-SKU</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- SKUs with expansion level + stock + 30-day sales -->
       <div class="card">
-        <h2>SKUs on Blinkit · stock, expansion, 30-day sales <span class="badge" id="blkLiveSkuTotalBadge"></span></h2>
+        <h2>SKUs on Blinkit · stock, expansion, 30-day sales <span class="badge">12 SKUs</span></h2>
         <div style="max-height:460px; overflow:auto; margin:0 -24px;">
-          <table id="blkLiveSkuTable">
+          <table>
             <thead><tr>
-              <th>SKU</th><th>Level</th><th class="num">MRP</th><th class="num">Darkstore</th><th class="num">Warehouse</th><th class="num">Incoming</th><th class="num">Unsellable</th><th class="num">Near-exp</th><th class="num">Lost</th><th class="num">Sales 30d</th><th>Health</th>
+              <th>SKU</th><th>Level</th><th class="num">MRP</th><th class="num">Darkstore</th><th class="num">Warehouse</th><th class="num">Incoming</th><th class="num">Near-exp</th><th class="num">Lost</th><th class="num">Sales 30d</th><th>Health</th>
             </tr></thead>
-            <tbody id="blkLiveSkuBody"><tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading…</td></tr></tbody>
+            <tbody>
+              <tr><td style="padding-left:24px">Kashmir Qahwa Green Tea (Saffron Spice)</td><td>L3</td><td class="num">₹650</td><td class="num" style="font-weight:600; color:var(--danger-700);">29</td><td class="num">0</td><td class="num">492</td><td class="num">2</td><td class="num" style="color:var(--danger-700);">53</td><td class="num">2</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Kashmir Saffron Mongra (Pure Threads)</td><td style="font-weight:600;">L4</td><td class="num">₹700</td><td class="num" style="color:var(--warn-800);">106</td><td class="num">1</td><td class="num">0</td><td class="num">31</td><td class="num" style="color:var(--danger-700);">58</td><td class="num" style="font-weight:600;">86</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Cold Pressed Almond Oil</td><td>L3</td><td class="num">₹1,155</td><td class="num" style="color:var(--warn-800);">114</td><td class="num">0</td><td class="num">469</td><td class="num">16</td><td class="num">13</td><td class="num">14</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Raw Monofloral Honey (Single Origin)</td><td>L3</td><td class="num">₹750</td><td class="num">128</td><td class="num">8</td><td class="num">0</td><td class="num">18</td><td class="num">1</td><td class="num">21</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Kashmir Zafrani Kehwa Green Tea (Saffron)</td><td>L3</td><td class="num">158</td><td class="num">2</td><td class="num">357</td><td class="num">1</td><td class="num" style="color:var(--danger-700); font-weight:600;">144</td><td class="num">19</td><td class="num">—</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Ladakh Apricots (Sun Dried)</td><td>L3</td><td class="num">₹1,550</td><td class="num">160</td><td class="num">21</td><td class="num">0</td><td class="num" style="color:var(--danger-700); font-weight:600;">151</td><td class="num">44</td><td class="num">38</td><td><span class="badge danger">Expiry risk</span></td></tr>
+              <tr><td style="padding-left:24px">Chamomile Herbal Infusion (Himalayan)</td><td>L3</td><td class="num">₹650</td><td class="num">202</td><td class="num">15</td><td class="num">343</td><td class="num">3</td><td class="num">29</td><td class="num">28</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Wild Floral Honey (Raw Multi Flower)</td><td>L3</td><td class="num">₹650</td><td class="num">259</td><td class="num">23</td><td class="num">338</td><td class="num">15</td><td class="num" style="color:var(--danger-700);">52</td><td class="num" style="font-weight:600;">57</td><td><span class="badge ok">OK</span></td></tr>
+              <tr><td style="padding-left:24px">Cold Pressed Walnut Oil</td><td>L3</td><td class="num">₹1,200</td><td class="num">265</td><td class="num">18</td><td class="num">310</td><td class="num">18</td><td class="num">30</td><td class="num">31</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Cow Ghee (Himalayan Badri)</td><td>L3</td><td class="num">₹1,800</td><td class="num">265</td><td class="num">1</td><td class="num">0</td><td class="num">11</td><td class="num">3</td><td class="num">7</td><td><span class="badge warn">Low</span></td></tr>
+              <tr><td style="padding-left:24px">Kashmir Almonds (Premium Mamra)</td><td style="font-weight:600;">L4</td><td class="num">₹1,950</td><td class="num">266</td><td class="num">28</td><td class="num">431</td><td class="num" style="color:var(--danger-700); font-weight:600;">111</td><td class="num">2</td><td class="num" style="font-weight:600;">52</td><td><span class="badge danger">Expiry risk</span></td></tr>
+              <tr><td style="padding-left:24px">Cold Pressed Apricot Oil</td><td>L3</td><td class="num">₹1,200</td><td class="num">302</td><td class="num">51</td><td class="num">94</td><td class="num">23</td><td class="num">19</td><td class="num">11</td><td><span class="badge warn">Low</span></td></tr>
+            </tbody>
           </table>
         </div>
+        <div class="meta" style="padding:12px 0 0; font-size:12px; color:var(--text-secondary);">Sorted by darkstore stock low→high. L3 = regional expansion level. L4 = national/elite tier. Kashmir Saffron Mongra &amp; Kashmir Almonds Premium Mamra are the only L4 SKUs.</div>
       </div>
 
-      <!-- Coverage by city -->
+      <!-- Coverage by city — top 20 live cities -->
       <div class="card">
-        <h2>Coverage · cities &amp; darkstores <span class="badge" id="blkLiveCovBadge"></span></h2>
+        <h2>Coverage · live cities &amp; darkstore fill rate <span class="badge">45 live cities</span></h2>
         <div style="max-height:460px; overflow:auto; margin:0 -24px;">
-          <table id="blkLiveCovTable">
-            <thead><tr>
-              <th>City</th><th class="num">Active SKUs</th><th class="num">Darkstores w/ stock</th><th class="num">Total darkstores</th><th class="num">Fill rate</th>
-            </tr></thead>
-            <tbody id="blkLiveCovBody"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading…</td></tr></tbody>
+          <table>
+            <thead><tr><th>City</th><th class="num">Active SKUs</th><th class="num">Darkstores w/ stock</th><th class="num">Total darkstores</th><th class="num">Fill rate</th></tr></thead>
+            <tbody>
+              <tr><td style="padding-left:24px"><strong>Bengaluru</strong></td><td class="num">15</td><td class="num" style="font-weight:600;">54</td><td class="num">78</td><td><span class="badge warn">69%</span></td></tr>
+              <tr><td style="padding-left:24px"><strong>Delhi</strong></td><td class="num">15</td><td class="num" style="font-weight:600;">39</td><td class="num">45</td><td><span class="badge ok">87%</span></td></tr>
+              <tr><td style="padding-left:24px">Hyderabad</td><td class="num">15</td><td class="num" style="font-weight:600;">28</td><td class="num">40</td><td><span class="badge warn">70%</span></td></tr>
+              <tr><td style="padding-left:24px">HR-NCR (Gurgaon)</td><td class="num">15</td><td class="num" style="font-weight:600;">21</td><td class="num">22</td><td><span class="badge ok">95%</span></td></tr>
+              <tr><td style="padding-left:24px">Chennai</td><td class="num">15</td><td class="num" style="font-weight:600;">17</td><td class="num">23</td><td><span class="badge warn">74%</span></td></tr>
+              <tr><td style="padding-left:24px">Ahmedabad</td><td class="num">13</td><td class="num">15</td><td class="num">18</td><td><span class="badge ok">83%</span></td></tr>
+              <tr><td style="padding-left:24px">Jaipur</td><td class="num">15</td><td class="num">9</td><td class="num">13</td><td><span class="badge warn">69%</span></td></tr>
+              <tr><td style="padding-left:24px">Indore</td><td class="num">14</td><td class="num">7</td><td class="num">8</td><td><span class="badge ok">88%</span></td></tr>
+              <tr><td style="padding-left:24px">Guwahati</td><td class="num">5</td><td class="num">7</td><td class="num">7</td><td><span class="badge ok">100%</span></td></tr>
+              <tr><td style="padding-left:24px">Dehradun</td><td class="num">15</td><td class="num">5</td><td class="num">8</td><td><span class="badge warn">63%</span></td></tr>
+              <tr><td style="padding-left:24px">Agra</td><td class="num">15</td><td class="num">4</td><td class="num">5</td><td><span class="badge ok">80%</span></td></tr>
+              <tr><td style="padding-left:24px">Faridabad</td><td class="num">15</td><td class="num">5</td><td class="num">5</td><td><span class="badge ok">100%</span></td></tr>
+              <tr><td style="padding-left:24px">Bhopal</td><td class="num">14</td><td class="num">5</td><td class="num">5</td><td><span class="badge ok">100%</span></td></tr>
+              <tr><td style="padding-left:24px">Jalandhar</td><td class="num">15</td><td class="num">2</td><td class="num">5</td><td><span class="badge danger">40%</span></td></tr>
+              <tr><td style="padding-left:24px">Bhubaneswar</td><td class="num">5</td><td class="num">3</td><td class="num">4</td><td><span class="badge warn">75%</span></td></tr>
+              <tr><td style="padding-left:24px">Jamshedpur</td><td class="num">5</td><td class="num">3</td><td class="num">4</td><td><span class="badge warn">75%</span></td></tr>
+              <tr><td style="padding-left:24px">Gorakhpur</td><td class="num">15</td><td class="num">1</td><td class="num">4</td><td><span class="badge danger">25%</span></td></tr>
+              <tr><td style="padding-left:24px">Amritsar</td><td class="num">15</td><td class="num">1</td><td class="num">3</td><td><span class="badge danger">33%</span></td></tr>
+              <tr><td style="padding-left:24px">Aligarh</td><td class="num">11</td><td class="num">1</td><td class="num">3</td><td><span class="badge danger">33%</span></td></tr>
+              <tr><td style="padding-left:24px">Goa</td><td class="num">11</td><td class="num">2</td><td class="num">3</td><td><span class="badge warn">67%</span></td></tr>
+            </tbody>
           </table>
         </div>
+        <div class="meta" style="padding:12px 0 0; font-size:12px; color:var(--text-secondary);">Top 20 of 45 live cities, sorted by darkstore count. 7 more cities approved and awaiting launch. 77 darkstores in live cities are approved but currently empty — lost shelf.</div>
       </div>
 
       <hr class="gold-rule" style="margin:32px 0;">
@@ -7614,8 +7662,6 @@
       el.addEventListener('click', () => setTimeout(fetchZoho, 100));
     } else if (dp === 'customer-ledger') {
       el.addEventListener('click', () => setTimeout(fetchZohoCustomerLedger, 100));
-    } else if (dp === 'blinkit') {
-      el.addEventListener('click', () => setTimeout(fetchBlinkitLive, 100));
     }
   });
   // Hook customer-ledger refresh button
