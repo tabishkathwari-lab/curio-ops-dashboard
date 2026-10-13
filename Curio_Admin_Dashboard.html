@@ -6411,8 +6411,14 @@
           //   • Amazon primary = Zoho invoices tagged Chain='Amazon' (currently 0)
           const mtPriYtd = MI.reduce((s,i) => s + Number(i.Total||0), 0);
           const mtPriMonth = MI.filter(i => { const m = String(i.Month||''); return (m.includes('T') ? m.slice(0,7) : m) === nowMo; }).reduce((s,i) => s + Number(i.Total||0), 0);
-          const blkPriMonth = MI.filter(i => /blinkit/i.test(String(i.Chain||'')) && (String(i.Month||'').slice(0,7) === nowMo)).reduce((s,i) => s + Number(i.Total||0), 0);
-          const amzPriMonth = MI.filter(i => /amazon/i.test(String(i.Chain||'')) && (String(i.Month||'').slice(0,7) === nowMo)).reduce((s,i) => s + Number(i.Total||0), 0);
+          // Blinkit/Amazon primary now pulls LIVE from Zoho Books invoices (via q=zoho_invoices)
+          let zohoInvs = [];
+          try { const zi = await CurioAPI.get('zoho_invoices').catch(()=>null); zohoInvs = (zi?.data?.invoices || zi?.data?.data?.invoices || []); } catch(e) {}
+          const BLINKIT_CUST_RE = /blink\s*commerce/i;
+          const AMZ_CUST_RE = /\bamazon\b|CloudTail|Appario/i;
+          const monthOfInv = i => { const d = String(i.date||''); return d.slice(0,7); };
+          const blkPriMonth = zohoInvs.filter(i => BLINKIT_CUST_RE.test(i.customer_name||'') && monthOfInv(i) === nowMo).reduce((s,i) => s + Number(i.total||0), 0);
+          const amzPriMonth = zohoInvs.filter(i => AMZ_CUST_RE.test(i.customer_name||'') && monthOfInv(i) === nowMo).reduce((s,i) => s + Number(i.total||0), 0);
           const primaryMonth = mtPriMonth + blkPriMonth + amzPriMonth;
           const primaryYtd = mtPriYtd;
 
@@ -6442,8 +6448,8 @@
           const monthLbl = new Date().toLocaleDateString('en-IN', {month:'short', year:'numeric'});
 
           // Per-channel YTD figures
-          const blkPriYtd = MI.filter(i => /blinkit/i.test(String(i.Chain||''))).reduce((s,i) => s + Number(i.Total||0), 0);
-          const amzPriYtd = MI.filter(i => /amazon/i.test(String(i.Chain||''))).reduce((s,i) => s + Number(i.Total||0), 0);
+          const blkPriYtd = zohoInvs.filter(i => BLINKIT_CUST_RE.test(i.customer_name||'')).reduce((s,i) => s + Number(i.total||0), 0);
+          const amzPriYtd = zohoInvs.filter(i => AMZ_CUST_RE.test(i.customer_name||'')).reduce((s,i) => s + Number(i.total||0), 0);
           const mtPriYtdX = MI.filter(i => !/blinkit|amazon/i.test(String(i.Chain||''))).reduce((s,i) => s + Number(i.Total||0), 0);
 
           const dashLine = (channel, kind1, val1Mo, val1Yt, kind2, val2Mo, val2Yt, note) => `
@@ -6506,6 +6512,21 @@
               <div><div style="font-size:11px; color:#166534; text-transform:uppercase; font-weight:700;">Secondary · ${monthLbl}</div><div style="font-size:20px; font-weight:800; color:#166534;">${fmtL(blkSecMonth)}</div><div style="font-size:11px; color:#64748b;">Blinkit → end consumer (${BL.filter(r => monthOf(r.Date)===nowMo).length} order-day rows)</div></div>
               <div><div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">Gap</div><div style="font-size:20px; font-weight:800; color:${blkPriMonth-blkSecMonth>=0?'#92400e':'#991b1b'};">${blkPriMonth===0?'—':(blkPriMonth-blkSecMonth>=0?'+':'')+fmtL(blkPriMonth-blkSecMonth)}</div><div style="font-size:11px; color:#64748b;">${blkPriMonth===0?'Add primary to see':'Buffer at warehouse'}</div></div>`;
             const head = blkPage.querySelector('.page-head'); if (head) head.parentNode.insertBefore(strip, head.nextSibling);
+            // Staleness banner — flag if secondary data is >2 days old
+            try {
+              const latestBl = BL.map(r => String(r.Date||'').slice(0,10)).sort().slice(-1)[0];
+              if (latestBl) {
+                const latestD = new Date(latestBl + 'T00:00:00Z').getTime();
+                const nowD = new Date().getTime();
+                const daysOld = Math.floor((nowD - latestD) / 86400000);
+                if (daysOld > 2) {
+                  const warn = document.createElement('div');
+                  warn.style.cssText = 'margin-bottom:14px; padding:14px 18px; background:var(--warn-50); border:1px solid var(--warn-200); border-left:4px solid var(--warn-500); border-radius:10px; display:flex; justify-content:space-between; align-items:center; gap:12px;';
+                  warn.innerHTML = `<div><div style="font-size:12px; font-weight:700; color:var(--warn-800); letter-spacing:0.08em; text-transform:uppercase;">Secondary data stale</div><div style="font-size:14px; color:var(--text-primary); margin-top:4px;">Latest consumer sale on file: <strong>${latestBl}</strong> · ${daysOld} days old. Oct 1 → today not yet pulled from the Blinkit portal.</div></div><button class="btn ghost" onclick="window.open('https://dashboard.curiolifestyle.com/Curio_Blinkit_Entry.html','_blank')">Open entry app</button>`;
+                  strip.parentNode.insertBefore(warn, strip.nextSibling);
+                }
+              }
+            } catch(e) {}
           }
           // Amazon page
           const amzPage = document.getElementById('page-amazon');
