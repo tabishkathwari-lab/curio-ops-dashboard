@@ -6300,7 +6300,7 @@
           salesEl.innerHTML = `
             <div class="page-head">
               <div><h1>Sales log</h1><div class="meta">Live across every channel · ${rows.length.toLocaleString('en-IN')} entries · ${fmtCr(totalRev)} · ${totalUnits.toLocaleString('en-IN')} units</div></div>
-              <button class="btn" onclick="event.stopPropagation(); (function(){const csv='Date,Channel,Entered by,SKU/Ref,Units,Revenue\\n'+${JSON.stringify(rows)}.map(r=>[r.date,r.channel,r.who,r.sku,r.units,r.revenue].join(',')).join('\\n');const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='sales_log_'+_ymdLocal()+'.csv';a.click();})()">Export CSV</button>
+              <button class="btn" id="btnSalesLogExport">Export CSV</button>
             </div>
             <div class="card">
               <div class="matrix-wrap"><table class="matrix" style="min-width:800px;font-size:12px;">
@@ -6309,6 +6309,22 @@
               </table></div>
               ${rows.length > 300 ? `<div style="padding:12px;font-size:12px;color:#888;text-align:center;">Showing 300 most recent of ${rows.length.toLocaleString('en-IN')} entries — export CSV for full log.</div>` : ''}
             </div>`;
+          // Store rows on window for the Export button (avoids 150KB JSON blob inlined into onclick attribute)
+          window.__salesLogRows = rows;
+          const expBtn = document.getElementById('btnSalesLogExport');
+          if (expBtn) {
+            expBtn.addEventListener('click', e => {
+              e.stopPropagation();
+              const data = window.__salesLogRows || [];
+              const esc = v => { const s = String(v==null?'':v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+              const csv = 'Date,Channel,Entered by,SKU/Ref,Units,Revenue\n' + data.map(r => [r.date, r.channel, r.who, r.sku, r.units, r.revenue].map(esc).join(',')).join('\n');
+              const b = new Blob([csv], {type: 'text/csv'});
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(b);
+              a.download = 'sales_log_' + (typeof _ymdLocal === 'function' ? _ymdLocal() : new Date().toISOString().slice(0,10)) + '.csv';
+              a.click();
+            });
+          }
         }
 
         // ============ MONTHLY TOTALS PAGE (page-monthly): channel × month grid ============
