@@ -6,39 +6,65 @@
 <title>Curio Admin Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* ============ DESIGN TOKENS ============ */
-  :root {
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
-    /* neutrals */
-    --bg-page: #fafafa;
+  /* ============ CURIO OPS DESIGN TOKENS (Stone theme) ============ */
+  :root, [data-theme="stone"] {
+    --font-sans: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Quicksand', ui-monospace, monospace;
+    /* Brand primary */
+    --navy: #161e39;
+    --champagne: #c6a36e;
+    --stone: #efefea;
+    --sand: #e3d7be;
+    --bronze: #735a40;
+    --ink: #0c1731;
+    --slate: #4f5569;
+    /* Surfaces */
+    --bg-page: var(--stone);
     --bg-card: #ffffff;
-    --bg-subtle: #f5f5f5;
-    --bg-hover: #f9fafb;
-    --border-subtle: rgba(0, 0, 0, 0.06);
-    --border-default: rgba(0, 0, 0, 0.09);
-    --border-strong: rgba(0, 0, 0, 0.15);
-    /* text */
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-tertiary: #94a3b8;
-    /* brand */
-    --brand-500: #1F4E78;
-    --brand-600: #17456B;
-    --brand-50: #eef4fa;
-    /* semantic */
-    --success-50: #ecfdf5; --success-500: #10b981; --success-700: #047857;
-    --warn-50: #fffbeb; --warn-500: #f59e0b; --warn-700: #b45309;
-    --danger-50: #fef2f2; --danger-500: #ef4444; --danger-700: #b91c1c;
+    --bg-subtle: var(--stone);
+    --bg-hover: #f6f6f2;
+    --border-subtle: rgba(12, 23, 49, 0.08);
+    --border-default: rgba(12, 23, 49, 0.12);
+    --border-strong: rgba(12, 23, 49, 0.36);
+    /* Text */
+    --text-primary: var(--ink);
+    --text-secondary: var(--slate);
+    --text-tertiary: var(--slate);
+    /* Action */
+    --brand-500: var(--navy);
+    --brand-600: var(--ink);
+    --on-brand: var(--stone);
+    --brand-50: var(--sand);
+    /* Gold */
+    --gold-text: var(--bronze);
+    --gold-line: var(--champagne);
+    --focus-ring: var(--navy);
+    /* Sidebar */
+    --sidebar-bg: #ffffff;
+    --sidebar-text: var(--slate);
+    --sidebar-text-hover: var(--ink);
+    --sidebar-heading: var(--ink);
+    --sidebar-label: var(--bronze);
+    --sidebar-active: var(--bronze);
+    /* Status */
+    --success-50: #ecfdf5; --success-100: #dcfce7; --success-500: #10b981; --success-700: #047857; --success-800: #166534;
+    --warn-50: #fffbeb; --warn-100: #fef3c7; --warn-500: #f59e0b; --warn-700: #b45309; --warn-800: #92400e;
+    --danger-50: #fef2f2; --danger-100: #fee2e2; --danger-500: #ef4444; --danger-700: #b91c1c; --danger-800: #991b1b;
     --info-50: #eff6ff; --info-500: #3b82f6; --info-700: #1d4ed8;
-    /* shadows */
-    --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.03);
-    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
-    --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
-    --shadow-focus: 0 0 0 3px rgba(31, 78, 120, 0.12);
-    /* motion */
+    /* Channel series */
+    --channel-amazon: #ff9900;
+    --channel-blinkit: #ffc107;
+    --channel-shopify: #5e8e3e;
+    --channel-b2b: #6b21a8;
+    --channel-inventory: #0f766e;
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(12, 23, 49, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(12, 23, 49, 0.06), 0 2px 4px -1px rgba(12, 23, 49, 0.04);
+    --shadow-lg: 0 10px 15px -3px rgba(12, 23, 49, 0.08), 0 4px 6px -2px rgba(12, 23, 49, 0.05);
+    --shadow-focus: 0 0 0 3px rgba(22, 30, 57, 0.14);
+    /* Motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
     --dur-fast: 120ms;
@@ -74,45 +100,44 @@
   .page.active > *:nth-child(5) { animation-delay: 160ms; }
   .app { display: flex; min-height: 100vh; }
 
-  /* Sidebar */
+  /* Sidebar — Stone theme: white with gold hairline */
   .sidebar {
-    width: 248px; color: #cbd5e1;
+    width: 248px; color: var(--sidebar-text);
     padding: 24px 0 32px; flex-shrink: 0;
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
-    background: linear-gradient(180deg, #0b1a2a 0%, #0d1f31 100%);
-    border-right: 1px solid rgba(255,255,255,0.04);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-subtle);
   }
   .brand {
-    padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 0 20px 20px; border-bottom: 1px solid var(--gold-line);
     margin-bottom: 8px;
   }
-  .brand h1 { color: #fff; font-size: 15px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
-  .brand p { color: #64748b; font-size: 11px; margin: 4px 0 0; font-weight: 500; }
+  .brand h1 { color: var(--sidebar-heading); font-size: 15px; margin: 0; font-weight: 500; letter-spacing: 0; }
+  .brand p { color: var(--sidebar-text); font-size: 11px; margin: 4px 0 0; font-weight: 400; }
   .nav-section-label {
-    color: #475569; font-size: 10px; text-transform: uppercase;
-    letter-spacing: 0.08em; padding: 16px 20px 6px; font-weight: 600;
+    color: var(--sidebar-label); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.28em; padding: 18px 20px 8px; font-weight: 600;
   }
   .nav-item {
     display: flex; align-items: center; gap: 11px;
-    padding: 7px 20px; color: #94a3b8; cursor: pointer;
-    font-size: 13px; font-weight: 500;
+    padding: 8px 20px; color: var(--sidebar-text); cursor: pointer;
+    font-size: 14px; font-weight: 500;
     border-left: 2px solid transparent;
     text-decoration: none;
     transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
-    letter-spacing: -0.005em;
-  }
-  .nav-item:hover { background: rgba(255,255,255,0.04); color: #e2e8f0; }
-  .nav-item:active { transform: scale(0.99); }
-  .nav-item.active { background: rgba(96, 165, 250, 0.08); color: #fff; border-left-color: #60a5fa; }
-  .nav-item .icon { font-size: 15px; width: 20px; text-align: center; opacity: 0.85; }
-  .nav-item.active .icon { opacity: 1; }
-  .nav-item .badge {
-    margin-left: auto; background: rgba(255,255,255,0.08); color: #94a3b8;
-    font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 600;
     letter-spacing: 0;
   }
-  .nav-item .badge.warn { background: rgba(245, 158, 11, 0.18); color: #fbbf24; }
-  .nav-item .badge.danger { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+  .nav-item:hover { background: var(--bg-hover); color: var(--sidebar-text-hover); }
+  .nav-item:active { transform: scale(0.99); }
+  .nav-item.active { background: transparent; color: var(--sidebar-heading); border-left-color: var(--sidebar-active); font-weight: 600; }
+  .nav-item .icon { font-size: 15px; width: 20px; text-align: center; opacity: 0.85; display: none; }
+  .nav-item .badge {
+    margin-left: auto; background: var(--bg-subtle); color: var(--text-secondary);
+    font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600;
+    letter-spacing: 0;
+  }
+  .nav-item .badge.warn { background: var(--warn-100); color: var(--warn-800); }
+  .nav-item .badge.danger { background: var(--danger-100); color: var(--danger-800); }
 
   /* Main */
   .main { flex: 1; padding: 32px 40px; overflow-x: auto; min-width: 0; }
@@ -120,8 +145,8 @@
     display: flex; justify-content: space-between; align-items: flex-end;
     margin-bottom: 28px;
   }
-  .page-head h1 { margin: 0; font-size: 26px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
-  .page-head .meta { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+  .page-head h1 { margin: 0; font-size: 40px; line-height: 46px; font-weight: 300; color: var(--text-primary); letter-spacing: 0; }
+  .page-head .meta { color: var(--text-secondary); font-size: 13px; line-height: 20px; margin-top: 4px; }
 
   .filters { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
   .filters select, .filters input {
@@ -160,8 +185,8 @@
     position: relative; overflow: hidden;
   }
   .kpi:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-default); }
-  .kpi .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 500; letter-spacing: -0.005em; }
-  .kpi .value { font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .kpi .label { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; letter-spacing: 0; }
+  .kpi .value { font-size: 26px; font-weight: 500; color: var(--text-primary); letter-spacing: 0; line-height: 32px; font-variant-numeric: tabular-nums; }
   .kpi .sub { font-size: 12px; color: var(--success-700); margin-top: 6px; font-weight: 500; }
   .kpi .sub.down { color: var(--danger-700); }
 
@@ -172,9 +197,9 @@
   }
   .card:hover { box-shadow: var(--shadow-sm); }
   .card h2 {
-    margin: 0 0 16px; font-size: 15px; font-weight: 600; color: var(--text-primary);
+    margin: 0 0 16px; font-size: 18px; line-height: 24px; font-weight: 500; color: var(--text-primary);
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
   }
   .badge {
     background: var(--info-50); color: var(--info-700); font-size: 11px;
@@ -202,15 +227,26 @@
 
   .status-dot {
     display: inline-block; width: 8px; height: 8px;
-    border-radius: 50%; background: #22c55e; margin-right: 6px; vertical-align: middle;
+    border-radius: 50%; background: var(--success-500); margin-right: 6px; vertical-align: middle;
   }
-  .status-dot.missing { background: #ef4444; }
-  .status-dot.warn { background: #f59e0b; }
+  .status-dot.missing { background: var(--danger-500); }
+  .status-dot.warn { background: var(--warn-500); }
+
+  /* Gold hairline — brand divider rule */
+  .gold-rule { height: 1px; background: var(--gold-line); border: 0; margin: 16px 0; }
+  .gold-rule.lead { width: 40px; margin: 0 0 12px; }
+
+  /* Eyebrow — the only uppercase, used above page titles */
+  .eyebrow {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--gold-text); line-height: 18px;
+  }
 
   .promoter-cell { display: flex; align-items: center; gap: 8px; }
   .avatar {
     width: 28px; height: 28px; border-radius: 50%;
-    background: #1F4E78; color: #fff; display: flex;
+    background: var(--brand-500); color: var(--on-brand); display: flex;
     align-items: center; justify-content: center;
     font-size: 11px; font-weight: 600; flex-shrink: 0;
   }
@@ -220,7 +256,7 @@
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 14px; color: #4338ca; cursor: pointer;
   }
-  .loc-link { color: #1F4E78; text-decoration: none; font-size: 12px; }
+  .loc-link { color: var(--brand-500); text-decoration: none; font-size: 12px; }
   .loc-link:hover { text-decoration: underline; }
 
   /* Stock matrix */
@@ -373,11 +409,11 @@
 
   /* Modern Trade upload styles */
   .mt-controls { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 18px; }
-  .mt-controls .btn-primary { background: #1F4E78; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .mt-controls .btn-primary { background: var(--brand-500); color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .mt-controls .btn-primary:hover { background: #2a5f8a; }
-  .mt-controls .btn-ghost { background: #fff; color: #1F4E78; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .mt-controls .btn-ghost { background: #fff; color: var(--brand-500); border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
   .mt-upload-zone { display: none; padding: 24px; border: 2px dashed #cbd5e1; border-radius: 10px; text-align: center; background: #f8fafc; margin-bottom: 16px; }
-  .mt-upload-zone.dragging { border-color: #1F4E78; background: #eff6ff; }
+  .mt-upload-zone.dragging { border-color: var(--brand-500); background: #eff6ff; }
   .mt-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
   .mt-modal.open { display: flex; }
   .mt-modal-inner { background: #fff; border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
@@ -391,14 +427,15 @@
 <body>
 
 <!-- ============ PASSWORD GATE (client-side, casual protection) ============ -->
-<div id="__pwGate" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0f172a;color:#f1f5f9;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <form id="__pwForm" style="background:#1e293b;padding:32px 36px;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);width:340px;max-width:90vw;text-align:center;">
-    <div style="font-size:32px;margin-bottom:12px;">🔒</div>
-    <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Curio Admin Dashboard</div>
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:20px;">Enter password to continue</div>
-    <input type="password" id="__pwInput" autofocus autocomplete="current-password" style="width:100%;padding:12px 14px;border:1px solid #334155;background:#0f172a;color:#f1f5f9;border-radius:8px;font-size:14px;box-sizing:border-box;">
-    <div id="__pwErr" style="color:#f87171;font-size:12px;margin-top:8px;height:16px;"></div>
-    <button type="submit" style="width:100%;margin-top:12px;padding:12px;background:#2563eb;color:white;border:0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Unlock</button>
+<div id="__pwGate" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#efefea;color:#0c1731;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:'Quicksand',-apple-system,BlinkMacSystemFont,sans-serif;">
+  <form id="__pwForm" style="background:#ffffff;padding:40px 44px;border-radius:14px;box-shadow:0 10px 15px -3px rgba(12,23,49,0.08);width:360px;max-width:90vw;text-align:center;border:1px solid rgba(12,23,49,0.08);">
+    <div style="font-size:12px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:#735a40;margin-bottom:14px;">curio ops</div>
+    <div style="height:1px;width:40px;background:#c6a36e;margin:0 auto 20px;"></div>
+    <div style="font-size:26px;line-height:32px;font-weight:500;margin-bottom:6px;color:#0c1731;">Curio admin dashboard</div>
+    <div style="font-size:13px;color:#4f5569;margin-bottom:24px;">Enter password to continue.</div>
+    <input type="password" id="__pwInput" autofocus autocomplete="current-password" style="width:100%;padding:12px 14px;border:1px solid rgba(12,23,49,0.36);background:#ffffff;color:#0c1731;border-radius:10px;font-size:16px;box-sizing:border-box;font-family:inherit;">
+    <div id="__pwErr" style="color:#991b1b;font-size:13px;margin-top:8px;height:16px;"></div>
+    <button type="submit" style="width:100%;margin-top:12px;padding:12px;background:#161e39;color:#efefea;border:0;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;letter-spacing:0;">Unlock</button>
   </form>
 </div>
 <script>
@@ -563,7 +600,7 @@
       <style>
         .sf-btn{padding:7px 14px; border:none; background:transparent; border-radius:7px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; color:#64748b; transition:all 0.12s;}
         .sf-btn:hover{background:#e2e8f0; color:#0f172a;}
-        .sf-btn.active{background:#1F4E78; color:#fff;}
+        .sf-btn.active{background:var(--brand-500); color:#fff;}
         .sf-row{display:flex; align-items:center; padding:9px 0; border-bottom:1px solid #f1f5f9; font-size:13px;}
         .sf-row:last-child{border-bottom:none;}
         .sf-row .sf-name{flex:1; font-weight:600; color:#0f172a;}
@@ -711,7 +748,7 @@
         <div style="flex: 1;"><div class="m-title">Anjali</div><div class="m-sub">+91 93113 10547 · ahanasharma0026@gmail.com · MB Arjun Marg, MB Cyberhub</div></div>
         <div class="m-actions"><button class="btn ghost small">Edit</button><button class="btn ghost small">Deactivate</button></div>
       </div>
-      <div style="padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: #1F4E78; margin-top: 8px;">
+      <div style="padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: var(--brand-500); margin-top: 8px;">
         <strong>3 promoters covering 7 stores.</strong> Remaining 12 modern-trade stores are office-entry only (store manager sends daily report, office team enters).
       </div>
     </div>
@@ -769,7 +806,7 @@
         </table>
       </div>
 
-      <div style="padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: #1F4E78;">
+      <div style="padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: var(--brand-500);">
         <strong>Data source mix:</strong> 7 stores covered by 3 promoters (📱 daily counts + attendance via app) · 12 stores report via office entry (📨 store manager sends sales, office team enters). You can convert any store to promoter mode by assigning one on the Promoters page. See <button class="btn ghost small" onclick="document.querySelector('[data-page=reports]').click();" style="margin-left: 4px;">📨 Store reports →</button> for the daily entry queue.
       </div>
     </div>
@@ -822,8 +859,8 @@
             <tr><td>Himalayan Chamomile Tea</td><td>50 g</td><td style="font-family: ui-monospace, monospace; font-size: 11px;">TEA-HC-50</td><td class="num">₹188</td><td class="num" style="color:#991b1b;">₹550</td><td class="num" style="color:#166534; font-weight:600;">₹650 ↑</td><td class="num">84</td><td><button class="btn ghost small">Edit</button></td></tr>
           </tbody>
         </table>
-        <div style="margin-top: 12px; padding: 10px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: #1F4E78;">
-          <strong style="color: #1F4E78;">31 SKUs across 6 categories</strong> · Source: Profitability Analysis Curio.xlsx · <strong>New MRP is live</strong> — old MRP shown for historical reference only
+        <div style="margin-top: 12px; padding: 10px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: var(--brand-500);">
+          <strong style="color: var(--brand-500);">31 SKUs across 6 categories</strong> · Source: Profitability Analysis Curio.xlsx · <strong>New MRP is live</strong> — old MRP shown for historical reference only
         </div>
       </div>
     </div>
@@ -848,7 +885,7 @@
       <div class="page-head">
         <div>
           <h1>🏭 Factory Inventory</h1>
-          <div class="meta">Himlahar Harvests Pvt Ltd · loading live factory stock…</div>
+          <div class="meta">Himlahar Harvests Pvt Ltd · Total stock ₹32.77L (as of 17 Jul 2026)</div>
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn ghost">Upload stock take (CSV)</button>
@@ -2197,7 +2234,7 @@
               <tr><td>Kashmir Qahwa — 200g</td><td class="num">6</td><td class="num">3,500</td></tr>
             </tbody>
           </table>
-          <div style="margin-top:8px; padding: 10px 12px; background:#f0f7ff; border-radius:6px; font-size:11px; color:#1F4E78;">
+          <div style="margin-top:8px; padding: 10px 12px; background:#f0f7ff; border-radius:6px; font-size:11px; color:var(--brand-500);">
             Note: unit column is only populated for orders from Jan 2025 onwards — Shopify export doesn't backfill line items for older orders. Revenue is complete for all periods.
           </div>
         </div>
@@ -2326,7 +2363,7 @@
         </div>
       </div>
 
-      <div style="padding: 14px 16px; background: #f0f7ff; border-radius: 10px; font-size: 12px; color: #1F4E78; margin-bottom: 20px;">
+      <div style="padding: 14px 16px; background: #f0f7ff; border-radius: 10px; font-size: 12px; color: var(--brand-500); margin-bottom: 20px;">
         <strong>Full YTD from Zoho Books — 114 customers, ₹3.44Cr net revenue.</strong> Blinkit &amp; Kissansay together = 77% of business. 44 J&amp;K/Kashmir traders form a real distribution network worth ₹23.3L. D2C individuals surprisingly meaningful at ₹13.6L across 41 buyers.
       </div>
 
@@ -2361,7 +2398,7 @@
         <div style="margin-top: 12px; padding: 12px 14px; background: #fef3c7; border-radius: 8px; font-size: 12px; color: #78350f;">
           <strong>Blinkit cadence is lumpy — that's how Blink Commerce settlements work.</strong> In May they invoiced ₹28.6L across 12 GSTINs (AP, Haryana, KA, MH, Punjab, RJ, Telangana, UP, WB), then nothing in June, then ₹5.35L in July across 7 GSTINs. Cash flow forecasting needs a 2-month buffer around Blinkit receipts.
         </div>
-        <div style="margin-top: 8px; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: #1F4E78;">
+        <div style="margin-top: 8px; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: var(--brand-500);">
           <strong>Note:</strong> April 2026 Zoho file appears to be a duplicate of July (same rows). Ask your accountant to re-export April separately.
         </div>
       </div>
@@ -2864,7 +2901,7 @@
         <h2>Balance Sheet as at 31 March 2026 <span class="badge">Snapshot</span></h2>
         <div class="grid-2">
           <div>
-            <h3 style="font-size:13px; margin:8px 0 6px; color:#1F4E78;">Equity &amp; Liabilities</h3>
+            <h3 style="font-size:13px; margin:8px 0 6px; color:var(--brand-500);">Equity &amp; Liabilities</h3>
             <table>
               <tbody>
                 <tr style="background:#f0f7ff; font-weight:600;"><td>Share Capital (Equity ₹1L + CCPS ₹2.25Cr)</td><td class="num">2,25,99,990</td></tr>
@@ -2887,7 +2924,7 @@
             </table>
           </div>
           <div>
-            <h3 style="font-size:13px; margin:8px 0 6px; color:#1F4E78;">Assets</h3>
+            <h3 style="font-size:13px; margin:8px 0 6px; color:var(--brand-500);">Assets</h3>
             <table>
               <tbody>
                 <tr><td colspan="2" style="background:#f5f5f7; font-size:11px; padding:4px 8px; color:#666;">Non-current Assets</td></tr>
@@ -2929,7 +2966,7 @@
             <tr style="font-weight:700; background:#f0fdf4;"><td>Cash at end of year (31 Mar 2026)</td><td class="num" style="color:#166534;">79,32,030</td><td>All held in FDs pledged against OD</td></tr>
           </tbody>
         </table>
-        <div style="margin-top: 12px; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: #1F4E78;">
+        <div style="margin-top: 12px; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: var(--brand-500);">
           <strong>The real story:</strong> The ₹47L cash increase was entirely funded by external capital (₹50L equity + ₹77L term loan = ₹1.27 Cr). The operating business consumed ₹82L in cash. This is normal for a scaling FMCG in growth mode — but it means you cannot self-fund yet. Every rupee of growth requires proportional working capital.
         </div>
       </div>
@@ -3416,7 +3453,7 @@
         <div style="margin-top: 12px; padding: 12px 14px; background: #fef3c7; border-radius: 8px; font-size: 12px; color: #78350f;">
           <strong>Payroll reconciliation note:</strong> Sum of gross salaries = ₹4.33L. Monthly Expenses sheet says ₹5.89L. ~₹1.56L gap — likely includes bonuses, incentives, PF/ESI employer contributions, or additional casual/contract labour. Worth confirming with your CA.
         </div>
-        <div style="margin-top: 8px; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: #1F4E78;">
+        <div style="margin-top: 8px; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; font-size: 12px; color: var(--brand-500);">
           <strong>Note on promoter roles:</strong> Laxmi Sharma, Laxmi Verma and Anjali are listed here as Factory Staff but the promoter data file assigns them modern-trade stores. Likely a dual role or a payroll-classification quirk. The Promoters page shows their store assignments; this page shows their compensation.
         </div>
       </div>
@@ -4327,7 +4364,7 @@
             const topSkus = Object.entries(p.skuMix).sort((a,b) => b[1]-a[1]).slice(0,5);
             const attendanceRate = (p.days.size / 30) * 100;
             const dualShiftRate = p.days.size > 0 ? ((Math.min(p.amCount, p.pmCount) / p.days.size) * 100) : 0;
-            html += `<div class="card" style="border-left:4px solid #1F4E78;">
+            html += `<div class="card" style="border-left:4px solid var(--brand-500);">
               <h2 style="display:flex; justify-content:space-between; align-items:center;"><span>${p.name}</span><span class="badge">last active ${fmtRelative(p.lastActive)}</span></h2>
               <div class="kpi-row" style="margin-bottom:14px;">
                 <div class="kpi"><div class="label">Revenue attributed</div><div class="value">${fmtL(p.revenue)}</div><div class="sub">Avg ${fmtL(avgRevPerDay)}/active day</div></div>
@@ -4964,7 +5001,7 @@
 
       <!-- MT TAB BAR -->
       <div class="mt-tabbar" style="display:flex; gap:4px; margin:0 0 16px; border-bottom:2px solid #e5e7eb; padding:0;">
-        <button class="mt-tab-btn active" data-mt-tab="overview" style="background:transparent; border:none; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; color:#1F4E78; border-bottom:3px solid #1F4E78; margin-bottom:-2px;">📊 Overview</button>
+        <button class="mt-tab-btn active" data-mt-tab="overview" style="background:transparent; border:none; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; color:var(--brand-500); border-bottom:3px solid var(--brand-500); margin-bottom:-2px;">📊 Overview</button>
         <button class="mt-tab-btn" data-mt-tab="trends" style="background:transparent; border:none; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; color:#6b7280; border-bottom:3px solid transparent; margin-bottom:-2px;">📈 Trends</button>
         <button class="mt-tab-btn" data-mt-tab="inventory" style="background:transparent; border:none; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; color:#6b7280; border-bottom:3px solid transparent; margin-bottom:-2px;">📦 Inventory & Audit</button>
       </div>`;
@@ -4981,7 +5018,7 @@
       </div>`;
 
       // ==== COVERAGE SNAPSHOT ====
-      html += `<div class="card" style="border-left: 4px solid #1F4E78; background:#f0f7ff;">
+      html += `<div class="card" style="border-left: 4px solid var(--brand-500); background:#f0f7ff;">
         <h2>🎯 Coverage snapshot · ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} <span class="badge">Source: Zoho + Store reports + Promoter counts</span></h2>
         <p style="font-size:12px; color:#666; margin:-6px 0 12px;">One view of who's active where. ${skusMoving} of ${skuMasterList.length} SKUs are moving in MT. ${reportingStores} of ${stores.length} stores have ever sent a report. ${staleStores} promoter-tracked stores need a fresh count.</p>
         <div class="kpi-row" style="margin-bottom:14px;">
@@ -4998,7 +5035,7 @@
               const hasSecondary = chainSecondary[c] && chainSecondary[c].revenue > 0;
               return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f3f4f6; font-size:12px;">
                 <div><strong>${c}</strong> ${hasSecondary ? '<span style="background:#dcfce7; color:#166534; padding:1px 6px; border-radius:6px; font-size:10px; margin-left:6px;">reporting</span>' : '<span style="background:#fee2e2; color:#991b1b; padding:1px 6px; border-radius:6px; font-size:10px; margin-left:6px;">no reports</span>'}</div>
-                <div style="text-align:right;"><div style="font-weight:600;">${fmtLakh(v.revenue)}</div><div style="width:100px; height:5px; background:#e5e7eb; border-radius:3px; margin-top:2px;"><div style="width:${pct}%; height:100%; background:#1F4E78; border-radius:3px;"></div></div></div>
+                <div style="text-align:right;"><div style="font-weight:600;">${fmtLakh(v.revenue)}</div><div style="width:100px; height:5px; background:#e5e7eb; border-radius:3px; margin-top:2px;"><div style="width:${pct}%; height:100%; background:var(--brand-500); border-radius:3px;"></div></div></div>
               </div>`;
             }).join('')}
           </div>
@@ -5085,7 +5122,7 @@
         <h2>Store performance by month · secondary sales <span class="badge">${storeList.length} stores reporting</span></h2>
         <div style="display:flex; gap:6px; margin:6px 0 12px; flex-wrap:wrap; align-items:center;">
           <span style="font-size:11px; color:#666;">Filter by chain:</span>
-          <button class="mt-chain-chip active" data-chain="__ALL__" style="background:#1F4E78; color:#fff; border:none; padding:4px 10px; border-radius:12px; font-size:11px; cursor:pointer;">All</button>
+          <button class="mt-chain-chip active" data-chain="__ALL__" style="background:var(--brand-500); color:#fff; border:none; padding:4px 10px; border-radius:12px; font-size:11px; cursor:pointer;">All</button>
           ${uniqChainsInStores.map(ch => `<button class="mt-chain-chip" data-chain="${ch}" style="background:#e5e7eb; color:#374151; border:none; padding:4px 10px; border-radius:12px; font-size:11px; cursor:pointer;">${ch}</button>`).join('')}
         </div>
         ${storeList.length === 0 ? '<div style="padding:24px; text-align:center; color:#999;">No secondary sales data yet.</div>' :
@@ -5111,7 +5148,7 @@
             <thead><tr><th class="mt-sort" data-col="name" data-type="text" style="cursor:pointer; text-align:left; min-width:260px;">Product ⇅</th><th class="mt-sort num" data-col="units" data-type="num" style="cursor:pointer; min-width:90px;">Units YTD ⇅</th><th class="mt-sort num" data-col="revenue" data-type="num" style="cursor:pointer; min-width:110px;">Revenue YTD ⇅</th>${shownMonths.slice(-4).map(m => `<th class="num" style="min-width:80px;">${monthLabel(m)}</th>`).join('')}</tr></thead>
             <tbody>${topSkusYTD.map(([canon, tot]) => {
               const name = canon.startsWith('_u:') ? `<span style="color:#dc2626;">⚠ ${canon.replace('_u:','')}</span>` : (canonToName[canon] || canon);
-              return `<tr><td style="text-align:left;"><strong>${name}</strong></td><td class="num" data-units="${tot.units}">${tot.units.toLocaleString('en-IN')}</td><td class="num" data-revenue="${tot.revenue}" style="font-weight:600; color:#1F4E78;">${Math.round(tot.revenue).toLocaleString('en-IN')}</td>${shownMonths.slice(-4).map(m => `<td class="num">${skuPrimaryMonth[canon]?.[m]?.units || '—'}</td>`).join('')}</tr>`;
+              return `<tr><td style="text-align:left;"><strong>${name}</strong></td><td class="num" data-units="${tot.units}">${tot.units.toLocaleString('en-IN')}</td><td class="num" data-revenue="${tot.revenue}" style="font-weight:600; color:var(--brand-500);">${Math.round(tot.revenue).toLocaleString('en-IN')}</td>${shownMonths.slice(-4).map(m => `<td class="num">${skuPrimaryMonth[canon]?.[m]?.units || '—'}</td>`).join('')}</tr>`;
             }).join('')}</tbody>
           </table>
         </div>
@@ -5154,7 +5191,7 @@
           </tr></thead>
           <tbody>${ledgerRows.slice(0, 200).map(r => {
             const oosBg = r.closing === 0 ? 'background:#fee2e2;' : r.closing < 5 ? 'background:#fef3c7;' : '';
-            return `<tr style="${oosBg}"><td style="text-align:left; font-weight:600;">${r.store}</td><td style="text-align:left;">${r.sku}</td><td class="num">${r.received}</td><td class="num" style="color:#166534;">${r.sold}</td><td class="num" style="font-weight:600; color:${r.closing===0?'#991b1b':r.closing<5?'#92400e':'#1F4E78'};">${r.closing}</td><td class="num">${fmtLakh(r.value)}</td><td style="font-size:11px; color:#666;">${r.lastTs ? fmtRelative(new Date(r.lastTs)) : '—'} · ${r.lastPromoter || '—'}</td></tr>`;
+            return `<tr style="${oosBg}"><td style="text-align:left; font-weight:600;">${r.store}</td><td style="text-align:left;">${r.sku}</td><td class="num">${r.received}</td><td class="num" style="color:#166534;">${r.sold}</td><td class="num" style="font-weight:600; color:${r.closing===0?'#991b1b':r.closing<5?'#92400e':'var(--brand-500)'};">${r.closing}</td><td class="num">${fmtLakh(r.value)}</td><td style="font-size:11px; color:#666;">${r.lastTs ? fmtRelative(new Date(r.lastTs)) : '—'} · ${r.lastPromoter || '—'}</td></tr>`;
           }).join('')}
           <tr style="background:#f4faff; font-weight:700; border-top:2px solid #ddd; position:sticky; bottom:0;"><td style="text-align:left;">All (${ledgerRows.length} rows)</td><td>—</td><td class="num">${ledTotals.received.toLocaleString('en-IN')}</td><td class="num">${ledTotals.sold.toLocaleString('en-IN')}</td><td class="num">${ledTotals.closing.toLocaleString('en-IN')}</td><td class="num">${fmtLakh(ledTotals.value)}</td><td>—</td></tr>
           </tbody>
@@ -5218,7 +5255,7 @@
         btn.addEventListener('click', () => {
           const target = btn.dataset.mtTab;
           mtPage.querySelectorAll('.mt-tab-btn').forEach(b => { b.classList.remove('active'); b.style.color = '#6b7280'; b.style.borderBottomColor = 'transparent'; });
-          btn.classList.add('active'); btn.style.color = '#1F4E78'; btn.style.borderBottomColor = '#1F4E78';
+          btn.classList.add('active'); btn.style.color = 'var(--brand-500)'; btn.style.borderBottomColor = 'var(--brand-500)';
           mtPage.querySelectorAll('.mt-tab-view').forEach(v => { v.style.display = v.dataset.mtTabView === target ? '' : 'none'; });
           window.scrollTo({ top: 0, behavior: 'smooth' });
         });
@@ -5229,7 +5266,7 @@
         chip.addEventListener('click', () => {
           const chain = chip.dataset.chain;
           mtPage.querySelectorAll('.mt-chain-chip').forEach(c => { c.style.background = '#e5e7eb'; c.style.color = '#374151'; c.classList.remove('active'); });
-          chip.style.background = '#1F4E78'; chip.style.color = '#fff'; chip.classList.add('active');
+          chip.style.background = 'var(--brand-500)'; chip.style.color = '#fff'; chip.classList.add('active');
           const tbl = document.getElementById('mtStoreTable');
           if (!tbl) return;
           tbl.querySelectorAll('tbody tr').forEach(tr => {
@@ -6394,14 +6431,14 @@
             liveBlock.innerHTML = `
               <div style="padding: 14px 16px; background: linear-gradient(135deg, #eef6ff, #e6f7f2); border: 1px solid #b8dbc9; border-radius: 12px; margin-bottom: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">🟢 Live factory snapshot</div><div style="font-size: 12px; color: #4a6c5a;">Updated ${String(asOfRaw)} · from the factory day sheet, refreshed every 30 minutes</div></div>
+                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">🟢 Live factory snapshot</div><div style="font-size: 12px; color: #4a6c5a;">As of ${asOf} · pulled live from Google Sheet</div></div>
                   <div style="text-align: right;"><div style="font-size: 22px; font-weight: 800; color: #14532d;">${fmtL2(invValue)}</div><div style="font-size: 11px; color: #4a6c5a;">Total inventory value @ MRP</div></div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
-                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Finished SKUs</div><div style="font-size: 20px; font-weight: 700; color: #1F4E78;">${F.length}</div><div style="font-size: 11px; color: #888;">${totalFinished.toLocaleString('en-IN')} units total</div></div>
+                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Finished SKUs</div><div style="font-size: 20px; font-weight: 700; color: var(--brand-500);">${F.length}</div><div style="font-size: 11px; color: #888;">${totalFinished.toLocaleString('en-IN')} units total</div></div>
                   <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Critical finished</div><div style="font-size: 20px; font-weight: 700; color: ${critFinished > 3 ? '#b91c1c' : '#166534'};">${critFinished}</div><div style="font-size: 11px; color: #888;">SKUs < 10 units</div></div>
-                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Raw material lines</div><div style="font-size: 20px; font-weight: 700; color: #1F4E78;">${Rm.length}</div><div style="font-size: 11px; color: #888;">${emptyRaw} lines Nil / 0</div></div>
-                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Packaging pool</div><div style="font-size: 20px; font-weight: 700; color: #1F4E78;">${Bt.length + Lb.length + Bx.length}</div><div style="font-size: 11px; color: #888;">Bottles ${Bt.length} · Labels ${Lb.length} · Boxes ${Bx.length}</div></div>
+                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Raw material lines</div><div style="font-size: 20px; font-weight: 700; color: var(--brand-500);">${Rm.length}</div><div style="font-size: 11px; color: #888;">${emptyRaw} lines Nil / 0</div></div>
+                  <div style="background: white; padding: 10px 12px; border-radius: 8px;"><div style="font-size: 11px; color: #666;">Packaging pool</div><div style="font-size: 20px; font-weight: 700; color: var(--brand-500);">${Bt.length + Lb.length + Bx.length}</div><div style="font-size: 11px; color: #888;">Bottles ${Bt.length} · Labels ${Lb.length} · Boxes ${Bx.length}</div></div>
                 </div>
               </div>
               <div class="card" style="margin-bottom: 18px;">
@@ -6449,15 +6486,11 @@
                   <tbody>${Bc.map(r => `<tr><td style="text-align:left;">${r.SKU||''}</td><td style="text-align:left; font-family: monospace; font-size: 11px;">${r.Batchcode||''}</td><td class="num">₹${(Number(r.MRP)||0).toLocaleString('en-IN')}</td><td class="num">${r.USP||''}</td><td style="text-align:left;">${r.Unit||''}</td><td style="text-align:left;">${r.Best_Before||''}</td></tr>`).join('')}</tbody>
                 </table></div>
               </div>
+              <div style="padding: 10px 14px; background: #fef8e7; border: 1px solid #f0d872; border-radius: 8px; font-size: 12px; color: #78561a; margin-bottom: 18px;">⚠ The blocks below are the older hardcoded inventory view — kept for historical reference only. The live snapshot above is the authoritative source.</div>
             `;
             const head = invEl.querySelector('.page-head');
             if (head) head.parentNode.insertBefore(liveBlock, head.nextSibling);
             else invEl.insertBefore(liveBlock, invEl.firstChild);
-            // live data replaces the old 17 Jul statement: update the header and hide the static blocks
-            const metaEl = head && head.querySelector('.meta');
-            if (metaEl) metaEl.textContent = 'Himlahar Harvests Pvt Ltd · Finished goods ' + fmtL2(invValue) + ' at MRP · live from the factory day sheet, updated ' + String(asOfRaw);
-            let oldEl = liveBlock.nextElementSibling;
-            while (oldEl) { const nxt = oldEl.nextElementSibling; oldEl.style.display = 'none'; oldEl = nxt; }
           }
         } catch(e) { console.warn('Factory inventory live render failed:', e); }
 
@@ -6807,7 +6840,7 @@
 <style>
 .ch-fy-btn{padding:5px 10px; border:none; background:transparent; border-radius:6px; cursor:pointer; font-size:11px; font-weight:600; font-family:inherit; color:#64748b; transition:all 0.12s;}
 .ch-fy-btn:hover{background:#e2e8f0; color:#0f172a;}
-.ch-fy-btn.active{background:#1F4E78; color:#fff;}
+.ch-fy-btn.active{background:var(--brand-500); color:#fff;}
 </style>
 
 <!-- === TEAM ATTENDANCE PANEL (all non-promoter employees · Check IN/OUT with GPS+selfie) === -->
@@ -6823,7 +6856,7 @@
   const panel = document.createElement('div');
   panel.id = 'team-attendance-panel';
   panel.className = 'team-att-card';
-  panel.style.cssText = 'background: white; border-radius: 14px; border: 1px solid #e5e7eb; margin: 0 0 18px; padding: 0; overflow: hidden; border-top: 4px solid #1F4E78; box-shadow: 0 1px 3px rgba(0,0,0,0.03);';
+  panel.style.cssText = 'background: white; border-radius: 14px; border: 1px solid #e5e7eb; margin: 0 0 18px; padding: 0; overflow: hidden; border-top: 4px solid var(--brand-500); box-shadow: 0 1px 3px rgba(0,0,0,0.03);';
   panel.innerHTML = `
     <div style="padding:16px 20px; background:linear-gradient(90deg,#eff6ff,#fff); border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <div>
@@ -7072,7 +7105,7 @@
 <style>
 .ea-view-btn{padding:5px 12px; border:none; background:transparent; border-radius:6px; cursor:pointer; font-size:11px; font-weight:600; font-family:inherit; color:#64748b; transition:all 0.12s;}
 .ea-view-btn:hover{background:#e2e8f0; color:#0f172a;}
-.ea-view-btn.active{background:#1F4E78; color:#fff;}
+.ea-view-btn.active{background:var(--brand-500); color:#fff;}
 </style>
 </body>
 </html>
