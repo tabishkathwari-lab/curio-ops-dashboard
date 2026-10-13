@@ -1310,7 +1310,7 @@
       <div class="page-head">
         <div>
           <h1>Blinkit</h1>
-          <div class="meta">Quick commerce · <strong>15 SKUs live · 85 cities · 2,873 darkstores</strong> (Aug 14 coverage) · H1 2026 sales loaded</div>
+          <div class="meta" id="blkMeta">Quick commerce · Loading live inventory + coverage from Blinkit Seller Hub…</div>
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn ghost">Paste today's report</button>
@@ -1318,7 +1318,51 @@
         </div>
       </div>
       <!-- LIVE DATA COMPLETENESS CARD -->
-      <div id="blinkitDataStatus" style="margin-bottom:14px; padding:14px 16px; background:linear-gradient(135deg,#f0f9ff,#fff); border:1px solid #bae6fd; border-radius:10px; font-size:13px; color:#075985;">📊 <strong>Loading current-month status…</strong></div>
+      <div id="blinkitDataStatus" style="margin-bottom:14px; padding:14px 16px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:10px; font-size:13px; color:var(--text-secondary);"><strong>Loading current-month status…</strong></div>
+
+      <!-- LIVE FROM BLINKIT SELLER HUB · populated weekly via the sync bookmarklet -->
+      <div class="card">
+        <h2>Live from Blinkit Seller Hub <span class="badge" id="blkLiveStatus">Loading…</span></h2>
+        <div id="blkLiveSyncBanner" style="padding:14px 16px; background:var(--warn-50); border:1px solid var(--warn-200); border-radius:10px; margin-bottom:16px; display:none;">
+          <strong style="color:var(--warn-800);">No Blinkit sync yet.</strong> Open <a href="/blinkit_sync_bookmarklet.html" target="_blank" style="color:var(--brand-500); font-weight:600;">the install page</a> to add the bookmarklet, then click it once a week while on seller.blinkit.com to refresh inventory + coverage.
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi"><div class="label">Active SKUs on Blinkit</div><div class="value" id="blkLiveSkuCount">—</div><div class="sub" id="blkLiveSkuSub">from live inventory</div></div>
+          <div class="kpi"><div class="label">Sellable stock (total)</div><div class="value" id="blkLiveStock">—</div><div class="sub" id="blkLiveStockSub">darkstore + warehouse</div></div>
+          <div class="kpi"><div class="label">Live cities</div><div class="value" id="blkLiveCities">—</div><div class="sub" id="blkLiveCitiesSub">from coverage</div></div>
+          <div class="kpi"><div class="label">Live darkstores (holding stock)</div><div class="value" id="blkLiveDS">—</div><div class="sub" id="blkLiveDSSub">—</div></div>
+        </div>
+      </div>
+
+      <!-- SKUs with expansion level + stock + 30-day sales -->
+      <div class="card">
+        <h2>SKUs on Blinkit · stock, expansion, 30-day sales <span class="badge" id="blkLiveSkuTotalBadge"></span></h2>
+        <div style="max-height:460px; overflow:auto; margin:0 -24px;">
+          <table id="blkLiveSkuTable">
+            <thead><tr>
+              <th>SKU</th><th>Level</th><th class="num">MRP</th><th class="num">Darkstore</th><th class="num">Warehouse</th><th class="num">Incoming</th><th class="num">Unsellable</th><th class="num">Near-exp</th><th class="num">Lost</th><th class="num">Sales 30d</th><th>Health</th>
+            </tr></thead>
+            <tbody id="blkLiveSkuBody"><tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Coverage by city -->
+      <div class="card">
+        <h2>Coverage · cities &amp; darkstores <span class="badge" id="blkLiveCovBadge"></span></h2>
+        <div style="max-height:460px; overflow:auto; margin:0 -24px;">
+          <table id="blkLiveCovTable">
+            <thead><tr>
+              <th>City</th><th class="num">Active SKUs</th><th class="num">Darkstores w/ stock</th><th class="num">Total darkstores</th><th class="num">Fill rate</th>
+            </tr></thead>
+            <tbody id="blkLiveCovBody"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <hr class="gold-rule" style="margin:32px 0;">
+      <div class="eyebrow" style="margin-bottom:16px;">Legacy YTD view (from Sales_Blinkit sheet)</div>
 
       <div class="kpi-row" id="blinkitLiveKPIs">
         <!-- Populated live from blinkit_monthly endpoint by refreshBlinkitPage() -->
@@ -7485,6 +7529,84 @@
     const el = document.getElementById('page-customer-ledger');
     if (el && el.classList.contains('active')) fetchZohoCustomerLedger();
   }
+
+  // ============ BLINKIT LIVE (from bookmarklet syncs) ============
+  async function fetchBlinkitLive() {
+    try {
+      const [invR, covR] = await Promise.all([
+        fetch(EXEC + '?q=blinkit_live_inventory').then(r=>r.json()),
+        fetch(EXEC + '?q=blinkit_live_coverage').then(r=>r.json())
+      ]);
+      const inv = invR?.data?.inventory || [];
+      const cov = covR?.data?.coverage || [];
+      const lastSync = invR?.data?.last_sync || covR?.data?.last_sync;
+      renderBlinkitLive(inv, cov, lastSync);
+    } catch(e) { console.error('Blinkit live fetch failed', e); }
+  }
+
+  function renderBlinkitLive(inv, cov, lastSync) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const banner = document.getElementById('blkLiveSyncBanner');
+    const status = document.getElementById('blkLiveStatus');
+    const meta = document.getElementById('blkMeta');
+
+    if (!inv.length && !cov.length) {
+      if (banner) banner.style.display = 'block';
+      if (status) status.textContent = 'No sync yet';
+      if (meta) meta.textContent = 'Quick commerce · No live sync yet. Install the bookmarklet to populate.';
+      ['blkLiveSkuCount','blkLiveStock','blkLiveCities','blkLiveDS'].forEach(id => set(id, '—'));
+      return;
+    }
+    if (banner) banner.style.display = 'none';
+    const stamp = lastSync ? new Date(lastSync).toLocaleString('en-IN', {timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short'}) : 'unknown';
+    if (status) status.textContent = 'Synced ' + stamp;
+
+    const liveCities = cov.filter(c => (+c.active_pids||0) > 0);
+    const totalStock = inv.reduce((s,r) => s + (+r.SOH_Total_Sellable||0), 0);
+    const totalDS = liveCities.reduce((s,c) => s + (+c.darkstores||0), 0);
+    const liveDS = liveCities.reduce((s,c) => s + (+c.darkstores_with_active||0), 0);
+
+    set('blkLiveSkuCount', inv.length);
+    set('blkLiveSkuSub', inv.filter(r => r.Low_Inv_Flag === 'LOW').length + ' flagged low');
+    set('blkLiveStock', totalStock.toLocaleString('en-IN'));
+    set('blkLiveStockSub', 'Dark ' + inv.reduce((s,r)=>s+(+r.SOH_Darkstore||0),0).toLocaleString('en-IN') + ' · WH ' + inv.reduce((s,r)=>s+(+r.SOH_Warehouse||0),0).toLocaleString('en-IN'));
+    set('blkLiveCities', liveCities.length);
+    set('blkLiveCitiesSub', cov.length + ' total checked');
+    set('blkLiveDS', liveDS.toLocaleString('en-IN'));
+    set('blkLiveDSSub', liveDS + ' of ' + totalDS + ' live (' + Math.round(liveDS/Math.max(1,totalDS)*100) + '%)');
+    if (meta) meta.textContent = 'Quick commerce · ' + inv.length + ' SKUs · ' + liveCities.length + ' cities · ' + liveDS + '/' + totalDS + ' darkstores · last synced ' + stamp;
+
+    set('blkLiveSkuTotalBadge', inv.length + ' SKUs');
+    set('blkLiveCovBadge', liveCities.length + ' live cities');
+
+    // SKU table — sort by darkstore stock ascending (urgent first)
+    const invSorted = [...inv].sort((a,b) => (+a.SOH_Darkstore||0) - (+b.SOH_Darkstore||0));
+    const skuBody = document.getElementById('blkLiveSkuBody');
+    if (skuBody) {
+      skuBody.innerHTML = invSorted.map(r => {
+        const lowFlag = r.Low_Inv_Flag === 'LOW' ? badge('Low', 'warn') : badge('OK', 'ok');
+        const nearExp = +r.Unsellable_NearExpiry || 0;
+        const health = nearExp > 50 ? badge('Expiry risk', 'danger') : lowFlag;
+        return `<tr><td style="padding-left:24px">${esc(r.Product_Name)}</td><td>${esc(r.Expansion_Level)}</td><td class="num">${fmtMoney(r.MRP)}</td><td class="num" style="font-weight:600">${(+r.SOH_Darkstore||0).toLocaleString('en-IN')}</td><td class="num">${(+r.SOH_Warehouse||0).toLocaleString('en-IN')}</td><td class="num">${(+r.Incoming_Scheduled||0).toLocaleString('en-IN')}</td><td class="num">${(+r.Unsellable_Total||0).toLocaleString('en-IN')}</td><td class="num" style="color:${nearExp>50?'var(--danger-700)':'var(--text-secondary)'}">${nearExp.toLocaleString('en-IN')}</td><td class="num">${(+r.Unsellable_Lost||0).toLocaleString('en-IN')}</td><td class="num" style="font-weight:600">${(+r.Sales_30day||0).toLocaleString('en-IN')}</td><td>${health}</td></tr>`;
+      }).join('') || '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-secondary);">No SKUs.</td></tr>';
+    }
+
+    // Coverage table — top live cities by darkstore count
+    const covSorted = liveCities.sort((a,b) => (+b.darkstores||0) - (+a.darkstores||0));
+    const covBody = document.getElementById('blkLiveCovBody');
+    if (covBody) {
+      covBody.innerHTML = covSorted.map(c => {
+        const fillPct = (+c.darkstores||0) > 0 ? Math.round((+c.darkstores_with_active||0) / (+c.darkstores||0) * 100) : 0;
+        const fillCls = fillPct >= 80 ? 'ok' : fillPct >= 50 ? 'warn' : 'danger';
+        return `<tr><td style="padding-left:24px">${esc(c.city_name)}</td><td class="num">${(+c.active_pids||0)}</td><td class="num" style="font-weight:600">${(+c.darkstores_with_active||0)}</td><td class="num">${(+c.darkstores||0)}</td><td>${badge(fillPct + '%', fillCls)}</td></tr>`;
+      }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-secondary);">No live cities.</td></tr>';
+    }
+  }
+
+  function tryLoadBlinkitLive() {
+    const el = document.getElementById('page-blinkit');
+    if (el && el.classList.contains('active')) fetchBlinkitLive();
+  }
   // Load on nav click
   document.querySelectorAll('.nav-item').forEach(el => {
     const dp = el.getAttribute('data-page');
@@ -7492,6 +7614,8 @@
       el.addEventListener('click', () => setTimeout(fetchZoho, 100));
     } else if (dp === 'customer-ledger') {
       el.addEventListener('click', () => setTimeout(fetchZohoCustomerLedger, 100));
+    } else if (dp === 'blinkit') {
+      el.addEventListener('click', () => setTimeout(fetchBlinkitLive, 100));
     }
   });
   // Hook customer-ledger refresh button
