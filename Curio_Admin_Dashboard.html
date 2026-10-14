@@ -5031,21 +5031,12 @@
               <div class="kpi"><div class="label">Total darkstore slots</div><div class="value">${totalDsSlots.toLocaleString('en-IN')}</div><div class="sub">Sum of SKU × store combinations</div></div>
               <div class="kpi"><div class="label">Widest reach</div><div class="value" style="font-size:14px;">${widest?.name?.replace('Curio Lifestyle ', '') || '—'}</div><div class="sub">${widest?.cities || 0} cities · ${widest?.darkstores || 0} darkstores</div></div>
             </div>
-            <div class="grid-2" style="margin-top:8px;">
-              <div>
-                <h3 style="font-size:13px; margin:12px 0 6px;">SKU coverage · sorted by darkstores</h3>
-                <table style="font-size:12px;">
-                  <thead><tr><th style="text-align:left;">SKU</th><th class="num">Cities</th><th class="num">Darkstores</th></tr></thead>
-                  <tbody>${skuList.map(s => { const tier = s.cities >= 50 ? 'ok' : s.cities >= 10 ? '' : 'warn'; return `<tr${tier==='warn'?' style="background:#fef3c7;"':tier==='ok'?' style="background:#dcfce7;"':''}><td>${s.name.replace('Curio Lifestyle ', '')}</td><td class="num">${s.cities}</td><td class="num" style="font-weight:600;">${s.darkstores}</td></tr>`; }).join('')}</tbody>
-                </table>
-              </div>
-              <div>
-                <h3 style="font-size:13px; margin:12px 0 6px;">Top cities · by total darkstore density</h3>
-                <table style="font-size:12px;">
-                  <thead><tr><th style="text-align:left;">City</th><th class="num">Total DS</th><th class="num">SKUs</th><th>Bar</th></tr></thead>
-                  <tbody>${cityList.map(c => `<tr><td>${c.city}</td><td class="num" style="font-weight:600;">${c.totalDs.toLocaleString('en-IN')}</td><td class="num">${c.skus}</td><td><span class="bar" style="display:inline-block; height:8px; width:${Math.max(4, Math.round(c.totalDs/maxDs*100))}px; background:${c.totalDs>=200?'#f59e0b':'#5E8E3E'};"></span></td></tr>`).join('')}</tbody>
-                </table>
-              </div>
+            <div style="margin-top:8px;">
+              <h3 style="font-size:13px; margin:12px 0 6px;">Top cities · by total darkstore density</h3>
+              <table style="font-size:12px; width:100%;">
+                <thead><tr><th style="text-align:left;">City</th><th class="num">Total DS</th><th class="num">SKUs</th><th style="width:40%;">Bar</th></tr></thead>
+                <tbody>${cityList.map(c => `<tr><td>${c.city}</td><td class="num" style="font-weight:600;">${c.totalDs.toLocaleString('en-IN')}</td><td class="num">${c.skus}</td><td><span class="bar" style="display:inline-block; height:8px; width:${Math.max(4, Math.round(c.totalDs/maxDs*100))}%; background:${c.totalDs>=200?'#f59e0b':'#5E8E3E'};"></span></td></tr>`).join('')}</tbody>
+              </table>
             </div>
           `;
           return;
