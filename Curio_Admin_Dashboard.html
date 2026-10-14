@@ -2240,9 +2240,129 @@
         </div>
       </div>
 
-      <div style="padding: 14px 16px; background: #fee2e2; border-radius: 10px; font-size: 12px; color: #7f1d1d; margin-bottom: 20px;">
-        <strong>🚨 Shopify D2C is essentially dead.</strong> FY27 (Apr–Jul 2026) has produced only <strong>12 orders and ₹20,760 in revenue across 4 months</strong>. Peak was Jan-Feb 2024 (~₹5.5L/month). Long slow decline since. Business has migrated to Blinkit and Amazon for e-commerce. Either invest to revive Shopify or accept it as a customer-service-only channel.
+      <!-- ===== SHOPIFY DAILY SALES (last 50 orders live from Shopify Admin API) ===== -->
+      <div class="card" id="shopifyDailyCard" style="margin-bottom:20px;">
+        <h2>Daily sales · Last 50 orders <span class="badge" id="shopifyDailyBadge">Snapshot 14 Oct 2026</span></h2>
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">
+          Order-level revenue grouped by day. Voided + refunded orders excluded. Pulled live from Shopify Admin API — snapshot of the 50 most recent orders.
+        </div>
+        <div class="kpi-row" style="margin-bottom:16px;">
+          <div class="kpi"><div class="label">Orders (period)</div><div class="value" id="shDaily_count">—</div><div class="sub" id="shDaily_range">—</div></div>
+          <div class="kpi"><div class="label">Revenue (period)</div><div class="value" id="shDaily_rev">—</div><div class="sub" id="shDaily_aov">—</div></div>
+          <div class="kpi"><div class="label">Last order</div><div class="value" style="font-size:16px;" id="shDaily_last">—</div><div class="sub" id="shDaily_lastAgo">—</div></div>
+          <div class="kpi"><div class="label">Active days (of last 30)</div><div class="value" id="shDaily_active">—</div><div class="sub">days with ≥1 order</div></div>
+        </div>
+        <div style="max-height:360px; overflow:auto; margin:0 -24px;">
+          <table id="shopifyDailyTable">
+            <thead><tr><th>Date</th><th class="num">Orders</th><th class="num">Revenue (₹)</th><th class="num">AOV (₹)</th><th>Status mix</th></tr></thead>
+            <tbody id="shopifyDailyBody"></tbody>
+          </table>
+        </div>
       </div>
+
+      <script>
+      (function() {
+        const SHOPIFY_RECENT_ORDERS = [
+          {date:"2026-10-14",total:2137.5,status:"PAID"},
+          {date:"2026-10-11",total:3674.12,status:"PAID"},
+          {date:"2026-10-11",total:617.5,status:"PAID"},
+          {date:"2026-10-08",total:14089,status:"PAID"},
+          {date:"2026-10-07",total:1600,status:"PENDING"},
+          {date:"2026-10-05",total:1530,status:"PENDING"},
+          {date:"2026-10-04",total:1539,status:"PENDING"},
+          {date:"2026-10-02",total:1330,status:"PAID"},
+          {date:"2026-09-29",total:617.5,status:"PAID"},
+          {date:"2026-09-20",total:1330,status:"PAID"},
+          {date:"2026-09-20",total:1400,status:"VOIDED"},
+          {date:"2026-09-20",total:700,status:"PENDING"},
+          {date:"2026-09-20",total:1400,status:"PAID"},
+          {date:"2026-09-20",total:1759.87,status:"PAID"},
+          {date:"2026-09-20",total:700,status:"PAID"},
+          {date:"2026-09-20",total:665,status:"PAID"},
+          {date:"2026-09-20",total:1330,status:"PAID"},
+          {date:"2026-09-19",total:700,status:"PENDING"},
+          {date:"2026-09-19",total:700,status:"VOIDED"},
+          {date:"2026-09-19",total:700,status:"PENDING"},
+          {date:"2026-09-18",total:700,status:"PENDING"},
+          {date:"2026-09-18",total:1097.25,status:"PAID"},
+          {date:"2026-09-18",total:665,status:"PAID"},
+          {date:"2026-09-18",total:700,status:"PENDING"},
+          {date:"2026-09-18",total:700,status:"PENDING"},
+          {date:"2026-09-17",total:700,status:"PENDING"},
+          {date:"2026-09-17",total:700,status:"PENDING"},
+          {date:"2026-09-17",total:700,status:"PENDING"},
+          {date:"2026-09-17",total:700,status:"PENDING"},
+          {date:"2026-09-17",total:700,status:"PAID"},
+          {date:"2026-09-17",total:1400,status:"PENDING"},
+          {date:"2026-09-17",total:700,status:"PENDING"},
+          {date:"2026-09-17",total:665,status:"PAID"},
+          {date:"2026-09-17",total:4037.5,status:"PAID"},
+          {date:"2026-09-16",total:11951,status:"PAID"},
+          {date:"2026-09-15",total:2137.5,status:"PAID"},
+          {date:"2026-09-06",total:1330,status:"PAID"},
+          {date:"2026-08-30",total:2907,status:"PAID"},
+          {date:"2026-08-29",total:2826.25,status:"PAID"},
+          {date:"2026-08-28",total:2394,status:"PAID"},
+          {date:"2026-08-26",total:4237.5,status:"PAID"},
+          {date:"2026-08-16",total:700,status:"PENDING"},
+          {date:"2026-08-14",total:700,status:"PENDING"},
+          {date:"2026-08-12",total:1624.5,status:"PAID"},
+          {date:"2026-08-12",total:1330,status:"PAID"},
+          {date:"2026-08-09",total:1598.87,status:"PAID"},
+          {date:"2026-07-20",total:650,status:"PENDING"},
+          {date:"2026-07-09",total:2503.25,status:"PAID"},
+          {date:"2026-07-03",total:1308.15,status:"PAID"},
+          {date:"2026-06-29",total:3068.5,status:"PAID"}
+        ];
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; return '₹' + Math.round(n).toLocaleString('en-IN'); };
+        // Exclude voided for KPI, but keep in table with badge
+        const valid = SHOPIFY_RECENT_ORDERS.filter(o => o.status !== 'VOIDED');
+        const totalRev = valid.reduce((a,o) => a + o.total, 0);
+        const dates = SHOPIFY_RECENT_ORDERS.map(o => o.date).sort();
+        const earliest = dates[0], latest = dates[dates.length-1];
+        document.getElementById('shDaily_count').textContent = valid.length;
+        document.getElementById('shDaily_range').textContent = earliest + ' → ' + latest;
+        document.getElementById('shDaily_rev').textContent = fmt(totalRev);
+        document.getElementById('shDaily_aov').textContent = 'AOV ' + fmt(totalRev / valid.length);
+        document.getElementById('shDaily_last').textContent = latest;
+        const daysSince = Math.floor((Date.now() - new Date(latest).getTime()) / 86400000);
+        document.getElementById('shDaily_lastAgo').textContent = daysSince + 'd ago';
+        // Active days of last 30
+        const today = new Date();
+        const cutoff = new Date(today.getTime() - 30*86400000);
+        const activeDays = new Set(SHOPIFY_RECENT_ORDERS.filter(o => new Date(o.date) >= cutoff).map(o => o.date));
+        document.getElementById('shDaily_active').textContent = activeDays.size;
+
+        // Daily rollup
+        const byDate = {};
+        SHOPIFY_RECENT_ORDERS.forEach(o => {
+          byDate[o.date] = byDate[o.date] || { date: o.date, orders: [], rev: 0, paid: 0, pending: 0, voided: 0 };
+          byDate[o.date].orders.push(o);
+          if (o.status !== 'VOIDED') byDate[o.date].rev += o.total;
+          if (o.status === 'PAID') byDate[o.date].paid++;
+          else if (o.status === 'PENDING') byDate[o.date].pending++;
+          else if (o.status === 'VOIDED') byDate[o.date].voided++;
+        });
+        const rows = Object.values(byDate).sort((a,b) => b.date.localeCompare(a.date));
+        document.getElementById('shopifyDailyBody').innerHTML = rows.map(r => {
+          const nValid = r.paid + r.pending;
+          const aov = nValid > 0 ? r.rev / nValid : 0;
+          const statusChips = [
+            r.paid > 0 ? `<span style="padding:2px 7px; background:#dcfce7; color:#166534; border-radius:4px; font-size:11px;">${r.paid} paid</span>` : '',
+            r.pending > 0 ? `<span style="padding:2px 7px; background:#fef3c7; color:#92400e; border-radius:4px; font-size:11px;">${r.pending} pending</span>` : '',
+            r.voided > 0 ? `<span style="padding:2px 7px; background:#fee2e2; color:#991b1b; border-radius:4px; font-size:11px;">${r.voided} voided</span>` : ''
+          ].filter(Boolean).join(' ');
+          return `
+            <tr>
+              <td style="padding-left:24px;"><strong>${r.date}</strong></td>
+              <td class="num">${r.orders.length}</td>
+              <td class="num" style="font-weight:600;">${fmt(r.rev)}</td>
+              <td class="num">${fmt(aov)}</td>
+              <td>${statusChips}</td>
+            </tr>`;
+        }).join('');
+      })();
+      </script>
 
       <!-- ===== PAID ADS → WEBSITE PERFORMANCE (auto-synced) ===== -->
       <div class="card" id="meta-shopify-perf" style="border: 2px solid #1877F2;">
@@ -2316,34 +2436,18 @@
         <div id="ss-note" style="margin-top:10px; padding:10px 12px; background:#faf5ff; border-radius:6px; font-size:11px; color:#6b21a8; display:none;"></div>
       </div>
 
-      <div class="kpi-row">
-        <div class="kpi" style="background:#fee2e2; border-color:#fecaca;">
-          <div class="label">FY27 revenue (Apr–Jul)</div>
-          <div class="value" style="color:#991b1b;">₹20,760</div>
-          <div class="sub down">12 orders · 10 units · essentially inactive</div>
-        </div>
-        <div class="kpi">
-          <div class="label">FY26 revenue (Apr 25 – Mar 26)</div>
-          <div class="value">₹6.50L</div>
-          <div class="sub">415 orders · ~₹54k/month avg</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Lifetime revenue</div>
-          <div class="value">₹20.73L</div>
-          <div class="sub">1,351 orders across 33 months</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Peak — Jan 2024</div>
-          <div class="value">₹2.74L</div>
-          <div class="sub">185 orders · never repeated since</div>
-        </div>
+      <!-- Live KPIs from shopify_monthly endpoint -->
+      <div class="kpi-row" id="shopifyLiveKpis">
+        <div class="kpi"><div class="label">FY27 YTD (Apr–now)</div><div class="value" id="shFY27Rev">—</div><div class="sub" id="shFY27Sub">loading…</div></div>
+        <div class="kpi"><div class="label">Last 3 months</div><div class="value" id="shL3MRev">—</div><div class="sub" id="shL3MSub">—</div></div>
+        <div class="kpi"><div class="label">Current month</div><div class="value" id="shCurMRev">—</div><div class="sub" id="shCurMSub">—</div></div>
+        <div class="kpi"><div class="label">Lifetime revenue</div><div class="value" id="shLifetimeRev">—</div><div class="sub" id="shLifetimeSub">—</div></div>
       </div>
 
-      <!-- Real monthly trajectory -->
+      <!-- Live monthly trajectory — last 12 months -->
       <div class="card">
-        <h2>Shopify monthly trajectory · full lifetime <span class="badge ok" id="shopifyTrajBadge">Real · 33 months</span></h2>
-        <div id="shopifyLiveRecent" style="margin: 8px 0 12px; padding: 12px 14px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; font-size: 12px; color: #166534;">Loading recent months from auto-sync…</div>
-        <p style="font-size: 12px; color: #666; margin: -6px 0 12px;">The rise and fall. Business launched Nov 2023, peaked Jan-Feb 2024, then stepped down after that. FY27 shows near-total abandonment.</p>
+        <h2>Shopify monthly trend · last 12 months <span class="badge ok" id="shopifyTrendBadge">Live</span></h2>
+        <p style="font-size: 12px; color: #666; margin: -6px 0 12px;">Rolling 12 months from the live shopify_monthly endpoint. Bar shows revenue relative to the best month in the window.</p>
         <div class="matrix-wrap">
           <table class="matrix" style="min-width: 700px; font-size: 12px;">
             <thead>
@@ -2355,36 +2459,59 @@
                 <th>Bar</th>
               </tr>
             </thead>
-            <tbody>
-              <tr><td>Nov 2023</td><td class="num">106</td><td class="num">1,49,358</td><td class="num">1,409</td><td><span class="bar" style="width:54px; background:#5E8E3E;"></span></td></tr>
-              <tr><td>Dec 2023</td><td class="num">163</td><td class="num">2,34,289</td><td class="num">1,437</td><td><span class="bar" style="width:84px; background:#5E8E3E;"></span></td></tr>
-              <tr style="background:#dcfce7;"><td>Jan 2024</td><td class="num">185</td><td class="num" style="font-weight:600; color:#166534;">2,73,780</td><td class="num">1,480</td><td><span class="bar" style="width:99px; background:#166534;"></span></td></tr>
-              <tr style="background:#dcfce7;"><td>Feb 2024</td><td class="num">162</td><td class="num" style="font-weight:600; color:#166534;">2,79,044</td><td class="num">1,722</td><td><span class="bar" style="width:100px; background:#166534;"></span></td></tr>
-              <tr><td>Mar 2024</td><td class="num">54</td><td class="num">78,954</td><td class="num">1,462</td><td><span class="bar" style="width:28px; background:#5E8E3E;"></span></td></tr>
-              <tr style="color:#999; font-size:11px;"><td colspan="5" style="text-align:center;">Apr-Nov 2024: near-zero activity (46 orders, ₹1.05L total across 8 months)</td></tr>
-              <tr><td>Dec 2024</td><td class="num">142</td><td class="num">2,61,687</td><td class="num">1,843</td><td><span class="bar" style="width:94px; background:#5E8E3E;"></span></td></tr>
-              <tr style="background:#dcfce7;"><td>Jan 2025</td><td class="num">187</td><td class="num" style="font-weight:600;">2,67,510</td><td class="num">1,431</td><td><span class="bar" style="width:96px; background:#166534;"></span></td></tr>
-              <tr><td>Feb 2025</td><td class="num">5</td><td class="num">7,246</td><td class="num">1,449</td><td><span class="bar" style="width:3px; background:#f59e0b;"></span></td></tr>
-              <tr><td>Mar 2025</td><td class="num">91</td><td class="num">1,38,605</td><td class="num">1,523</td><td><span class="bar" style="width:50px; background:#5E8E3E;"></span></td></tr>
-              <tr style="color:#999; font-size:11px;"><td colspan="5" style="text-align:center;">Apr 2025 → Jul 2026: declining pattern, average ~₹15k/month</td></tr>
-              <tr><td>May 2025</td><td class="num">56</td><td class="num">74,179</td><td class="num">1,325</td><td><span class="bar" style="width:27px; background:#f59e0b;"></span></td></tr>
-              <tr><td>Aug 2025</td><td class="num">52</td><td class="num">64,746</td><td class="num">1,245</td><td><span class="bar" style="width:23px; background:#f59e0b;"></span></td></tr>
-              <tr><td>Sep 2025</td><td class="num">44</td><td class="num">56,056</td><td class="num">1,274</td><td><span class="bar" style="width:20px; background:#f59e0b;"></span></td></tr>
-              <tr style="background:#fee2e2;"><td>Apr 2026</td><td class="num">3</td><td class="num" style="color:#991b1b;">4,458</td><td class="num">1,486</td><td><span class="bar" style="width:2px; background:#991b1b;"></span></td></tr>
-              <tr style="background:#fee2e2;"><td>May 2026</td><td class="num">4</td><td class="num" style="color:#991b1b;">7,675</td><td class="num">1,919</td><td><span class="bar" style="width:3px; background:#991b1b;"></span></td></tr>
-              <tr style="background:#fee2e2;"><td>Jun 2026</td><td class="num">2</td><td class="num" style="color:#991b1b;">4,166</td><td class="num">2,083</td><td><span class="bar" style="width:2px; background:#991b1b;"></span></td></tr>
-              <tr style="background:#fee2e2;"><td>Jul 2026</td><td class="num">3</td><td class="num" style="color:#991b1b;">4,461</td><td class="num">1,487</td><td><span class="bar" style="width:2px; background:#991b1b;"></span></td></tr>
-              <tr style="background: #fef2f2; font-weight: 700;">
-                <td>LIFETIME</td>
-                <td class="num">1,351</td>
-                <td class="num">20,72,609</td>
-                <td class="num">1,534</td>
-                <td>—</td>
-              </tr>
+            <tbody id="shopifyLiveTrend">
+              <tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">Loading live…</td></tr>
             </tbody>
           </table>
         </div>
       </div>
+
+      <script>
+      (async function() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; return '₹' + Math.round(n).toLocaleString('en-IN'); };
+        try {
+          const r = await fetch(EXEC + '?q=shopify_monthly');
+          const j = await r.json();
+          const arr = Array.isArray(j.data) ? j.data : Object.values(j.data);
+          if (!arr.length) return;
+          arr.sort((a,b) => String(a.Month).localeCompare(String(b.Month)));
+          // FY27 = Apr 2026 → Mar 2027
+          const fy27 = arr.filter(m => m.Month >= '2026-04' && m.Month <= '2027-03');
+          const fy27Rev = fy27.reduce((s,m) => s + (+m.Revenue || 0), 0);
+          const fy27Orders = fy27.reduce((s,m) => s + (+m.Orders || 0), 0);
+          const curM = arr[arr.length - 1];
+          const last3 = arr.slice(-3);
+          const l3Rev = last3.reduce((s,m) => s + (+m.Revenue || 0), 0);
+          const l3Orders = last3.reduce((s,m) => s + (+m.Orders || 0), 0);
+          const lifetimeRev = arr.reduce((s,m) => s + (+m.Revenue || 0), 0);
+          const lifetimeOrders = arr.reduce((s,m) => s + (+m.Orders || 0), 0);
+
+          document.getElementById('shFY27Rev').textContent = fmt(fy27Rev);
+          document.getElementById('shFY27Sub').textContent = fy27Orders + ' orders · ' + fy27.length + ' months';
+          document.getElementById('shL3MRev').textContent = fmt(l3Rev);
+          document.getElementById('shL3MSub').textContent = l3Orders + ' orders · AOV ' + fmt(l3Orders > 0 ? l3Rev/l3Orders : 0);
+          document.getElementById('shCurMRev').textContent = fmt(curM.Revenue);
+          document.getElementById('shCurMSub').textContent = curM.Month + ' · ' + curM.Orders + ' orders';
+          document.getElementById('shLifetimeRev').textContent = fmt(lifetimeRev);
+          document.getElementById('shLifetimeSub').textContent = lifetimeOrders.toLocaleString('en-IN') + ' orders across ' + arr.length + ' months';
+
+          // Last 12 months table
+          const last12 = arr.slice(-12);
+          const maxRev = Math.max(...last12.map(m => +m.Revenue || 0));
+          const tbody = document.getElementById('shopifyLiveTrend');
+          tbody.innerHTML = last12.map(m => {
+            const rev = +m.Revenue || 0;
+            const orders = +m.Orders || 0;
+            const aov = orders > 0 ? rev/orders : 0;
+            const barW = maxRev > 0 ? Math.round((rev / maxRev) * 100) : 0;
+            const [y, mm] = String(m.Month).split('-');
+            const monthLabel = new Date(+y, +mm - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+            return '<tr><td>' + monthLabel + '</td><td class="num">' + orders + '</td><td class="num" style="font-weight:600;">' + fmt(rev) + '</td><td class="num">' + fmt(aov) + '</td><td><span class="bar" style="width:' + barW + 'px; background:#5E8E3E;"></span></td></tr>';
+          }).join('');
+        } catch (e) { console.error('Shopify live KPIs failed', e); }
+      })();
+      </script>
 
       <!-- Top products + top cities -->
       <div class="grid-2">
@@ -2462,18 +2589,6 @@
         </div>
       </div>
 
-      <!-- Verdict -->
-      <div class="card" style="background: #fee2e2; border-color: #fecaca;">
-        <h2 style="color: #7f1d1d;">The Shopify decision</h2>
-        <div style="font-size: 13px; color: #7f1d1d; line-height: 1.7;">
-          <p style="margin: 4px 0;">Shopify D2C generated ₹20.73L over 33 months. The last 4 months produced ₹20k. The channel is not dead by structure — organic search + returning customers still show up. It's dead by neglect — no ads, no email, no new content.</p>
-          <p style="margin: 4px 0;"><strong>Three options:</strong></p>
-          <p style="margin: 4px 0; padding-left: 12px;"><strong>1. Revive:</strong> ₹50k-₹1L/month of Meta/Google ads + email revival. Peak months hit ₹2.7L. If you get back to ₹1L/month at 33% margin, that's ₹4L profit/year vs ₹6-12L/year spend. Marginal.</p>
-          <p style="margin: 4px 0; padding-left: 12px;"><strong>2. Maintain minimum:</strong> Keep the store live, don't spend on ads. ₹15k/month organic revenue. Zero cost. Serves as brand credibility + repeat customer lifeline.</p>
-          <p style="margin: 4px 0; padding-left: 12px;"><strong>3. Shut down:</strong> Divert Shopify Plus subscription (~₹15k/month) to more Blinkit ads. Route curious customers to Amazon. Cleanest.</p>
-          <p style="margin: 4px 0;">The current path — keeping it open but ignoring it — is the worst of all worlds. Pick one.</p>
-        </div>
-      </div>
     </div>
 
     <!-- PAGE: B2B -->
