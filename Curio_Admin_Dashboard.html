@@ -6677,7 +6677,7 @@
             liveBlock.innerHTML = `
               <div style="padding: 14px 16px; background: linear-gradient(135deg, #eef6ff, #e6f7f2); border: 1px solid #b8dbc9; border-radius: 12px; margin-bottom: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">Factory stock (count kept at the factory)</div><div style="font-size: 12px; color: #4a6c5a;">Factory stock master · file updated ${String(asOfRaw)} · refreshed every 30 minutes</div></div>
+                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">🟢 Live factory snapshot</div><div style="font-size: 12px; color: #4a6c5a;">As of ${asOf} · pulled live from Google Sheet</div></div>
                   <div style="text-align: right;"><div style="font-size: 22px; font-weight: 800; color: #14532d;">${fmtL2(invValue)}</div><div style="font-size: 11px; color: #4a6c5a;">Total inventory value @ MRP</div></div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
@@ -6732,45 +6732,11 @@
                   <tbody>${Bc.map(r => `<tr><td style="text-align:left;">${r.SKU||''}</td><td style="text-align:left; font-family: monospace; font-size: 11px;">${r.Batchcode||''}</td><td class="num">₹${(Number(r.MRP)||0).toLocaleString('en-IN')}</td><td class="num">${r.USP||''}</td><td style="text-align:left;">${r.Unit||''}</td><td style="text-align:left;">${r.Best_Before||''}</td></tr>`).join('')}</tbody>
                 </table></div>
               </div>
+              <div style="padding: 10px 14px; background: #fef8e7; border: 1px solid #f0d872; border-radius: 8px; font-size: 12px; color: #78561a; margin-bottom: 18px;">⚠ The blocks below are the older hardcoded inventory view — kept for historical reference only. The live snapshot above is the authoritative source.</div>
             `;
             const head = invEl.querySelector('.page-head');
             if (head) head.parentNode.insertBefore(liveBlock, head.nextSibling);
             else invEl.insertBefore(liveBlock, invEl.firstChild);
-            // ---- Factory count vs Zoho check + hide legacy static view (added 14 Oct 2026) ----
-            try {
-              const legacy = [...invEl.querySelectorAll('.eyebrow')].find(e => /Legacy stock view/i.test(e.textContent));
-              if (legacy) {
-                const hr = legacy.previousElementSibling; if (hr && hr.tagName === 'HR') hr.style.display = 'none';
-                let n = legacy; while (n) { const x = n.nextElementSibling; n.style.display = 'none'; n = x; }
-              }
-              const ZMAP = {
-                'almond oil 100 ml':'ALOIL-100','almond oil 250 ml':'SKH-OIL-002','walnut oil 100 ml':'SKH-OIL-005','walnut oil 250 ml':'SKH-OIL-006',
-                'apricot oil 100 ml':'SKH-OIL-003','apricot oil 250 ml':'SKH-OIL-004','mustard oil 500 ml':'SKH-OIL-007',
-                'kashmir almonds 500 g':'SKU-DF-00003','kashmir walnuts 500 g':'SKU-DF-00001','ladakh apricot 500 g':'SKU-DF-00005',
-                'himalayan badri cow ghee 500 ml':'SKU-GHEE-001','kashmir saffron 1 g':'SKU-SF-001','kashmir saffron 2 g':'SKU-SF-002',
-                'kashmir qahwa 200 g':'SKU-TE-001','zafrani kehwa 250 g':'SKU-TE-002','himalayan chamomile tea 60 g':'SKU-TE-003',
-                'wild multi floral honey 500 g':'SKU-HN-001','mono floral borage honey 500 g':'SKU-HN-002','black forest honey 500 g':'SKU-HN-003','sidr honey 500 g':'SKU-HN-004'
-              };
-              const zr = await fetch('https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec?q=zoho_items').then(r => r.json());
-              const zs = {}; (zr?.data?.items || []).forEach(it => { zs[String(it.sku || '').trim()] = Number(it.stock_on_hand || 0); });
-              const rows = F.map(r => {
-                const name = String(r.SKU || '').trim(); const sku = ZMAP[name.toLowerCase()] || '';
-                const f = Number(r.Total || 0); const z = sku && (sku in zs) ? zs[sku] : null;
-                return { name, sku, f, z, d: z == null ? null : Math.round((f - z) * 1000) / 1000 };
-              });
-              const nDiff = rows.filter(x => x.d !== 0).length;
-              const cell = x => x.d == null ? '<span style="color:#888;">not in Zoho</span>' : x.d === 0 ? '<span style="color:#166534;">match</span>' : `<b style="color:${x.d > 0 ? '#92400e' : '#991b1b'};">${x.d > 0 ? '+' : ''}${x.d}</b>`;
-              const card = document.createElement('div');
-              card.className = 'card'; card.style.marginBottom = '18px';
-              card.innerHTML = `<h2>Factory count vs Zoho <span class="badge ${nDiff ? 'warn' : 'ok'}">${nDiff} of ${rows.length} differ</span></h2>
-                <p style="font-size:12px;color:#666;margin:-6px 0 12px;">Factory = the stock master kept at the factory. Zoho = the books. A plus means the factory holds more than Zoho shows (usually packing or a receipt not yet entered in Zoho); a minus means Zoho holds more (usually a dispatch not yet invoiced).</p>
-                <div class="matrix-wrap"><table class="matrix" style="min-width:600px;font-size:12px;">
-                <thead><tr><th style="text-align:left;">Product</th><th style="text-align:left;">Zoho SKU</th><th class="num">Factory</th><th class="num">Zoho</th><th class="num">Difference</th></tr></thead>
-                <tbody>${rows.sort((a, b) => Math.abs(b.d || 0) - Math.abs(a.d || 0)).map(x => `<tr style="${x.d ? 'background:#fff7ed;' : ''}"><td style="text-align:left;">${x.name}</td><td style="text-align:left;font-family:monospace;font-size:11px;">${x.sku}</td><td class="num">${x.f}</td><td class="num">${x.z == null ? '' : x.z}</td><td class="num">${cell(x)}</td></tr>`).join('')}</tbody>
-                </table></div>`;
-              liveBlock.insertBefore(card, liveBlock.children[1] || null);
-            } catch (e) { console.warn('Factory vs Zoho check failed', e); }
-
           }
         } catch(e) { console.warn('Factory inventory live render failed:', e); }
 
@@ -7715,6 +7681,294 @@
   // Also try to prefetch after 2s regardless
   setTimeout(fetchZoho, 2000);
   setTimeout(fetchZohoCustomerLedger, 2500);
+})();
+</script>
+
+<!-- ============================================================================
+     MT + B2B REBUILD — 14 Oct 2026
+     - Modern Trade = 3 confirmed retail chains (Modern Bazaar, Food Square, Pick & Choose)
+     - B2B = 6 confirmed distributors / corporate accounts
+     - Blinkit excluded from MT (separate channel)
+     - All numbers computed client-side from ?q=zoho_invoices
+============================================================================ -->
+<script>
+(function(){
+  const MT_CUSTOMERS = {
+    'NEW MODERN BAZAAR DEPARTMENTAL STORES PRIVATE LIMITED': 'Modern Bazaar',
+    'FOOD SQUARE-LANDCRAFT RETAIL PRIVATE LIMITED':          'Food Square',
+    'PICK-N-CHOOSE SUPERMARKET BAGAAT':                       'Pick & Choose',
+  };
+  const B2B_CUSTOMERS = {
+    'Kissansay Agtech Private Limited':          { short: 'Kissansay',       type: 'Distributor' },
+    'Lulu Hypermarket CL India':                  { short: 'Lulu',            type: 'Distributor' },
+    'DAULAT RAM ENGINEERING SERVICES LIMITED':    { short: 'Daulat Ram',      type: 'Corporate'   },
+    'Metamorphosis Engitch India Pvt Ltd':        { short: 'Metamorphosis',   type: 'Corporate'   },
+    'Udhampur Apple Store':                       { short: 'Udhampur Apple',  type: 'Reseller'    },
+    'Baba Ghulam Traders':                        { short: 'Baba Ghulam',     type: 'Reseller'    },
+  };
+  const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+
+  const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; return '₹' + n.toLocaleString('en-IN', {maximumFractionDigits:0}); };
+  const dateFmt = s => { s = String(s||'').slice(0,10); return s || '—'; };
+  const ageOf = d => { if (!d) return 0; const t = new Date(d).getTime(); if (isNaN(t)) return 0; return Math.floor((Date.now() - t) / 86400000); };
+
+  let cachedInvoices = null;
+  let lastSync = null;
+
+  async function loadInvoices(force) {
+    if (!force && cachedInvoices) return cachedInvoices;
+    const r = await fetch(EXEC + '?q=zoho_invoices');
+    const j = await r.json();
+    cachedInvoices = j && j.data && j.data.invoices || [];
+    lastSync = new Date();
+    return cachedInvoices;
+  }
+
+  function aggregate(invoices, whitelist, labelFn) {
+    const groups = {};
+    Object.keys(whitelist).forEach(k => {
+      const label = labelFn(whitelist[k]);
+      if (!groups[label]) groups[label] = { label, invoices: [], shipped: 0, outstanding: 0, last: '', zoho_name: k, meta: whitelist[k] };
+    });
+    invoices.forEach(inv => {
+      const match = whitelist[inv.customer_name];
+      if (!match) return;
+      const label = labelFn(match);
+      const g = groups[label];
+      const total = +inv.total || 0;
+      const balance = +inv.balance || 0;
+      const d = String(inv.date || '').slice(0, 10);
+      g.invoices.push({ ...inv, _total: total, _balance: balance, _date: d });
+      g.shipped += total;
+      g.outstanding += balance;
+      if (d > g.last) g.last = d;
+    });
+    return Object.values(groups);
+  }
+
+  function renderMtPage(invoices) {
+    const page = document.getElementById('page-mt-overview');
+    if (!page) return;
+    const chains = aggregate(invoices, MT_CUSTOMERS, v => v);
+    chains.sort((a,b) => b.shipped - a.shipped);
+    const totalShipped = chains.reduce((a,c) => a + c.shipped, 0);
+    const totalOut = chains.reduce((a,c) => a + c.outstanding, 0);
+    const totalInv = chains.reduce((a,c) => a + c.invoices.length, 0);
+    const lastShipment = chains.map(c => c.last).filter(Boolean).sort().slice(-1)[0] || '—';
+    const openInvoices = chains.flatMap(c => c.invoices.filter(i => i._balance > 0).map(i => ({ ...i, _chain: c.label })))
+                              .sort((a,b) => (a._date||'').localeCompare(b._date||''));
+    const syncTime = lastSync ? lastSync.toLocaleString('en-IN', { timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short' }) : '—';
+
+    page.innerHTML = `
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Modern Trade · Live from Zoho</div>
+          <h1>Modern Trade</h1>
+          <div class="meta">Retail chains Curio ships to directly · Primary (Zoho invoices) + Secondary (store reports) · Synced ${esc(syncTime)}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn ghost" id="mtSyncBtn">↻ Sync from Zoho</button>
+          <button class="btn" id="mtStoreReportBtn">+ Record store report</button>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi"><div class="label">Primary (shipped)</div><div class="value">${fmt(totalShipped)}</div><div class="sub">${totalInv} invoices across ${chains.length} chains</div></div>
+        <div class="kpi"><div class="label">Outstanding</div><div class="value" style="color:${totalOut > 0 ? 'var(--danger-700, #c00)' : 'var(--text-primary)'};">${fmt(totalOut)}</div><div class="sub">${totalShipped > 0 ? ((totalOut/totalShipped*100).toFixed(1) + '% of invoiced') : '—'}</div></div>
+        <div class="kpi"><div class="label">Open invoices</div><div class="value">${openInvoices.length}</div><div class="sub">awaiting payment</div></div>
+        <div class="kpi"><div class="label">Last shipment</div><div class="value" style="font-size:18px;">${esc(lastShipment)}</div><div class="sub">${ageOf(lastShipment)}d ago</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Chains · Shipped vs outstanding</h2>
+        <table>
+          <thead><tr><th>Chain</th><th class="num">Invoices</th><th class="num">Shipped</th><th class="num">Outstanding</th><th>Collection %</th><th>Last shipment</th></tr></thead>
+          <tbody>${chains.map(c => {
+            const collectedPct = c.shipped > 0 ? ((1 - c.outstanding/c.shipped) * 100).toFixed(0) : '—';
+            const outColor = c.outstanding > 0 ? 'var(--danger-700, #c00)' : 'var(--text-primary)';
+            return `
+            <tr>
+              <td><strong>${esc(c.label)}</strong><br><span style="color:var(--text-secondary);font-size:11px;">${esc(c.zoho_name)}</span></td>
+              <td class="num">${c.invoices.length}</td>
+              <td class="num" style="font-weight:600;">${fmt(c.shipped)}</td>
+              <td class="num" style="color:${outColor}; font-weight:600;">${fmt(c.outstanding)}</td>
+              <td style="color:${collectedPct >= 80 ? '#070' : collectedPct >= 50 ? '#a60' : '#c00'}; font-weight:600;">${collectedPct}${collectedPct === '—' ? '' : '%'}</td>
+              <td>${esc(c.last || '—')} ${c.last ? '<span style="color:var(--text-secondary);font-size:11px;">· ' + ageOf(c.last) + 'd ago</span>' : ''}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Open invoices · ${openInvoices.length} <span class="badge warn">${fmt(totalOut)} total</span></h2>
+        <div style="max-height:420px; overflow:auto; margin:0 -24px;">
+          <table>
+            <thead><tr><th>Invoice</th><th>Chain</th><th>Date</th><th>Due</th><th class="num">Total</th><th class="num">Outstanding</th><th>Aging</th></tr></thead>
+            <tbody>${openInvoices.map(i => {
+              const age = ageOf(i._date);
+              const dueAge = ageOf(i.due_date);
+              const ageBand = age < 30 ? 'ok' : age < 60 ? 'warn' : 'danger';
+              const ageLabel = age < 30 ? 'Current' : age < 60 ? '30-60 d' : age < 90 ? '60-90 d' : '90+ d';
+              return `
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12px; padding-left:24px;">${esc(i.invoice_number || '')}</td>
+                <td>${esc(i._chain)}</td>
+                <td>${esc(i._date)}</td>
+                <td>${esc(dateFmt(i.due_date))}</td>
+                <td class="num">${fmt(i._total)}</td>
+                <td class="num" style="color:var(--danger-700, #c00); font-weight:600;">${fmt(i._balance)}</td>
+                <td><span class="badge ${ageBand}">${ageLabel}</span></td>
+              </tr>`;
+            }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-secondary);">No open invoices — all paid.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="mtSecondarySlot" style="padding-bottom:40px;">
+        <h2>Secondary sales · Store-level offtake</h2>
+        <div style="padding: 14px 16px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 10px; font-size: 13px; color: #78350f; margin-bottom: 20px;">
+          <strong>Per-SKU breakdown pending.</strong> Zoho invoice line-items sync is coded but blocked on a Zoho detail-API URL fix (~15 min dev work). Once resolved, this card will show shipped-per-SKU per store with promoter & office store reports deducted to compute in-hand stock. Primary (above) and promoter reports (Attendance → MT) are already live.
+        </div>
+        <div style="text-align:center; padding:30px; color:var(--text-secondary); font-size:13px;">
+          Secondary data entry: <a href="#" id="mtGoAttendance" style="color:var(--brand-500);">promoter check-outs</a> or use the <strong>+ Record store report</strong> button above.
+        </div>
+      </div>
+    `;
+
+    // Wire buttons
+    document.getElementById('mtSyncBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('mtSyncBtn');
+      btn.textContent = '⟳ Syncing…'; btn.disabled = true;
+      await loadInvoices(true);
+      renderMtPage(cachedInvoices);
+      renderB2bPage(cachedInvoices);
+    });
+    document.getElementById('mtStoreReportBtn').addEventListener('click', () => {
+      alert('Store report entry UI coming next build. For now, promoter check-outs flow into Attendance → MT panel.');
+    });
+    const g = document.getElementById('mtGoAttendance');
+    if (g) g.addEventListener('click', (e) => {
+      e.preventDefault();
+      const navAtt = document.querySelector('.nav-item[data-page="attendance"]');
+      if (navAtt) navAtt.click();
+    });
+  }
+
+  function renderB2bPage(invoices) {
+    const page = document.getElementById('page-b2b');
+    if (!page) return;
+    const accounts = aggregate(invoices, B2B_CUSTOMERS, v => v.short);
+    accounts.sort((a,b) => b.shipped - a.shipped);
+    const totalShipped = accounts.reduce((a,c) => a + c.shipped, 0);
+    const totalOut = accounts.reduce((a,c) => a + c.outstanding, 0);
+    const totalInv = accounts.reduce((a,c) => a + c.invoices.length, 0);
+    const openInvoices = accounts.flatMap(c => c.invoices.filter(i => i._balance > 0).map(i => ({ ...i, _acct: c.label, _type: c.meta.type })))
+                                 .sort((a,b) => (a._date||'').localeCompare(b._date||''));
+    const syncTime = lastSync ? lastSync.toLocaleString('en-IN', { timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short' }) : '—';
+
+    page.innerHTML = `
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">B2B · Live from Zoho</div>
+          <h1>B2B · Direct sales</h1>
+          <div class="meta">Distributors, resellers, corporate accounts · ${accounts.length} accounts · Synced ${esc(syncTime)}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn ghost" id="b2bSyncBtn">↻ Sync from Zoho</button>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi"><div class="label">Total shipped</div><div class="value">${fmt(totalShipped)}</div><div class="sub">${totalInv} invoices</div></div>
+        <div class="kpi"><div class="label">Outstanding</div><div class="value" style="color:${totalOut > 0 ? 'var(--danger-700, #c00)' : 'var(--text-primary)'};">${fmt(totalOut)}</div><div class="sub">${totalShipped > 0 ? ((totalOut/totalShipped*100).toFixed(1) + '% of invoiced') : '—'}</div></div>
+        <div class="kpi"><div class="label">Active accounts</div><div class="value">${accounts.filter(a => a.invoices.length).length}</div><div class="sub">of ${accounts.length}</div></div>
+        <div class="kpi"><div class="label">Open invoices</div><div class="value">${openInvoices.length}</div><div class="sub">awaiting payment</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Accounts · ranked by revenue</h2>
+        <table>
+          <thead><tr><th>Account</th><th>Type</th><th class="num">Invoices</th><th class="num">Shipped</th><th class="num">Outstanding</th><th>Collection %</th><th>Last shipment</th></tr></thead>
+          <tbody>${accounts.map(a => {
+            const collectedPct = a.shipped > 0 ? ((1 - a.outstanding/a.shipped) * 100).toFixed(0) : '—';
+            const outColor = a.outstanding > 0 ? 'var(--danger-700, #c00)' : 'var(--text-primary)';
+            return `
+            <tr>
+              <td><strong>${esc(a.label)}</strong><br><span style="color:var(--text-secondary);font-size:11px;">${esc(a.zoho_name)}</span></td>
+              <td><span class="badge">${esc(a.meta.type)}</span></td>
+              <td class="num">${a.invoices.length}</td>
+              <td class="num" style="font-weight:600;">${fmt(a.shipped)}</td>
+              <td class="num" style="color:${outColor}; font-weight:600;">${fmt(a.outstanding)}</td>
+              <td style="color:${collectedPct >= 80 ? '#070' : collectedPct >= 50 ? '#a60' : '#c00'}; font-weight:600;">${collectedPct}${collectedPct === '—' ? '' : '%'}</td>
+              <td>${esc(a.last || '—')} ${a.last ? '<span style="color:var(--text-secondary);font-size:11px;">· ' + ageOf(a.last) + 'd ago</span>' : ''}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Open invoices · ${openInvoices.length} <span class="badge warn">${fmt(totalOut)} total</span></h2>
+        <div style="max-height:420px; overflow:auto; margin:0 -24px;">
+          <table>
+            <thead><tr><th>Invoice</th><th>Account</th><th>Date</th><th>Due</th><th class="num">Total</th><th class="num">Outstanding</th><th>Aging</th></tr></thead>
+            <tbody>${openInvoices.map(i => {
+              const age = ageOf(i._date);
+              const ageBand = age < 30 ? 'ok' : age < 60 ? 'warn' : 'danger';
+              const ageLabel = age < 30 ? 'Current' : age < 60 ? '30-60 d' : age < 90 ? '60-90 d' : '90+ d';
+              return `
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12px; padding-left:24px;">${esc(i.invoice_number || '')}</td>
+                <td>${esc(i._acct)}</td>
+                <td>${esc(i._date)}</td>
+                <td>${esc(dateFmt(i.due_date))}</td>
+                <td class="num">${fmt(i._total)}</td>
+                <td class="num" style="color:var(--danger-700, #c00); font-weight:600;">${fmt(i._balance)}</td>
+                <td><span class="badge ${ageBand}">${ageLabel}</span></td>
+              </tr>`;
+            }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-secondary);">No open invoices — all paid.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('b2bSyncBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('b2bSyncBtn');
+      btn.textContent = '⟳ Syncing…'; btn.disabled = true;
+      await loadInvoices(true);
+      renderMtPage(cachedInvoices);
+      renderB2bPage(cachedInvoices);
+    });
+  }
+
+  async function initMtB2b() {
+    try {
+      const inv = await loadInvoices();
+      renderMtPage(inv);
+      renderB2bPage(inv);
+
+      // Re-render if any upstream script overwrites page content later
+      ['page-mt-overview', 'page-b2b'].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        const observer = new MutationObserver((muts) => {
+          // Only re-render if OUR markers are gone (something nuked our content)
+          const ours = el.querySelector(id === 'page-mt-overview' ? '#mtSyncBtn' : '#b2bSyncBtn');
+          if (!ours && cachedInvoices) {
+            observer.disconnect();
+            if (id === 'page-mt-overview') renderMtPage(cachedInvoices); else renderB2bPage(cachedInvoices);
+            observer.observe(el, { childList: true, subtree: false });
+          }
+        });
+        observer.observe(el, { childList: true, subtree: false });
+      });
+    } catch (e) {
+      console.error('MT/B2B rebuild failed:', e);
+    }
+  }
+
+  // Wait for other scripts to settle, then render once (and keep guard with MutationObserver)
+  if (document.readyState === 'complete') setTimeout(initMtB2b, 3000);
+  else window.addEventListener('load', () => setTimeout(initMtB2b, 3000));
 })();
 </script>
 </body>
