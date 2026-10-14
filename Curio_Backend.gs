@@ -348,6 +348,11 @@ function doGet(e) {
       case 'blinkit_live_inventory':  return respond({ ok: true, data: readSheet('Blinkit_Live_Inventory') });
       case 'mt_store_reports':        return respond({ ok: true, data: readSheet('MT_Store_Reports') });
       case 'zoho_invoices':           return respond({ ok: true, data: { invoices: readSheet('Zoho_Invoices'), count: (readSheet('Zoho_Invoices')||[]).length } });
+      case 'blinkit_raw':             return respond({ ok: true, data: readSheet('Sales_Blinkit') });
+      case 'amazon_raw':              return respond({ ok: true, data: readSheet('Sales_Amazon') });
+      case 'b2b_raw':                 return respond({ ok: true, data: readSheet('Sales_B2B') });
+      case 'meta_monthly':            return respond({ ok: true, data: readSheet('Meta_Monthly') });
+      case 'amazon_ads_live':         return respond({ ok: true, data: readSheet('Amazon_Ads') });
       case 'blinkit_business_metrics_daily': return respond({ ok: true, data: readSheet('Blinkit_Business_Metrics_Daily') });
       // Employee attendance (all non-promoter staff — Check IN / Check OUT with GPS + selfie)
       case 'employee_checkins_today': return respond({ ok: true, data: filterByDate('Log_Employee_Attendance', todayIST()) });
