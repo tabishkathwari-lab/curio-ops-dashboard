@@ -6677,7 +6677,7 @@
             liveBlock.innerHTML = `
               <div style="padding: 14px 16px; background: linear-gradient(135deg, #eef6ff, #e6f7f2); border: 1px solid #b8dbc9; border-radius: 12px; margin-bottom: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">🟢 Live factory snapshot</div><div style="font-size: 12px; color: #4a6c5a;">As of ${asOf} · pulled live from Google Sheet</div></div>
+                  <div><div style="font-size: 18px; font-weight: 700; color: #14532d;">Factory stock (count kept at the factory)</div><div style="font-size: 12px; color: #4a6c5a;">Factory stock master · file updated ${String(asOfRaw)} · refreshed every 30 minutes</div></div>
                   <div style="text-align: right;"><div style="font-size: 22px; font-weight: 800; color: #14532d;">${fmtL2(invValue)}</div><div style="font-size: 11px; color: #4a6c5a;">Total inventory value @ MRP</div></div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
@@ -6732,11 +6732,45 @@
                   <tbody>${Bc.map(r => `<tr><td style="text-align:left;">${r.SKU||''}</td><td style="text-align:left; font-family: monospace; font-size: 11px;">${r.Batchcode||''}</td><td class="num">₹${(Number(r.MRP)||0).toLocaleString('en-IN')}</td><td class="num">${r.USP||''}</td><td style="text-align:left;">${r.Unit||''}</td><td style="text-align:left;">${r.Best_Before||''}</td></tr>`).join('')}</tbody>
                 </table></div>
               </div>
-              <div style="padding: 10px 14px; background: #fef8e7; border: 1px solid #f0d872; border-radius: 8px; font-size: 12px; color: #78561a; margin-bottom: 18px;">⚠ The blocks below are the older hardcoded inventory view — kept for historical reference only. The live snapshot above is the authoritative source.</div>
             `;
             const head = invEl.querySelector('.page-head');
             if (head) head.parentNode.insertBefore(liveBlock, head.nextSibling);
             else invEl.insertBefore(liveBlock, invEl.firstChild);
+            // ---- Factory count vs Zoho check + hide legacy static view (added 14 Oct 2026) ----
+            try {
+              const legacy = [...invEl.querySelectorAll('.eyebrow')].find(e => /Legacy stock view/i.test(e.textContent));
+              if (legacy) {
+                const hr = legacy.previousElementSibling; if (hr && hr.tagName === 'HR') hr.style.display = 'none';
+                let n = legacy; while (n) { const x = n.nextElementSibling; n.style.display = 'none'; n = x; }
+              }
+              const ZMAP = {
+                'almond oil 100 ml':'ALOIL-100','almond oil 250 ml':'SKH-OIL-002','walnut oil 100 ml':'SKH-OIL-005','walnut oil 250 ml':'SKH-OIL-006',
+                'apricot oil 100 ml':'SKH-OIL-003','apricot oil 250 ml':'SKH-OIL-004','mustard oil 500 ml':'SKH-OIL-007',
+                'kashmir almonds 500 g':'SKU-DF-00003','kashmir walnuts 500 g':'SKU-DF-00001','ladakh apricot 500 g':'SKU-DF-00005',
+                'himalayan badri cow ghee 500 ml':'SKU-GHEE-001','kashmir saffron 1 g':'SKU-SF-001','kashmir saffron 2 g':'SKU-SF-002',
+                'kashmir qahwa 200 g':'SKU-TE-001','zafrani kehwa 250 g':'SKU-TE-002','himalayan chamomile tea 60 g':'SKU-TE-003',
+                'wild multi floral honey 500 g':'SKU-HN-001','mono floral borage honey 500 g':'SKU-HN-002','black forest honey 500 g':'SKU-HN-003','sidr honey 500 g':'SKU-HN-004'
+              };
+              const zr = await fetch('https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec?q=zoho_items').then(r => r.json());
+              const zs = {}; (zr?.data?.items || []).forEach(it => { zs[String(it.sku || '').trim()] = Number(it.stock_on_hand || 0); });
+              const rows = F.map(r => {
+                const name = String(r.SKU || '').trim(); const sku = ZMAP[name.toLowerCase()] || '';
+                const f = Number(r.Total || 0); const z = sku && (sku in zs) ? zs[sku] : null;
+                return { name, sku, f, z, d: z == null ? null : Math.round((f - z) * 1000) / 1000 };
+              });
+              const nDiff = rows.filter(x => x.d !== 0).length;
+              const cell = x => x.d == null ? '<span style="color:#888;">not in Zoho</span>' : x.d === 0 ? '<span style="color:#166534;">match</span>' : `<b style="color:${x.d > 0 ? '#92400e' : '#991b1b'};">${x.d > 0 ? '+' : ''}${x.d}</b>`;
+              const card = document.createElement('div');
+              card.className = 'card'; card.style.marginBottom = '18px';
+              card.innerHTML = `<h2>Factory count vs Zoho <span class="badge ${nDiff ? 'warn' : 'ok'}">${nDiff} of ${rows.length} differ</span></h2>
+                <p style="font-size:12px;color:#666;margin:-6px 0 12px;">Factory = the stock master kept at the factory. Zoho = the books. A plus means the factory holds more than Zoho shows (usually packing or a receipt not yet entered in Zoho); a minus means Zoho holds more (usually a dispatch not yet invoiced).</p>
+                <div class="matrix-wrap"><table class="matrix" style="min-width:600px;font-size:12px;">
+                <thead><tr><th style="text-align:left;">Product</th><th style="text-align:left;">Zoho SKU</th><th class="num">Factory</th><th class="num">Zoho</th><th class="num">Difference</th></tr></thead>
+                <tbody>${rows.sort((a, b) => Math.abs(b.d || 0) - Math.abs(a.d || 0)).map(x => `<tr style="${x.d ? 'background:#fff7ed;' : ''}"><td style="text-align:left;">${x.name}</td><td style="text-align:left;font-family:monospace;font-size:11px;">${x.sku}</td><td class="num">${x.f}</td><td class="num">${x.z == null ? '' : x.z}</td><td class="num">${cell(x)}</td></tr>`).join('')}</tbody>
+                </table></div>`;
+              liveBlock.insertBefore(card, liveBlock.children[1] || null);
+            } catch (e) { console.warn('Factory vs Zoho check failed', e); }
+
           }
         } catch(e) { console.warn('Factory inventory live render failed:', e); }
 
