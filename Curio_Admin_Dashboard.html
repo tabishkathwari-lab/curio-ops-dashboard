@@ -4997,7 +4997,8 @@
           const daysAgo = Math.floor((Date.now() - upDate.getTime()) / 86400000);
           const upBy = avail[0].Uploaded_By || avail[0].uploaded_by || '—';
           const upDateStr = isNaN(upDate) ? '—' : upDate.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
-          const staleColor = daysAgo <= 2 ? '#166534' : daysAgo <= 7 ? '#92400e' : '#991b1b';
+          // City×SKU is a monthly refresh — green up to 35 days, amber 35-45, red >45
+          const staleColor = daysAgo <= 35 ? '#166534' : daysAgo <= 45 ? '#92400e' : '#991b1b';
           const staleLabel = daysAgo <= 1 ? 'fresh' : daysAgo + ' days ago';
 
           // Aggregate by SKU
@@ -5023,7 +5024,7 @@
 
           card.innerHTML = `
             <h2>🎯 Coverage snapshot · <span style="color:${staleColor};">${upDateStr}</span> <span class="badge ok">Live from Blinkit_Availability</span></h2>
-            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Uploaded ${staleLabel} by ${upBy} · ${avail.length.toLocaleString('en-IN')} city × SKU records${daysAgo > 14 ? ' <span style="color:#991b1b; font-weight:600;">⚠️ Data over 2 weeks old — upload latest Blinkit coverage export</span>' : ''}</p>
+            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">City × SKU breakdown · last synced ${staleLabel} by ${upBy} · ${avail.length.toLocaleString('en-IN')} records${daysAgo > 45 ? ' <span style="color:#991b1b; font-weight:600;">⚠️ Over 45 days old — Faraaz re-upload Blinkit coverage CSV</span>' : (daysAgo > 35 ? ' <span style="color:#92400e;">· monthly refresh due</span>' : '')}<br><span style="color:#166534;">● Per-SKU stock is fresher — see "Blinkit feeder warehouse inventory" below (Oct 13 snapshot)</span></p>
             <div class="kpi-row" style="margin-bottom:14px;">
               <div class="kpi"><div class="label">SKUs live</div><div class="value">${skusLive} / ${Object.keys(bySku).length}</div><div class="sub">Catalog reach on Blinkit</div></div>
               <div class="kpi"><div class="label">Cities live</div><div class="value">${citiesLive}</div><div class="sub">Distinct cities with ≥1 SKU</div></div>
