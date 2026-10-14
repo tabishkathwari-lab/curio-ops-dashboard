@@ -674,21 +674,50 @@
           const opEl = document.getElementById('ovOrdersPrev'); opEl.textContent = op.txt; opEl.className = op.cls;
           const oyEl = document.getElementById('ovOrdersYoy'); oyEl.textContent = oy.txt; oyEl.className = oy.cls;
           spark('ovOrdersSpark', last12.map(c => c.orders), '#5eead4');
-          // Ads: pull from Meta + Amazon ads endpoints if available
+          // Ads: COMBINED spend across Meta + Amazon + Blinkit per month
           try {
             const [metaR, amAds] = await Promise.all([
               fetch(EXEC + '?q=meta_monthly').then(r=>r.json()).catch(e=>({data:[]})),
               fetch(EXEC + '?q=amazon_ads_live').then(r=>r.json()).catch(e=>({data:[]}))
             ]);
-            const metaMo = normalize(metaR).map(r => ({ month: String(r.Month || '').slice(0,7), spend: +r.Spend || +r.spend || 0 }));
-            const adsLast12 = last12.map(c => {
-              const m = metaMo.find(x => x.month === c.month);
-              return m ? m.spend : 0;
+            // Meta spend by month
+            const metaMo = {};
+            normalize(metaR).filter(r => !/\(/.test(String(r.Month||r.month||''))).forEach(r => {
+              const m = String(r.Month || r.month || '').slice(0,7);
+              if (m) metaMo[m] = (metaMo[m] || 0) + (+r.Spend || +r.spend || 0);
             });
+            // Blinkit Ad_Spend by month (from blinkit_monthly which we already fetched)
+            const blinkitAdByMonth = {};
+            normalize(bkM).filter(r => !/\(/.test(String(r.Month||r.month||''))).forEach(r => {
+              const m = String(r.Month || r.month || '').slice(0,7);
+              if (m) blinkitAdByMonth[m] = (blinkitAdByMonth[m] || 0) + (+r.Ad_Spend || 0);
+            });
+            // Amazon ad spend by month — try amazon_monthly first (if it has Ad_Spend column), fall back to amazon_ads_live
+            const amazonAdByMonth = {};
+            normalize(amM).filter(r => !/\(/.test(String(r.Month||r.month||''))).forEach(r => {
+              const m = String(r.Month || r.month || '').slice(0,7);
+              if (m) amazonAdByMonth[m] = (amazonAdByMonth[m] || 0) + (+r.Ad_Spend || +r.AdSpend || 0);
+            });
+            // amazon_ads_live may be flat list of campaigns with Spend + Month fields
+            normalize(amAds).forEach(r => {
+              const m = String(r.Month || r.month || r.Date || '').slice(0,7);
+              if (!m || /\(/.test(String(r.Month||r.month||''))) return;
+              if (!amazonAdByMonth[m]) amazonAdByMonth[m] = (+r.Spend || +r.spend || 0);
+            });
+            const adsLast12 = last12.map(c => (metaMo[c.month] || 0) + (blinkitAdByMonth[c.month] || 0) + (amazonAdByMonth[c.month] || 0));
             const curA = adsLast12[curIdx] || 0, prevA = adsLast12[curIdx - 1] || 0;
             document.getElementById('ovAdsVal').textContent = fmt(curA);
-            const ap = pct(curA, prevA), ay = pct(curA, 0);
-            const apEl = document.getElementById('ovAdsPrev'); apEl.textContent = ap.txt; apEl.className = ap.cls;
+            // Build breakdown subline (which platforms contributed)
+            const parts = [];
+            if ((metaMo[curM.month]||0) > 0) parts.push('Meta ' + fmt(metaMo[curM.month]));
+            if ((blinkitAdByMonth[curM.month]||0) > 0) parts.push('Blinkit ' + fmt(blinkitAdByMonth[curM.month]));
+            if ((amazonAdByMonth[curM.month]||0) > 0) parts.push('Amazon ' + fmt(amazonAdByMonth[curM.month]));
+            const adsLabelEl = document.querySelectorAll('#homeOverviewRow .ov-label')[1];
+            if (adsLabelEl) adsLabelEl.textContent = 'TOTAL ADVERTISING COST · ' + curM.month;
+            const ap = pct(curA, prevA);
+            const apEl = document.getElementById('ovAdsPrev');
+            apEl.textContent = parts.length ? parts.join(' + ') : (ap.txt + ' vs prev');
+            apEl.className = ap.cls;
             spark('ovAdsSpark', adsLast12, '#f59e0b');
             // ROAS = Sales / Ad spend
             const roas = curA > 0 ? curM.rev / curA : 0;
