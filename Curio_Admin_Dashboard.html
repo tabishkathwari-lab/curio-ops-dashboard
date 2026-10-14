@@ -7900,14 +7900,33 @@
       </div>
 
       <div class="card" id="mtUploadSlot" style="padding-bottom:40px;">
-        <h2>Upload secondary sales (manual) · CSV</h2>
+        <h2>Upload MT stock snapshot · CSV</h2>
         <div style="font-size:13px; color:var(--text-secondary); margin-bottom:14px;">
-          For stores without a promoter: drop a CSV with columns <strong>date,chain,store,sku,sold</strong> (sold = units sold to consumer that day). One row per SKU per store per day. Backdated entries are fine. Rows are appended to <code>Sales_MT_Store_Reports</code>.
+          Drop a CSV with columns <strong>date, chain, store, sku, stock_in_hand, expired_returned</strong>. One row per SKU per store per snapshot date. The dashboard computes <strong>Sold = Shipped − stock_in_hand − expired_returned</strong>.
+          <br>
+          <span style="color:var(--text-tertiary); font-size:12px;">Also accepts the simpler <code>date,chain,store,sku,sold</code> format if you prefer entering sold directly.</span>
         </div>
+
+        <div style="background:#f8f6f1; border:1px solid var(--border-subtle, #e5e5e5); border-radius:8px; padding:14px; margin-bottom:16px;">
+          <div style="font-weight:600; font-size:13px; margin-bottom:10px;">Add a new store (pre-fills next template download)</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <select id="mtNewStoreChain" style="padding:7px 10px; border:1px solid #d4d4d8; border-radius:6px; font-size:13px;">
+              <option>Modern Bazaar</option>
+              <option>Food Square</option>
+              <option>Pick & Choose</option>
+              <option>Aapka Bazar</option>
+            </select>
+            <input type="text" id="mtNewStoreName" placeholder="Store name (e.g., MB Vasant Kunj)" style="padding:7px 10px; border:1px solid #d4d4d8; border-radius:6px; font-size:13px; min-width:260px;">
+            <button class="btn" id="mtAddStoreBtn">+ Add store</button>
+            <span id="mtAddStoreStatus" style="font-size:12px; color:var(--text-secondary);"></span>
+          </div>
+          <div style="font-size:11px; color:var(--text-tertiary); margin-top:8px;">Known stores so far: <span id="mtKnownStores">Modern Bazaar — Dwarka Sec 21, Kailash, Cyberhub · Food Square — Ahmedabad DC · Pick &amp; Choose — Residency Road · Aapka Bazar — Gurgaon</span></div>
+        </div>
+
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
           <input type="file" id="mtCsvInput" accept=".csv" style="padding:8px; border:1px solid var(--border-default, #ddd); border-radius:6px;">
           <button class="btn" id="mtCsvUploadBtn" disabled>Upload</button>
-          <a href="data:text/csv;charset=utf-8,date%2Cchain%2Cstore%2Csku%2Csold%0A2026-10-14%2CModern%20Bazaar%2CMB%20Kailash%2CKashmir%20Walnuts%2C4%0A2026-10-14%2CModern%20Bazaar%2CMB%20Kailash%2CSIDR%20Honey%2C2" download="mt_secondary_template.csv" style="font-size:12px; color:var(--brand-500);">Download template</a>
+          <button class="btn ghost" id="mtDownloadTplBtn">↓ Download template (with known stores)</button>
           <span id="mtCsvStatus" style="font-size:12px; color:var(--text-secondary);"></span>
         </div>
       </div>
@@ -7989,6 +8008,57 @@
     const csvBtn = document.getElementById('mtCsvUploadBtn');
     const csvStatus = document.getElementById('mtCsvStatus');
     csvInput.addEventListener('change', () => { csvBtn.disabled = !csvInput.files.length; });
+
+    // Add-store form + dynamic template download
+    const KNOWN_SKUS = ['Himalayan Badri Cow Ghee 500mL','Kashmir Walnut 500gm','Kashmir Almond 500gm','Kashmir Qahwa 200gm','Ladakh Apricot 500gm','Kashmir Saffron Mongra 1gm','Kashmir Saffron Mongra 2gm','Borage Honey Monofloral 500gm','Sidr Honey Monofloral 500gm','SIDR Honey 500gm','Zafrani Kehwa 250gm','Himalayan Chamomile Infusion 60gm','Cold Pressed Almond Oil 100mL','Cold Pressed Almond Oil 250mL','Cold Pressed Apricot Oil 100mL','Cold Pressed Apricot Oil 250mL','Cold Pressed Walnut Oil 100mL','Cold Pressed Walnut Oil 250mL','Cold Pressed Mustard Oil 500mL'];
+    let userStores = JSON.parse(localStorage.getItem('mt_user_stores') || '[]');
+    const DEFAULT_STORES = [
+      ['Modern Bazaar', 'MB Dwarka Sec 21'], ['Modern Bazaar', 'MB Kailash'], ['Modern Bazaar', 'MB Cyberhub'],
+      ['Food Square', 'FS Ahmedabad DC'],
+      ['Pick & Choose', 'PNC Residency Road'],
+      ['Aapka Bazar', 'AB Gurgaon']
+    ];
+    function allStores() {
+      const combined = [...DEFAULT_STORES, ...userStores];
+      // Dedup by chain+store key
+      const seen = new Set();
+      return combined.filter(([c, s]) => { const k = c + '|' + s; if (seen.has(k)) return false; seen.add(k); return true; });
+    }
+    function updateKnownStoresDisplay() {
+      const grouped = {};
+      allStores().forEach(([c, s]) => { grouped[c] = grouped[c] || []; grouped[c].push(s); });
+      document.getElementById('mtKnownStores').textContent = Object.entries(grouped).map(([c, ss]) => c + ' — ' + ss.join(', ')).join(' · ');
+    }
+    updateKnownStoresDisplay();
+
+    document.getElementById('mtAddStoreBtn').addEventListener('click', () => {
+      const chain = document.getElementById('mtNewStoreChain').value;
+      const name = document.getElementById('mtNewStoreName').value.trim();
+      const status = document.getElementById('mtAddStoreStatus');
+      if (!name) { status.textContent = 'Please enter a store name.'; return; }
+      if (allStores().some(([c, s]) => c === chain && s.toLowerCase() === name.toLowerCase())) {
+        status.textContent = '⚠ Already exists.'; return;
+      }
+      userStores.push([chain, name]);
+      localStorage.setItem('mt_user_stores', JSON.stringify(userStores));
+      updateKnownStoresDisplay();
+      document.getElementById('mtNewStoreName').value = '';
+      status.textContent = '✓ Added — next template download includes it.';
+    });
+
+    document.getElementById('mtDownloadTplBtn').addEventListener('click', () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const lines = ['date,chain,store,sku,stock_in_hand,expired_returned'];
+      allStores().forEach(([chain, store]) => {
+        KNOWN_SKUS.forEach(sku => lines.push([today, chain, store, sku, 0, 0].join(',')));
+      });
+      const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'MT_Stock_Template_' + today + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
     csvBtn.addEventListener('click', async () => {
       const file = csvInput.files[0]; if (!file) return;
       csvBtn.disabled = true; csvStatus.textContent = 'Parsing…';
@@ -7996,6 +8066,8 @@
       const lines = text.split(/\r?\n/).filter(Boolean);
       const header = lines.shift().split(',').map(h => h.trim().toLowerCase());
       const col = n => header.indexOf(n);
+      // Detect format: stock-based (has stock_in_hand) vs direct-sold (has sold)
+      const isStockFmt = col('stock_in_hand') >= 0;
       const byDateChainStore = {};
       let bad = 0;
       lines.forEach(ln => {
@@ -8004,11 +8076,17 @@
         const chain = (p[col('chain')] || '').trim();
         const store = (p[col('store')] || '').trim();
         const sku = (p[col('sku')] || '').trim();
-        const sold = +(p[col('sold')] || 0);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !chain || !store || !sku) { bad++; return; }
         const k = date + '|' + chain + '|' + store;
         if (!byDateChainStore[k]) byDateChainStore[k] = { date, chain, store, items: [] };
-        byDateChainStore[k].items.push({ sku, sold });
+        if (isStockFmt) {
+          const stock_in_hand = +(p[col('stock_in_hand')] || 0);
+          const expired_returned = +(p[col('expired_returned')] || 0);
+          byDateChainStore[k].items.push({ sku, stock_in_hand, expired_returned, _format: 'stock' });
+        } else {
+          const sold = +(p[col('sold')] || 0);
+          byDateChainStore[k].items.push({ sku, sold, _format: 'sold' });
+        }
       });
       const payloads = Object.values(byDateChainStore);
       if (!payloads.length) { csvStatus.textContent = '⚠ No valid rows found. Check header + date format.'; csvBtn.disabled = false; return; }
@@ -8025,10 +8103,15 @@
       }
       if (unknownAction && errs === payloads.length) {
         // Backend endpoint not live yet — fallback: build a tab-separated block for direct paste into Sales_MT_Store_Reports
-        const header = 'Timestamp\tDate\tUser\tChain\tStore\tSKU\tSold\tSource';
+        const header = 'Timestamp\tDate\tUser\tChain\tStore\tSKU\tStock_In_Hand\tExpired_Returned\tSold\tSource';
         const now = new Date().toISOString();
         const tsvRows = [header];
-        payloads.forEach(p => p.items.forEach(i => tsvRows.push([now, p.date, 'csv-upload', p.chain, p.store, i.sku, i.sold, 'manual'].join('\t'))));
+        payloads.forEach(p => p.items.forEach(i => {
+          const sih = i.stock_in_hand != null ? i.stock_in_hand : '';
+          const er = i.expired_returned != null ? i.expired_returned : '';
+          const sold = i.sold != null ? i.sold : '';
+          tsvRows.push([now, p.date, 'csv-upload', p.chain, p.store, i.sku, sih, er, sold, 'manual'].join('\t'));
+        }));
         const tsv = tsvRows.join('\n');
         // Create a modal with the content and a copy button
         const modal = document.createElement('div');
