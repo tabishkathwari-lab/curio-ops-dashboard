@@ -5026,10 +5026,10 @@
             <h2>🎯 Coverage snapshot · <span style="color:${staleColor};">${upDateStr}</span> <span class="badge ok">Live from Blinkit_Availability</span></h2>
             <p style="font-size:12px; color:#666; margin:-6px 0 12px;">City × SKU breakdown · last synced ${staleLabel} by ${upBy} · ${avail.length.toLocaleString('en-IN')} records${daysAgo > 45 ? ' <span style="color:#991b1b; font-weight:600;">⚠️ Over 45 days old — Faraaz re-upload Blinkit coverage CSV</span>' : (daysAgo > 35 ? ' <span style="color:#92400e;">· monthly refresh due</span>' : '')}<br><span style="color:#166534;">● Per-SKU stock is fresher — see "Blinkit feeder warehouse inventory" below (Oct 13 snapshot)</span></p>
             <div class="kpi-row" style="margin-bottom:14px;">
-              <div class="kpi"><div class="label">SKUs live</div><div class="value">${skusLive} / ${Object.keys(bySku).length}</div><div class="sub">Catalog reach on Blinkit</div></div>
               <div class="kpi"><div class="label">Cities live</div><div class="value">${citiesLive}</div><div class="sub">Distinct cities with ≥1 SKU</div></div>
-              <div class="kpi"><div class="label">Total darkstore slots</div><div class="value">${totalDsSlots.toLocaleString('en-IN')}</div><div class="sub">Sum of SKU × store combinations</div></div>
-              <div class="kpi"><div class="label">Widest reach</div><div class="value" style="font-size:14px;">${widest?.name?.replace('Curio Lifestyle ', '') || '—'}</div><div class="sub">${widest?.cities || 0} cities · ${widest?.darkstores || 0} darkstores</div></div>
+              <div class="kpi"><div class="label">Total darkstores</div><div class="value">${totalDsSlots.toLocaleString('en-IN')}</div><div class="sub">Sum across all cities</div></div>
+              <div class="kpi"><div class="label">Catalog on Blinkit</div><div class="value">15 SKUs</div><div class="sub">Per Faraaz's coverage CSV</div></div>
+              <div class="kpi"><div class="label">Avg DS per city</div><div class="value">${citiesLive ? Math.round(totalDsSlots/citiesLive) : 0}</div><div class="sub">Density</div></div>
             </div>
             <div style="margin-top:8px;">
               <h3 style="font-size:13px; margin:12px 0 6px;">Top cities · by total darkstore density</h3>
@@ -7748,14 +7748,15 @@
             const monthRev = monthDates.reduce((s,d) => s + byDate[d].netSales, 0);
             const monthUnits = monthDates.reduce((s,d) => s + byDate[d].units, 0);
             const monthlyAggAug = (blkMonthly.data||[]).find(m => String(m.Month||'').startsWith(yyyyMm));
-            // Ad spend: sum from raw sheet's Ad_Spend column (attached to first item by entry app), else fall back to monthly aggregate
-            const rawAdSpendMonth = monthDates.reduce((s,d) => s + rows.filter(r => String(r.Date||'').slice(0,10)===d).reduce((x,r) => x + Number(r.Ad_Spend||0), 0), 0);
-            const adSpendMonth = rawAdSpendMonth > 0 ? rawAdSpendMonth : Number(monthlyAggAug?.Ad_Spend||0);
             // Pull metrics from Blinkit_Business_Metrics_Daily if entry app filled them
             const metricsThisMonth = metricsRows.filter(m => String(m.Date||'').slice(0,7) === yyyyMm);
             const metricSum = k => metricsThisMonth.filter(m => m.Metric === k).reduce((s,m) => s + Number(m.Value||0), 0);
             const directAdSalesMonth = metricSum('directAdSales');
             const organicSalesMonth = metricSum('organicSales');
+            // Ad spend: prefer raw sheet's Ad_Spend column, then entry app's totalSpends metric, then monthly aggregate
+            const rawAdSpendMonth = monthDates.reduce((s,d) => s + rows.filter(r => String(r.Date||'').slice(0,10)===d).reduce((x,r) => x + Number(r.Ad_Spend||0), 0), 0);
+            const totalSpendsFromMetrics = metricSum('totalSpends');
+            const adSpendMonth = rawAdSpendMonth > 0 ? rawAdSpendMonth : (totalSpendsFromMetrics > 0 ? totalSpendsFromMetrics : Number(monthlyAggAug?.Ad_Spend||0));
             // Compute ratios
             const tacosMonth = monthRev > 0 && adSpendMonth > 0 ? (adSpendMonth/monthRev*100) : 0;
             const acosMonth = directAdSalesMonth > 0 && adSpendMonth > 0 ? (adSpendMonth/directAdSalesMonth*100) : 0;
