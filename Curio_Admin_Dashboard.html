@@ -7714,6 +7714,7 @@
   const ageOf = d => { if (!d) return 0; const t = new Date(d).getTime(); if (isNaN(t)) return 0; return Math.floor((Date.now() - t) / 86400000); };
 
   let cachedInvoices = null;
+  let cachedMtExtras = null;
   let lastSync = null;
 
   async function loadInvoices(force) {
@@ -7723,6 +7724,19 @@
     cachedInvoices = j && j.data && j.data.invoices || [];
     lastSync = new Date();
     return cachedInvoices;
+  }
+
+  async function loadMtExtras(force) {
+    if (!force && cachedMtExtras) return cachedMtExtras;
+    const safe = async (q) => { try { const r = await fetch(EXEC + '?q=' + q); const j = await r.json(); return j && j.data ? j.data : []; } catch (e) { return []; } };
+    const [mtInvoices, promoterRows, storeReports] = await Promise.all([
+      safe('mt_invoices'),
+      safe('mt_promoter'),
+      safe('mt_store_reports')
+    ]);
+    const toArr = x => Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.values(x) : []);
+    cachedMtExtras = { mtInvoices: toArr(mtInvoices), promoterRows: toArr(promoterRows), storeReports: toArr(storeReports) };
+    return cachedMtExtras;
   }
 
   function aggregate(invoices, whitelist, labelFn) {
@@ -7825,13 +7839,29 @@
         </div>
       </div>
 
-      <div class="card" id="mtSecondarySlot" style="padding-bottom:40px;">
-        <h2>Secondary sales · Store-level offtake</h2>
-        <div style="padding: 14px 16px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 10px; font-size: 13px; color: #78350f; margin-bottom: 20px;">
-          <strong>Per-SKU breakdown pending.</strong> Zoho invoice line-items sync is coded but blocked on a Zoho detail-API URL fix (~15 min dev work). Once resolved, this card will show shipped-per-SKU per store with promoter & office store reports deducted to compute in-hand stock. Primary (above) and promoter reports (Attendance → MT) are already live.
+      <div class="card" id="mtPerStoreSlot" style="padding-bottom:20px;">
+        <h2>Per-store rollup · Billed qty vs secondary sold <span class="badge" id="mtStoreCountBadge">—</span></h2>
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">
+          Source: 143 historical invoices (Oct 2024 → now) parsed from Zoho PDFs + current live invoices. Secondary (consumer offtake) comes from promoter check-outs when a promoter covers the store; otherwise upload below.
         </div>
-        <div style="text-align:center; padding:30px; color:var(--text-secondary); font-size:13px;">
-          Secondary data entry: <a href="#" id="mtGoAttendance" style="color:var(--brand-500);">promoter check-outs</a> or use the <strong>+ Record store report</strong> button above.
+        <div style="overflow:auto; margin:0 -24px;">
+          <table id="mtStoreTable">
+            <thead><tr><th>Store</th><th>Chain</th><th class="num">Invoices</th><th class="num">Qty billed</th><th class="num">Qty sold (secondary)</th><th class="num">In hand</th><th class="num">₹ billed</th><th>Last invoice</th></tr></thead>
+            <tbody id="mtStoreBody"><tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading per-store rollup…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="mtUploadSlot" style="padding-bottom:40px;">
+        <h2>Upload secondary sales (manual) · CSV</h2>
+        <div style="font-size:13px; color:var(--text-secondary); margin-bottom:14px;">
+          For stores without a promoter: drop a CSV with columns <strong>date,chain,store,sku,sold</strong> (sold = units sold to consumer that day). One row per SKU per store per day. Backdated entries are fine. Rows are appended to <code>Sales_MT_Store_Reports</code>.
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input type="file" id="mtCsvInput" accept=".csv" style="padding:8px; border:1px solid var(--border-default, #ddd); border-radius:6px;">
+          <button class="btn" id="mtCsvUploadBtn" disabled>Upload</button>
+          <a href="data:text/csv;charset=utf-8,date%2Cchain%2Cstore%2Csku%2Csold%0A2026-10-14%2CModern%20Bazaar%2CMB%20Kailash%2CKashmir%20Walnuts%2C4%0A2026-10-14%2CModern%20Bazaar%2CMB%20Kailash%2CSIDR%20Honey%2C2" download="mt_secondary_template.csv" style="font-size:12px; color:var(--brand-500);">Download template</a>
+          <span id="mtCsvStatus" style="font-size:12px; color:var(--text-secondary);"></span>
         </div>
       </div>
     `;
@@ -7841,17 +7871,108 @@
       const btn = document.getElementById('mtSyncBtn');
       btn.textContent = '⟳ Syncing…'; btn.disabled = true;
       await loadInvoices(true);
+      await loadMtExtras(true);
       renderMtPage(cachedInvoices);
       renderB2bPage(cachedInvoices);
     });
     document.getElementById('mtStoreReportBtn').addEventListener('click', () => {
-      alert('Store report entry UI coming next build. For now, promoter check-outs flow into Attendance → MT panel.');
+      document.getElementById('mtUploadSlot').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-    const g = document.getElementById('mtGoAttendance');
-    if (g) g.addEventListener('click', (e) => {
-      e.preventDefault();
-      const navAtt = document.querySelector('.nav-item[data-page="attendance"]');
-      if (navAtt) navAtt.click();
+
+    // Per-store table (uses mt_invoices endpoint)
+    (async () => {
+      const extras = await loadMtExtras();
+      const perStore = {};
+      (extras.mtInvoices || []).forEach(inv => {
+        const store = String(inv.Customer_Raw || '').trim();
+        const chain = String(inv.Chain || '').trim();
+        if (!store) return;
+        if (!perStore[store]) perStore[store] = { store, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        const s = perStore[store];
+        s.invoices++;
+        s.billed_qty += (+inv.Total_Qty || 0);
+        s.billed_val += (+inv.Total || 0);
+        const d = String(inv.Date || '').slice(0, 10);
+        if (d > s.last) s.last = d;
+      });
+      // Add secondary from promoter sales if available
+      (extras.promoterRows || []).forEach(r => {
+        const store = String(r.Store || r.store || '').trim();
+        const qty = +(r.Sold || r.sold || r.Units || 0);
+        if (!store || !qty) return;
+        if (!perStore[store]) perStore[store] = { store, chain: String(r.Chain||r.chain||'').trim(), invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[store].sold_qty += qty;
+      });
+      // Add secondary from manual store reports
+      (extras.storeReports || []).forEach(r => {
+        const store = String(r.Store || r.store || '').trim();
+        const qty = +(r.Sold || r.sold || 0);
+        if (!store || !qty) return;
+        if (!perStore[store]) perStore[store] = { store, chain: String(r.Chain||r.chain||'').trim(), invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[store].sold_qty += qty;
+      });
+
+      const stores = Object.values(perStore).sort((a,b) => b.billed_val - a.billed_val);
+      document.getElementById('mtStoreCountBadge').textContent = stores.length + ' stores';
+      const body = document.getElementById('mtStoreBody');
+      body.innerHTML = stores.map(s => {
+        const inHand = Math.max(0, s.billed_qty - s.sold_qty);
+        const sellThrough = s.billed_qty > 0 ? ((s.sold_qty / s.billed_qty) * 100).toFixed(0) : '—';
+        return `
+          <tr>
+            <td style="padding-left:24px;"><strong>${esc(s.store)}</strong></td>
+            <td>${esc(s.chain)}</td>
+            <td class="num">${s.invoices}</td>
+            <td class="num" style="font-weight:600;">${s.billed_qty.toLocaleString('en-IN')}</td>
+            <td class="num" style="color:${s.sold_qty > 0 ? '#059669' : 'var(--text-secondary)'};">${s.sold_qty > 0 ? s.sold_qty.toLocaleString('en-IN') + ' <span style="font-size:10px;color:var(--text-secondary);">(' + sellThrough + '%)</span>' : '<em style="color:var(--text-secondary);">no data</em>'}</td>
+            <td class="num" style="font-weight:600;">${inHand.toLocaleString('en-IN')}</td>
+            <td class="num">${fmt(s.billed_val)}</td>
+            <td>${esc(s.last || '—')}</td>
+          </tr>`;
+      }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-secondary);">No store data loaded.</td></tr>';
+    })();
+
+    // CSV upload wiring
+    const csvInput = document.getElementById('mtCsvInput');
+    const csvBtn = document.getElementById('mtCsvUploadBtn');
+    const csvStatus = document.getElementById('mtCsvStatus');
+    csvInput.addEventListener('change', () => { csvBtn.disabled = !csvInput.files.length; });
+    csvBtn.addEventListener('click', async () => {
+      const file = csvInput.files[0]; if (!file) return;
+      csvBtn.disabled = true; csvStatus.textContent = 'Parsing…';
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      const header = lines.shift().split(',').map(h => h.trim().toLowerCase());
+      const col = n => header.indexOf(n);
+      const byDateChainStore = {};
+      let bad = 0;
+      lines.forEach(ln => {
+        const p = ln.split(',');
+        const date = (p[col('date')] || '').trim();
+        const chain = (p[col('chain')] || '').trim();
+        const store = (p[col('store')] || '').trim();
+        const sku = (p[col('sku')] || '').trim();
+        const sold = +(p[col('sold')] || 0);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !chain || !store || !sku) { bad++; return; }
+        const k = date + '|' + chain + '|' + store;
+        if (!byDateChainStore[k]) byDateChainStore[k] = { date, chain, store, items: [] };
+        byDateChainStore[k].items.push({ sku, sold });
+      });
+      const payloads = Object.values(byDateChainStore);
+      if (!payloads.length) { csvStatus.textContent = '⚠ No valid rows found. Check header + date format.'; csvBtn.disabled = false; return; }
+      csvStatus.textContent = `Uploading ${payloads.length} store-days (${bad > 0 ? bad + ' skipped' : 'all valid'})…`;
+      let done = 0, errs = 0;
+      for (const p of payloads) {
+        try {
+          const r = await fetch(EXEC, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action:'mt_store_report', user:'csv-upload', payload: p }) });
+          const j = await r.json(); if (!j.ok) errs++;
+          done++;
+        } catch(e) { errs++; done++; }
+        csvStatus.textContent = `Uploaded ${done}/${payloads.length}…`;
+      }
+      csvStatus.textContent = `✓ Done. ${payloads.length - errs} store-days saved${errs ? ', ' + errs + ' failed' : ''}. Reload to see in table.`;
+      csvBtn.disabled = false;
+      csvInput.value = '';
     });
   }
 
