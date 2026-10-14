@@ -2891,15 +2891,18 @@
         <div id="mp-note" style="margin-top:10px; padding:10px 12px; background:#eff6ff; border-radius:6px; font-size:11px; color:#1e40af; display:none;"></div>
       </div>
 
-      <!-- ===== SHIPROCKET SHIPMENT STATUS (auto-synced) ===== -->
+      <!-- ===== SHIPROCKET SHIPMENT STATUS (CSV re-sync) ===== -->
       <div class="card" id="ship-status" style="border: 2px solid #7c3aed;">
-        <h2 style="display:flex; align-items:center; gap:10px;">
+        <h2 style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           🚚 Shipment status · Shiprocket
-          <span class="badge" style="background:#dcfce7; color:#166534; border-color:#86efac;">🟢 Auto-syncing every 6 hours</span>
+          <span class="badge ok" id="srkLastSyncBadge">Live from Shipments_Shiprocket_Live</span>
+          <button id="srkUploadBtn" style="margin-left:auto; padding:6px 12px; background:#7c3aed; color:#fff; border:0; border-radius:6px; font-size:12px; cursor:pointer;">⬆ Upload Shiprocket CSV</button>
+          <input type="file" id="srkCsvInput" accept=".csv" style="display:none;">
         </h2>
         <p style="font-size:12px; color:#666; margin:-4px 0 12px;">
-          Live shipment status for every Shopify order pushed through Shiprocket. Delivered% is the true fulfilment rate; RTO% is the biggest hidden cost driver (returns cost you shipping both ways + damaged stock).
+          Live shipment status for every Shopify order shipped via Shiprocket. Delivered% is the true fulfilment rate; RTO% is the biggest hidden cost driver (returns cost you shipping both ways + damaged stock). Re-sync anytime: export <em>All Orders</em> from Shiprocket → upload here (full replace).
         </p>
+        <div id="srkUploadStatus" style="font-size:12px; color:#6b21a8; margin:0 0 10px; display:none;"></div>
         <div id="ss-kpis" class="kpi-row" style="margin-bottom:14px;">
           <div class="kpi"><div class="label">Loading…</div><div class="value" style="color:#999;">—</div></div>
         </div>
@@ -2928,6 +2931,93 @@
         </div>
         <div id="ss-note" style="margin-top:10px; padding:10px 12px; background:#faf5ff; border-radius:6px; font-size:11px; color:#6b21a8; display:none;"></div>
       </div>
+      <script>
+      // === SHIPROCKET CSV UPLOADER === Full replace into Shipments_Shiprocket_Live
+      (function() {
+        const btn = document.getElementById('srkUploadBtn');
+        const input = document.getElementById('srkCsvInput');
+        const status = document.getElementById('srkUploadStatus');
+        if (!btn || !input) return;
+        btn.addEventListener('click', () => input.click());
+        input.addEventListener('change', async e => {
+          const file = e.target.files[0];
+          if (!file) return;
+          status.style.display = 'block';
+          status.textContent = '📄 Reading CSV…';
+          const text = await file.text();
+          // Parse CSV (simple quoted-field aware)
+          const parseCSV = (txt) => {
+            const rows = [];
+            let row = [], field = '', inQ = false;
+            for (let i = 0; i < txt.length; i++) {
+              const c = txt[i], n = txt[i+1];
+              if (inQ) {
+                if (c === '"' && n === '"') { field += '"'; i++; }
+                else if (c === '"') { inQ = false; }
+                else field += c;
+              } else {
+                if (c === '"') inQ = true;
+                else if (c === ',') { row.push(field); field = ''; }
+                else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+                else if (c === '\r') {}
+                else field += c;
+              }
+            }
+            if (field || row.length) { row.push(field); rows.push(row); }
+            return rows;
+          };
+          const rows = parseCSV(text);
+          if (!rows.length) { status.textContent = '❌ Empty CSV'; return; }
+          const headers = rows[0].map(h => h.trim());
+          const h = (name) => headers.indexOf(name);
+          const idx = {
+            OrderID: h('Order ID'), Date: h('Shiprocket Created At'),
+            Channel: h('Channel'), Status: h('Status'),
+            SKU: h('Master SKU'), Product: h('Product Name'), Qty: h('Product Quantity'),
+            Customer: h('Customer Name'), City: h('Address City'), State: h('Address State'), Pincode: h('Address Pincode'),
+            Payment: h('Payment Method'), Order_Total: h('Order Total'), Product_Price: h('Product Price'),
+            Weight: h('Weight (KG)'), Courier: h('Courier Company'), AWB: h('AWB Code'), Zone: h('Zone'),
+            Freight: h('Freight Total Amount'), COD_Payable: h('COD Payble Amount'), COD_Remitted: h('Remitted Amount'),
+            Delivered_Date: h('Order Delivered Date'), RTO_Date: h('RTO Delivered Date'),
+            RTO_Risk: h('RTO Risk'), EDD: h('EDD'), Picked_Up: h('Order Picked Up Date')
+          };
+          const g = (r, k) => (idx[k] >= 0 ? (r[idx[k]] || '') : '').trim();
+          const n = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+          const slice10 = v => (v || '').slice(0, 10);
+          const records = rows.slice(1).filter(r => r[idx.OrderID]).map(r => ({
+            OrderID: g(r, 'OrderID'), Date: slice10(g(r, 'Date')),
+            Channel: g(r, 'Channel'), Status: g(r, 'Status'),
+            SKU: g(r, 'SKU'), Product: g(r, 'Product'), Qty: Math.round(n(g(r, 'Qty'))),
+            Customer: g(r, 'Customer'), City: g(r, 'City'), State: g(r, 'State'), Pincode: g(r, 'Pincode'),
+            Payment: g(r, 'Payment').toLowerCase(),
+            Order_Total: n(g(r, 'Order_Total')), Product_Price: n(g(r, 'Product_Price')),
+            Weight: n(g(r, 'Weight')), Courier: g(r, 'Courier'), AWB: g(r, 'AWB'), Zone: g(r, 'Zone'),
+            Freight: n(g(r, 'Freight')), COD_Payable: n(g(r, 'COD_Payable')), COD_Remitted: n(g(r, 'COD_Remitted')),
+            Delivered_Date: slice10(g(r, 'Delivered_Date')), RTO_Date: slice10(g(r, 'RTO_Date')),
+            RTO_Risk: g(r, 'RTO_Risk'), EDD: slice10(g(r, 'EDD')), Picked_Up: slice10(g(r, 'Picked_Up'))
+          }));
+          status.textContent = `📤 Uploading ${records.length} records to backend…`;
+          const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+          try {
+            const resp = await fetch(EXEC, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'shiprocket_bulk_load', user: 'csv-upload', payload: { records } })
+            });
+            const j = await resp.json();
+            if (j.ok) {
+              status.innerHTML = `✅ Pushed ${records.length} order-lines to backend. Reloading dashboard…`;
+              setTimeout(() => location.reload(), 1500);
+            } else {
+              status.innerHTML = `❌ Backend error: ${j.error || 'unknown'}`;
+            }
+          } catch (ex) {
+            status.innerHTML = `❌ Upload failed: ${ex.message}`;
+          }
+          input.value = '';
+        });
+      })();
+      </script>
 
       <!-- Live KPIs from shopify_monthly endpoint -->
       <div class="kpi-row" id="shopifyLiveKpis">
@@ -6851,7 +6941,7 @@
     if (!tbody) return;
     const res = await CurioAPI.get('shiprocket_live');
     if (!res.ok || !res.data || !res.data.length) {
-      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#999; padding:20px;">Shiprocket data not yet synced.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#999; padding:20px;">Shiprocket data not yet synced. Click <strong>Upload Shiprocket CSV</strong> above to load.</td></tr>';
       return;
     }
     const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -6860,18 +6950,50 @@
       const [y, mo] = String(m).split('-');
       return new Date(Number(y), Number(mo) - 1, 1).toLocaleString('en-IN', { month: 'short', year: 'numeric' });
     };
-    // Sort desc, latest first
-    const rows = res.data.slice().sort((a, b) => String(b.Month).localeCompare(String(a.Month)));
+    // Data is per-order-line; dedup by OrderID (keep status of first row for the order)
+    const orders = {};
+    res.data.forEach(r => {
+      const oid = r.OrderID || r.Order_ID;
+      if (!oid) return;
+      if (!orders[oid]) orders[oid] = r;
+    });
+    const uniq = Object.values(orders);
+    // Aggregate by month from raw orders
+    const byM = {};
+    uniq.forEach(r => {
+      const m = String(r.Date || '').slice(0, 7);
+      if (!m) return;
+      if (!byM[m]) byM[m] = { Month: m, Total_Shipments:0, Delivered:0, In_Transit:0, RTO:0, Cancelled:0, Pending:0,
+        COD_Count:0, Prepaid_Count:0, COD_Delivered:0, COD_RTO:0, Revenue:0, Freight:0 };
+      const s = String(r.Status || '').toUpperCase();
+      const payment = String(r.Payment || '').toLowerCase();
+      byM[m].Total_Shipments++;
+      byM[m].Revenue += Number(r.Order_Total || 0);
+      byM[m].Freight += Number(r.Freight || 0);
+      if (s === 'DELIVERED') byM[m].Delivered++;
+      else if (s.startsWith('IN TRANSIT')) byM[m].In_Transit++;
+      else if (s === 'RTO DELIVERED' || s.startsWith('RTO')) byM[m].RTO++;
+      else if (s === 'CANCELED' || s === 'CANCELLED') byM[m].Cancelled++;
+      else byM[m].Pending++;
+      if (payment === 'cod') {
+        byM[m].COD_Count++;
+        if (s === 'DELIVERED') byM[m].COD_Delivered++;
+        if (s.startsWith('RTO')) byM[m].COD_RTO++;
+      } else {
+        byM[m].Prepaid_Count++;
+      }
+    });
+    const rows = Object.values(byM).sort((a, b) => String(b.Month).localeCompare(String(a.Month)));
     // Lifetime totals
     let tTotal = 0, tDeliv = 0, tRto = 0, tCod = 0, tCodDeliv = 0, tCodRto = 0, tPrepaid = 0;
     rows.forEach(r => {
-      tTotal += Number(r.Total_Shipments || r.Total_Orders || 0);
-      tDeliv += Number(r.Delivered || 0);
-      tRto += Number(r.RTO || 0);
-      tCod += Number(r.COD_Count || 0);
-      tPrepaid += Number(r.Prepaid_Count || 0);
-      tCodDeliv += Number(r.COD_Delivered || 0);
-      tCodRto += Number(r.COD_RTO || 0);
+      tTotal += r.Total_Shipments;
+      tDeliv += r.Delivered;
+      tRto += r.RTO;
+      tCod += r.COD_Count;
+      tPrepaid += r.Prepaid_Count;
+      tCodDeliv += r.COD_Delivered;
+      tCodRto += r.COD_RTO;
     });
     const delivPct = tTotal > 0 ? (tDeliv / tTotal * 100) : 0;
     const rtoPct = tTotal > 0 ? (tRto / tTotal * 100) : 0;

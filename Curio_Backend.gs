@@ -293,6 +293,7 @@ function doPost(e) {
       case 'blinkit_add_city':      result = saveBlinkitAddCity(ts, user, payload); break;
       case 'blinkit_availability_bulk_load': result = saveBlinkitAvailability(ts, user, payload); break;
       case 'blinkit_live_inventory_bulk_load': result = saveBlinkitLiveInventory(ts, user, payload); break;
+      case 'shiprocket_bulk_load':  result = saveShiprocketBulkLoad(ts, user, payload); break;
       case 'mt_store_reports_bulk_load': result = saveMtStoreReportsBulk(ts, user, payload); break;
       case 'sku_add_alias':         result = saveSkuAddAlias(ts, user, payload); break;
       case 'mt_invoices_bulk_load': result = saveMtInvoicesBulkLoad(ts, user, payload); break;
@@ -892,6 +893,35 @@ function saveBlinkitAvailability(ts, user, p) {
 //   unsellable_total, unsellable_near_expiry, unsellable_damaged, unsellable_lost, unsellable_expired,
 //   sales_7day, sales_30day, rev_30day }, ...] }
 // Replaces the entire sheet on each upload (idempotent — the latest snapshot overrides).
+// Shiprocket bulk load — full replace. Each row = one order-line (so one order with 2 SKUs = 2 rows).
+// Payload: { records: [{ OrderID, Date, Channel, Status, SKU, Product, Qty, Customer, City, State, Pincode, Payment, Order_Total, Product_Price, Weight, Courier, AWB, Zone, Freight, COD_Payable, COD_Remitted, Delivered_Date, RTO_Date, RTO_Risk, EDD, Picked_Up }, ...] }
+function saveShiprocketBulkLoad(ts, user, p) {
+  p = p || {};
+  let sh = SS.getSheetByName('Shipments_Shiprocket_Live');
+  if (!sh) {
+    sh = SS.insertSheet('Shipments_Shiprocket_Live');
+    sh.appendRow(['Uploaded_At','Uploaded_By','OrderID','Date','Channel','Status','SKU','Product','Qty',
+      'Customer','City','State','Pincode','Payment','Order_Total','Product_Price','Weight',
+      'Courier','AWB','Zone','Freight','COD_Payable','COD_Remitted','Delivered_Date','RTO_Date','RTO_Risk','EDD','Picked_Up']);
+    sh.setFrozenRows(1);
+  }
+  // Full replace — treat as a snapshot of all Shiprocket orders
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow()-1, sh.getLastColumn()).clearContent();
+  const rows = (p.records || []).map(r => [
+    ts, user,
+    r.OrderID || '', r.Date || '', r.Channel || '', r.Status || '',
+    r.SKU || '', r.Product || '', Number(r.Qty || 0),
+    r.Customer || '', r.City || '', r.State || '', r.Pincode || '',
+    (r.Payment || '').toLowerCase(),
+    Number(r.Order_Total || 0), Number(r.Product_Price || 0), Number(r.Weight || 0),
+    r.Courier || '', r.AWB || '', r.Zone || '',
+    Number(r.Freight || 0), Number(r.COD_Payable || 0), Number(r.COD_Remitted || 0),
+    r.Delivered_Date || '', r.RTO_Date || '', r.RTO_Risk || '', r.EDD || '', r.Picked_Up || ''
+  ]);
+  if (rows.length) sh.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  return { id: 'shiprocket-bulk-' + ts.getTime(), message: 'Shiprocket: ' + rows.length + ' order-lines saved (full replace)' };
+}
+
 function saveBlinkitLiveInventory(ts, user, p) {
   p = p || {};
   const snapshotDate = p.snapshot_date || Utilities.formatDate(ts, 'Asia/Kolkata', 'yyyy-MM-dd');
