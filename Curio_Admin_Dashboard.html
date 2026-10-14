@@ -1528,6 +1528,72 @@
       })();
       </script>
 
+      <!-- ========== BLINKIT PERFORMANCE (sales source + top SKUs) ========== -->
+      <div class="ov-strip">■ BLINKIT PERFORMANCE</div>
+      <div style="display:grid; grid-template-columns:1fr 2fr; gap:0; background:#fff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 10px 10px; margin-bottom:20px; overflow:hidden;">
+        <div style="padding:16px 18px; border-right:1px solid #f1f5f9;">
+          <div class="ov-label">SALES SOURCE</div>
+          <div style="display:flex; align-items:center; gap:16px; margin-top:16px;">
+            <svg id="blkPerfDonut" viewBox="0 0 100 100" width="120" height="120">
+              <circle cx="50" cy="50" r="35" fill="none" stroke="#f1f5f9" stroke-width="14"/>
+            </svg>
+            <div id="blkPerfLegend" style="font-size:11px; color:#64748b;">—</div>
+          </div>
+        </div>
+        <div style="padding:16px 18px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+            <div class="ov-label">BLINKIT TRACKING · ROAS, TACOS, AOV</div>
+            <div style="font-size:11px; color:#94a3b8;" id="blkPerfPeriod">—</div>
+          </div>
+          <table style="width:100%; font-size:12px;">
+            <tbody id="blkPerfTable"><tr><td style="padding:7px 0; color:#94a3b8;">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <script>
+      (async function blinkitPerf() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        try {
+          const r = await fetch(EXEC+'?q=blinkit_monthly').then(r=>r.json()).catch(()=>({data:[]}));
+          const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
+          const rows = data.map(x=>({ m:String(x.Month||'').slice(0,7), total:+x.Total_Sales||0, ad:+x.Direct_Ad_Sales||0, organic:+x.Organic_Sales||0, spend:+x.Ad_Spend||0, roas:+x.ROAS||0, tacos:+x.TACOS_Pct||0, aov:+x.AOV||0, units:+x.Total_Units||0 })).filter(r=>r.m).sort((a,b)=>a.m.localeCompare(b.m));
+          const last12 = rows.slice(-12);
+          if (!last12.length) { document.getElementById('blkPerfTable').innerHTML = '<tr><td style="padding:7px 0; color:#94a3b8;">No data</td></tr>'; return; }
+          const sumAd = last12.reduce((s,r)=>s+r.ad,0);
+          const sumOrg = last12.reduce((s,r)=>s+r.organic,0);
+          const sumTotal = sumAd + sumOrg || 1;
+          const adPct = (sumAd/sumTotal*100);
+          const orgPct = (sumOrg/sumTotal*100);
+          // donut
+          const C = 2*Math.PI*35; // circumference
+          const adLen = (adPct/100) * C;
+          const orgLen = (orgPct/100) * C;
+          document.getElementById('blkPerfDonut').innerHTML =
+            '<circle cx="50" cy="50" r="35" fill="none" stroke="#f1f5f9" stroke-width="14"/>' +
+            '<circle cx="50" cy="50" r="35" fill="none" stroke="#60a5fa" stroke-width="14" stroke-dasharray="'+adLen.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 50 50)"/>' +
+            '<circle cx="50" cy="50" r="35" fill="none" stroke="#2dd4bf" stroke-width="14" stroke-dasharray="'+orgLen.toFixed(1)+' '+C.toFixed(1)+'" stroke-dashoffset="-'+adLen.toFixed(1)+'" transform="rotate(-90 50 50)"/>' +
+            '<text x="50" y="54" text-anchor="middle" font-size="11" font-weight="700" fill="#0f172a">'+fmt(sumTotal)+'</text>';
+          document.getElementById('blkPerfLegend').innerHTML =
+            '<div style="margin-bottom:4px;"><span style="display:inline-block;width:9px;height:9px;background:#60a5fa;border-radius:50%;margin-right:6px;"></span>Paid ads — '+adPct.toFixed(0)+'%</div>' +
+            '<div><span style="display:inline-block;width:9px;height:9px;background:#2dd4bf;border-radius:50%;margin-right:6px;"></span>Organic — '+orgPct.toFixed(0)+'%</div>';
+          document.getElementById('blkPerfPeriod').textContent = 'Last ' + last12.length + ' months';
+          // table — per month breakdown
+          document.getElementById('blkPerfTable').innerHTML = last12.slice().reverse().map(r =>
+            '<tr><td style="padding:6px 0; font-weight:500;">' + r.m + '</td>' +
+            '<td style="text-align:right;">' + fmt(r.total) + '</td>' +
+            '<td style="text-align:right; color:#60a5fa; padding-left:16px;">' + fmt(r.ad) + '</td>' +
+            '<td style="text-align:right; color:#2dd4bf; padding-left:16px;">' + fmt(r.organic) + '</td>' +
+            '<td style="text-align:right; color:#8b5cf6; padding-left:16px;">' + (r.roas ? r.roas.toFixed(2)+'x' : '—') + '</td>' +
+            '<td style="text-align:right; color:#94a3b8; padding-left:16px;">' + (r.tacos ? r.tacos.toFixed(1)+'%' : '—') + '</td></tr>'
+          ).join('');
+          // add header row
+          const head = '<tr style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;"><th style="text-align:left; padding:6px 0;">Month</th><th style="text-align:right;">Total</th><th style="text-align:right; padding-left:16px;">Paid</th><th style="text-align:right; padding-left:16px;">Organic</th><th style="text-align:right; padding-left:16px;">ROAS</th><th style="text-align:right; padding-left:16px;">TACoS</th></tr>';
+          document.getElementById('blkPerfTable').innerHTML = head + document.getElementById('blkPerfTable').innerHTML;
+        } catch(e) { console.error('blinkit perf failed', e); }
+      })();
+      </script>
+
       <!-- LIVE DATA COMPLETENESS CARD -->
       <div id="blinkitDataStatus" style="margin-bottom:14px; padding:14px 16px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:10px; font-size:13px; color:var(--text-secondary);"><strong>Loading current-month status…</strong></div>
 
@@ -2094,6 +2160,80 @@
           <button class="btn">Export</button>
         </div>
       </div>
+
+      <!-- ========== AMAZON PERFORMANCE (sales source + monthly) ========== -->
+      <div class="ov-strip">■ AMAZON PERFORMANCE</div>
+      <div style="display:grid; grid-template-columns:1fr 2fr; gap:0; background:#fff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 10px 10px; margin-bottom:20px; overflow:hidden;">
+        <div style="padding:16px 18px; border-right:1px solid #f1f5f9;">
+          <div class="ov-label">SALES SOURCE</div>
+          <div style="display:flex; align-items:center; gap:16px; margin-top:16px;">
+            <svg id="amzPerfDonut" viewBox="0 0 100 100" width="120" height="120">
+              <circle cx="50" cy="50" r="35" fill="none" stroke="#f1f5f9" stroke-width="14"/>
+            </svg>
+            <div id="amzPerfLegend" style="font-size:11px; color:#64748b;">—</div>
+          </div>
+        </div>
+        <div style="padding:16px 18px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+            <div class="ov-label">AMAZON TRACKING · MONTHLY BREAKDOWN</div>
+            <div style="font-size:11px; color:#94a3b8;" id="amzPerfPeriod">—</div>
+          </div>
+          <table style="width:100%; font-size:12px;">
+            <tbody id="amzPerfTable"><tr><td style="padding:7px 0; color:#94a3b8;">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <script>
+      (async function amazonPerf() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        try {
+          const [amR, adsR] = await Promise.all([
+            fetch(EXEC+'?q=amazon_monthly').then(r=>r.json()).catch(()=>({data:[]})),
+            fetch(EXEC+'?q=amazon_ads_live').then(r=>r.json()).catch(()=>({data:[]}))
+          ]);
+          const amData = Array.isArray(amR.data)?amR.data:Object.values(amR.data||{});
+          const rows = amData.map(x=>({
+            m:String(x.Month||'').slice(0,7),
+            total:+x.Revenue||+x.Total_Sales||+x.OrderedProductSales||0,
+            units:+x.Units||+x.Total_Units||0,
+            orders:+x.Orders||0,
+            ad:+x.Ad_Sales||+x.AdSales||+x.Direct_Ad_Sales||0,
+            spend:+x.Ad_Spend||+x.AdSpend||0,
+            acos:+x.ACOS||+x.ACoS||0
+          })).filter(r=>r.m).sort((a,b)=>a.m.localeCompare(b.m));
+          const last12 = rows.slice(-12);
+          if (!last12.length) { document.getElementById('amzPerfTable').innerHTML = '<tr><td style="padding:7px 0; color:#94a3b8;">No data</td></tr>'; return; }
+          const sumAd = last12.reduce((s,r)=>s+r.ad,0);
+          const sumTotal = last12.reduce((s,r)=>s+r.total,0) || 1;
+          const sumOrg = Math.max(sumTotal - sumAd, 0);
+          const adPct = (sumAd/sumTotal*100);
+          const orgPct = (sumOrg/sumTotal*100);
+          const C = 2*Math.PI*35;
+          const adLen = (adPct/100) * C;
+          const orgLen = (orgPct/100) * C;
+          document.getElementById('amzPerfDonut').innerHTML =
+            '<circle cx="50" cy="50" r="35" fill="none" stroke="#f1f5f9" stroke-width="14"/>' +
+            '<circle cx="50" cy="50" r="35" fill="none" stroke="#f59e0b" stroke-width="14" stroke-dasharray="'+adLen.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 50 50)"/>' +
+            '<circle cx="50" cy="50" r="35" fill="none" stroke="#2dd4bf" stroke-width="14" stroke-dasharray="'+orgLen.toFixed(1)+' '+C.toFixed(1)+'" stroke-dashoffset="-'+adLen.toFixed(1)+'" transform="rotate(-90 50 50)"/>' +
+            '<text x="50" y="54" text-anchor="middle" font-size="11" font-weight="700" fill="#0f172a">'+fmt(sumTotal)+'</text>';
+          document.getElementById('amzPerfLegend').innerHTML =
+            '<div style="margin-bottom:4px;"><span style="display:inline-block;width:9px;height:9px;background:#f59e0b;border-radius:50%;margin-right:6px;"></span>Ad-attributed — '+adPct.toFixed(0)+'%</div>' +
+            '<div><span style="display:inline-block;width:9px;height:9px;background:#2dd4bf;border-radius:50%;margin-right:6px;"></span>Organic — '+orgPct.toFixed(0)+'%</div>';
+          document.getElementById('amzPerfPeriod').textContent = 'Last ' + last12.length + ' months';
+          const head = '<tr style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;"><th style="text-align:left; padding:6px 0;">Month</th><th style="text-align:right;">Sales</th><th style="text-align:right; padding-left:16px;">Units</th><th style="text-align:right; padding-left:16px;">Ad spend</th><th style="text-align:right; padding-left:16px;">Ad sales</th><th style="text-align:right; padding-left:16px;">ACoS</th></tr>';
+          const body = last12.slice().reverse().map(r =>
+            '<tr><td style="padding:6px 0; font-weight:500;">' + r.m + '</td>' +
+            '<td style="text-align:right;">' + fmt(r.total) + '</td>' +
+            '<td style="text-align:right; padding-left:16px;">' + (r.units || '—') + '</td>' +
+            '<td style="text-align:right; color:#f59e0b; padding-left:16px;">' + (r.spend ? fmt(r.spend) : '—') + '</td>' +
+            '<td style="text-align:right; color:#f59e0b; padding-left:16px;">' + (r.ad ? fmt(r.ad) : '—') + '</td>' +
+            '<td style="text-align:right; color:#8b5cf6; padding-left:16px;">' + (r.acos ? r.acos.toFixed(1)+'%' : '—') + '</td></tr>'
+          ).join('');
+          document.getElementById('amzPerfTable').innerHTML = head + body;
+        } catch(e) { console.error('amazon perf failed', e); }
+      })();
+      </script>
 
       <!-- ===== FY27 AMAZON SALES SUMMARY ===== -->
       <div class="card" style="border-left: 4px solid #166534; background:#f0fdf4;">
