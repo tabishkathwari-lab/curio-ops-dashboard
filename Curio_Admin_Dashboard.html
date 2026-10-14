@@ -7853,6 +7853,52 @@
         </div>
       </div>
 
+      <div class="card" id="mtCoverageSlot" style="padding-bottom:20px;">
+        <h2>Store coverage · Per-SKU shipped <span class="badge warn">Sample · 2 of 91 invoices</span></h2>
+        <div style="padding:12px 14px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; font-size:12px; color:#78350f; margin-bottom:16px;">
+          <strong>Sample view — 2 most recent invoices (Jul & Jun 2026).</strong> Full per-SKU-per-store backfill of all 91 MT invoices needs the Zoho detail-fetch fix (~15 min, see Curio_MT_B2B_Handoff.docx). Once Sahil ships that, this table shows every SKU × store × invoice automatically.
+        </div>
+        <div style="overflow:auto; margin:0 -24px;">
+          <table>
+            <thead><tr><th>Store</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line value (₹)</th></tr></thead>
+            <tbody>
+              ${(() => {
+                const sample = [
+                  // Modern Bazaar INV-000566 (Dwarka Sec 21, 2026-07-03)
+                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Himalayan Badri Cow Ghee 500mL',6,7200],
+                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Borage Honey Monofloral 500gm',6,3000],
+                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Walnut 500gm',12,14400],
+                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Qahwa 200gm',6,2600],
+                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Almond 500gm',12,15600],
+                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Ladakh Apricot 500gm',6,6200],
+                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Saffron Mongra 2gm',6,5600],
+                  // Food Square INV-000564 (Ahmedabad, 2026-06-23)
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Almond Oil 100mL',12,7656],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Almond Oil 250mL',12,18560],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Apricot Oil 100mL',12,7954],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Apricot Oil 250mL',12,19886],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Himalayan Chamomile Infusion 60gm',12,4309],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Himalayan Badri Cow Ghee 500mL',12,11931],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Almond 500gm',12,12926],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Qahwa 200gm',12,4309],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Saffron Mongra 1gm',12,4640],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Saffron Mongra 2gm',12,9280],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Walnut 500gm',12,11931],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Ladakh Apricot 500gm',12,10274],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Borage Honey Monofloral 500gm',12,4971],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Mustard Oil 500mL',12,4309],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Sidr Honey Monofloral 500gm',12,9280],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Zafrani Kehwa 250gm',12,4309],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Walnut Oil 100mL',12,7954],
+                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Walnut Oil 250mL',12,19886],
+                ];
+                return sample.map(r => `<tr><td style="padding-left:24px;"><strong>${r[0]}</strong></td><td>${r[1]}</td><td style="font-family:var(--font-mono);font-size:12px;">${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td class="num">${r[5]}</td><td class="num">${fmt(r[6])}</td></tr>`).join('');
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card" id="mtUploadSlot" style="padding-bottom:40px;">
         <h2>Upload secondary sales (manual) · CSV</h2>
         <div style="font-size:13px; color:var(--text-secondary); margin-bottom:14px;">
