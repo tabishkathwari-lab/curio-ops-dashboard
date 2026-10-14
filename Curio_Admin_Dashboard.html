@@ -1489,8 +1489,8 @@
         const spark = (id, series, color) => { const svg = document.getElementById(id); if (!svg || !series.length) return; const vals = series.map(v=>+v||0); const max = Math.max(...vals,1), min = Math.min(...vals,0); const w=200,h=52; const pts = vals.map((v,i)=>{ const x = series.length===1?0:(i/(series.length-1))*w; const y = h - ((v-min)/(max-min||1))*(h-6) - 3; return x+','+y; }); const path = 'M'+pts.join(' L'); const area = path+' L'+w+','+h+' L0,'+h+' Z'; svg.innerHTML = '<path fill="'+color+'20" d="'+area+'" /><path fill="none" stroke="'+color+'" stroke-width="2" d="'+path+'" />'; };
         try {
           const r = await fetch(EXEC+'?q=blinkit_monthly').then(r=>r.json()).catch(()=>({data:[]}));
-          const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
-          const rows = data.map(x=>({ m:String(x.Month||'').slice(0,7), rev:+x.Revenue||+x.NetRevenue||0, units:+x.Units||+x.Qty||0 })).filter(x=>x.m).sort((a,b)=>a.m.localeCompare(b.m));
+          const data = Array.isArray(r.data)?r.data:(r.data&&r.data.rows)||Object.values(r.data||{});
+          const rows = data.map(x=>({ m:String(x.Month||'').slice(0,7), rev:+x.Total_Sales||+x.Net_Sales||+x.Revenue||0, units:+x.Total_Units||+x.Units||+x.Qty||0 })).filter(x=>x.m).sort((a,b)=>a.m.localeCompare(b.m));
           const last12 = rows.slice(-12);
           if (!last12.length) return;
           const cur = last12[last12.length-1], prev = last12[last12.length-2]||{rev:0,units:0};
@@ -3039,7 +3039,7 @@
         const spark = (id, series, color) => { const svg = document.getElementById(id); if (!svg || !series.length) return; const vals = series.map(v=>+v||0); const max = Math.max(...vals,1), min = Math.min(...vals,0); const w=200,h=52; const pts = vals.map((v,i)=>{ const x = series.length===1?0:(i/(series.length-1))*w; const y = h - ((v-min)/(max-min||1))*(h-6) - 3; return x+','+y; }); const path = 'M'+pts.join(' L'); const area = path+' L'+w+','+h+' L0,'+h+' Z'; svg.innerHTML = '<path fill="'+color+'20" d="'+area+'" /><path fill="none" stroke="'+color+'" stroke-width="2" d="'+path+'" />'; };
         try {
           const r = await fetch(EXEC+'?q=zoho_invoices').then(r=>r.json()).catch(()=>({data:[]}));
-          const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
+          const data = Array.isArray(r.data) ? r.data : (r.data && Array.isArray(r.data.invoices) ? r.data.invoices : []);
           const b2b = data.filter(i => B2B_NAMES.some(n => String(i.customer_name||'').toLowerCase() === n.toLowerCase()));
           if (!b2b.length) return;
           const byMonth = {};
@@ -3141,7 +3141,7 @@
         const spark = (id, series, color) => { const svg = document.getElementById(id); if (!svg || !series.length) return; const vals = series.map(v=>+v||0); const max = Math.max(...vals,1), min = Math.min(...vals,0); const w=200,h=52; const pts = vals.map((v,i)=>{ const x = series.length===1?0:(i/(series.length-1))*w; const y = h - ((v-min)/(max-min||1))*(h-6) - 3; return x+','+y; }); const path = 'M'+pts.join(' L'); const area = path+' L'+w+','+h+' L0,'+h+' Z'; svg.innerHTML = '<path fill="'+color+'20" d="'+area+'" /><path fill="none" stroke="'+color+'" stroke-width="2" d="'+path+'" />'; };
         try {
           const r = await fetch(EXEC+'?q=zoho_invoices').then(r=>r.json()).catch(()=>({data:[]}));
-          const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
+          const data = Array.isArray(r.data) ? r.data : (r.data && Array.isArray(r.data.invoices) ? r.data.invoices : []);
           const mt = data.filter(i => MT_NAMES.some(n => String(i.customer_name||'').toLowerCase().indexOf(n.toLowerCase()) === 0));
           if (!mt.length) return;
           const byMonth = {};
