@@ -7697,6 +7697,7 @@
     'NEW MODERN BAZAAR DEPARTMENTAL STORES PRIVATE LIMITED': 'Modern Bazaar',
     'FOOD SQUARE-LANDCRAFT RETAIL PRIVATE LIMITED':          'Food Square',
     'PICK-N-CHOOSE SUPERMARKET BAGAAT':                       'Pick & Choose',
+    'AAP KA BAZAR':                                           'Aapka Bazar',
   };
   const B2B_CUSTOMERS = {
     'Kissansay Agtech Private Limited':          { short: 'Kissansay',       type: 'Distributor' },
@@ -7880,13 +7881,18 @@
     });
 
     // Per-store table (uses mt_invoices endpoint)
+    // Explicit allow-list — Blinkit is excluded (it's quick-commerce, NOT MT)
+    const MT_CHAIN_ALLOW = /^(pick\s*n\s*choose|landcraft\s*retail|new\s*modern\s*bazaar|modern\s*bazaar|aap\s*ka\s*bazar|aapka\s*bazar|food\s*square)$/i;
+    const MT_CHAIN_DENY = /blink|quick\s*commerce|zepto|instamart/i;
     (async () => {
       const extras = await loadMtExtras();
       const perStore = {};
       (extras.mtInvoices || []).forEach(inv => {
         const store = String(inv.Customer_Raw || '').trim();
         const chain = String(inv.Chain || '').trim();
-        if (!store) return;
+        if (!store || !chain) return;
+        if (MT_CHAIN_DENY.test(chain)) return;                 // Hard-block Blinkit + QC
+        if (!MT_CHAIN_ALLOW.test(chain)) return;               // Only known MT chains in
         if (!perStore[store]) perStore[store] = { store, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
         const s = perStore[store];
         s.invoices++;
