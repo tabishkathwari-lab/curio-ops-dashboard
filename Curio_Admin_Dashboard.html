@@ -8947,14 +8947,13 @@
       document.getElementById('mtUploadSlot').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
-    // ===== Populate Primary vs Secondary card (sell-through) =====
-    (async () => {
+    // ===== Populate Primary vs Secondary card (sell-through) — DEFERRED so UI renders first =====
+    setTimeout(async () => {
       try {
-        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
         const extras = await loadMtExtras().catch(()=>({}));
         let totalSec = 0, totalUnits = 0, storesSet = new Set();
-        // Prefer store reports; fall back to promoter rows
-        const rows = (extras.mtStoreReports || extras.promoterRows || []);
+        // Correct key is `storeReports` (loadMtExtras returns {mtInvoices, promoterRows, storeReports})
+        const rows = (extras.storeReports && extras.storeReports.length ? extras.storeReports : extras.promoterRows || []);
         rows.forEach(r => {
           const units = +r.Units || +r.Qty || +r.Sold || +r.Units_Sold || 0;
           const val = +r.Value || +r.Revenue || +r.Sold_Value || 0;
@@ -9061,7 +9060,7 @@
       } catch(e) {
         console.warn('MT primary/secondary populate failed', e);
       }
-    })();
+    }, 50); // 50ms yield so UI paints first
 
     // Per-store table (uses mt_invoices endpoint)
     // Explicit allow-list — Blinkit is excluded (it's quick-commerce, NOT MT)
