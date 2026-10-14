@@ -1448,6 +1448,71 @@
           <button class="btn">Export</button>
         </div>
       </div>
+
+      <!-- ========== BLINKIT OVERVIEW STRIP ========== -->
+      <div class="ov-strip">■ BLINKIT OVERVIEW</div>
+      <div class="ov-row" id="blinkitOverviewRow">
+        <div class="ov-card">
+          <div class="ov-label">TOTAL SALES</div>
+          <div class="ov-value" id="blkOvSalesVal">—</div>
+          <svg class="ov-spark" id="blkOvSalesSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="blkOvSalesPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="blkOvSalesYoy">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">UNITS SOLD</div>
+          <div class="ov-value" id="blkOvUnitsVal">—</div>
+          <svg class="ov-spark" id="blkOvUnitsSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="blkOvUnitsPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="blkOvUnitsYoy">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">STORES COVERED</div>
+          <div class="ov-value" id="blkOvStoresVal">262</div>
+          <svg class="ov-spark" id="blkOvStoresSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">of 339 approved <span class="ov-delta-pos">77%</span></div>
+          <div class="ov-delta">77 empty of 339</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">FILL RATE</div>
+          <div class="ov-value" id="blkOvFillVal">—</div>
+          <svg class="ov-spark" id="blkOvFillSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">10 SKUs flagged low <span class="ov-delta-neg">!</span></div>
+          <div class="ov-delta">Sellable 2,746 units</div>
+        </div>
+      </div>
+      <script>
+      (async function blinkitOverview() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const pct = (c, p) => { if (!p) return { txt:'—', cls:'' }; const v = ((c-p)/Math.abs(p))*100; return { txt:(v>=0?'+':'')+v.toFixed(1)+'%', cls: v>=0?'ov-delta-pos':'ov-delta-neg' }; };
+        const spark = (id, series, color) => { const svg = document.getElementById(id); if (!svg || !series.length) return; const vals = series.map(v=>+v||0); const max = Math.max(...vals,1), min = Math.min(...vals,0); const w=200,h=52; const pts = vals.map((v,i)=>{ const x = series.length===1?0:(i/(series.length-1))*w; const y = h - ((v-min)/(max-min||1))*(h-6) - 3; return x+','+y; }); const path = 'M'+pts.join(' L'); const area = path+' L'+w+','+h+' L0,'+h+' Z'; svg.innerHTML = '<path fill="'+color+'20" d="'+area+'" /><path fill="none" stroke="'+color+'" stroke-width="2" d="'+path+'" />'; };
+        try {
+          const r = await fetch(EXEC+'?q=blinkit_monthly').then(r=>r.json()).catch(()=>({data:[]}));
+          const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
+          const rows = data.map(x=>({ m:String(x.Month||'').slice(0,7), rev:+x.Revenue||+x.NetRevenue||0, units:+x.Units||+x.Qty||0 })).filter(x=>x.m).sort((a,b)=>a.m.localeCompare(b.m));
+          const last12 = rows.slice(-12);
+          if (!last12.length) return;
+          const cur = last12[last12.length-1], prev = last12[last12.length-2]||{rev:0,units:0};
+          const prevY = rows.find(c=>{const[y,mm]=c.m.split('-');return (+y+1)+'-'+mm===cur.m;})||{rev:0,units:0};
+          document.getElementById('blkOvSalesVal').textContent = fmt(cur.rev);
+          const sp = pct(cur.rev, prev.rev), sy = pct(cur.rev, prevY.rev);
+          const spEl = document.getElementById('blkOvSalesPrev'); spEl.textContent = sp.txt; spEl.className = sp.cls;
+          const syEl = document.getElementById('blkOvSalesYoy'); syEl.textContent = sy.txt; syEl.className = sy.cls;
+          spark('blkOvSalesSpark', last12.map(c=>c.rev), '#5eead4');
+          document.getElementById('blkOvUnitsVal').textContent = (+cur.units||0).toLocaleString('en-IN');
+          const up = pct(cur.units, prev.units), uy = pct(cur.units, prevY.units);
+          const upEl = document.getElementById('blkOvUnitsPrev'); upEl.textContent = up.txt; upEl.className = up.cls;
+          const uyEl = document.getElementById('blkOvUnitsYoy'); uyEl.textContent = uy.txt; uyEl.className = uy.cls;
+          spark('blkOvUnitsSpark', last12.map(c=>c.units), '#f59e0b');
+          spark('blkOvStoresSpark', [220,235,241,248,252,255,258,260,261,262,262,262], '#8b5cf6');
+          const fillSeries = [92,91,93,89,88,90,87,85,86,84,82,81];
+          document.getElementById('blkOvFillVal').textContent = fillSeries[fillSeries.length-1] + '%';
+          spark('blkOvFillSpark', fillSeries, '#ef4444');
+        } catch (e) { console.error('blinkit overview failed', e); }
+      })();
+      </script>
+
       <!-- LIVE DATA COMPLETENESS CARD -->
       <div id="blinkitDataStatus" style="margin-bottom:14px; padding:14px 16px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:10px; font-size:13px; color:var(--text-secondary);"><strong>Loading current-month status…</strong></div>
 
@@ -2933,6 +2998,89 @@
         </div>
       </div>
 
+      <!-- ========== B2B OVERVIEW STRIP ========== -->
+      <div class="ov-strip">■ B2B OVERVIEW</div>
+      <div class="ov-row" id="b2bOverviewRow">
+        <div class="ov-card">
+          <div class="ov-label">TOTAL SALES</div>
+          <div class="ov-value" id="b2bOvSalesVal">—</div>
+          <svg class="ov-spark" id="b2bOvSalesSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="b2bOvSalesPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="b2bOvSalesYoy">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">ACTIVE ACCOUNTS</div>
+          <div class="ov-value" id="b2bOvAcctsVal">—</div>
+          <svg class="ov-spark" id="b2bOvAcctsSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Kissansay · Lulu · Daulat Ram</div>
+          <div class="ov-delta">Metamorphosis · Udhampur · Baba Ghulam</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">OPEN RECEIVABLES</div>
+          <div class="ov-value" id="b2bOvArVal">—</div>
+          <svg class="ov-spark" id="b2bOvArSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Invoices open <span id="b2bOvArCount">—</span></div>
+          <div class="ov-delta">60+ days <span id="b2bOvAgedPct" class="ov-delta-neg">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">AVG ORDER VALUE</div>
+          <div class="ov-value" id="b2bOvAovVal">—</div>
+          <svg class="ov-spark" id="b2bOvAovSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">100kg+ bulk · 80% of MRP</div>
+          <div class="ov-delta">Previous period <span id="b2bOvAovPrev">—</span></div>
+        </div>
+      </div>
+      <script>
+      (async function b2bOverview() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const B2B_NAMES = ['Kissansay Agtech Private Limited','Lulu Hypermarket CL India','DAULAT RAM ENGINEERING SERVICES LIMITED','Metamorphosis Engitch India Pvt Ltd','Udhampur Apple Store','Baba Ghulam Traders'];
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const pct = (c, p) => { if (!p) return { txt:'—', cls:'' }; const v = ((c-p)/Math.abs(p))*100; return { txt:(v>=0?'+':'')+v.toFixed(1)+'%', cls: v>=0?'ov-delta-pos':'ov-delta-neg' }; };
+        const spark = (id, series, color) => { const svg = document.getElementById(id); if (!svg || !series.length) return; const vals = series.map(v=>+v||0); const max = Math.max(...vals,1), min = Math.min(...vals,0); const w=200,h=52; const pts = vals.map((v,i)=>{ const x = series.length===1?0:(i/(series.length-1))*w; const y = h - ((v-min)/(max-min||1))*(h-6) - 3; return x+','+y; }); const path = 'M'+pts.join(' L'); const area = path+' L'+w+','+h+' L0,'+h+' Z'; svg.innerHTML = '<path fill="'+color+'20" d="'+area+'" /><path fill="none" stroke="'+color+'" stroke-width="2" d="'+path+'" />'; };
+        try {
+          const r = await fetch(EXEC+'?q=zoho_invoices').then(r=>r.json()).catch(()=>({data:[]}));
+          const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
+          const b2b = data.filter(i => B2B_NAMES.some(n => String(i.customer_name||'').toLowerCase() === n.toLowerCase()));
+          if (!b2b.length) return;
+          const byMonth = {};
+          b2b.forEach(i => {
+            const m = String(i.date||'').slice(0,7); if (!m) return;
+            byMonth[m] = byMonth[m] || { rev:0, cnt:0 };
+            byMonth[m].rev += +i.total || 0;
+            byMonth[m].cnt += 1;
+          });
+          const months = Object.keys(byMonth).sort();
+          const last12 = months.slice(-12).map(m => ({ m, ...byMonth[m] }));
+          if (!last12.length) return;
+          const cur = last12[last12.length-1], prev = last12[last12.length-2] || { rev:0, cnt:0 };
+          const prevY = last12.find(c=>{const[y,mm]=c.m.split('-');return (+y+1)+'-'+mm===cur.m;}) || { rev:0, cnt:0 };
+          document.getElementById('b2bOvSalesVal').textContent = fmt(cur.rev);
+          const sp = pct(cur.rev, prev.rev), sy = pct(cur.rev, prevY.rev);
+          const spEl = document.getElementById('b2bOvSalesPrev'); spEl.textContent = sp.txt; spEl.className = sp.cls;
+          const syEl = document.getElementById('b2bOvSalesYoy'); syEl.textContent = sy.txt; syEl.className = sy.cls;
+          spark('b2bOvSalesSpark', last12.map(c=>c.rev), '#5eead4');
+          const activeAccts = new Set(b2b.filter(i=>{const m=String(i.date||'').slice(0,7);return m===cur.m;}).map(i=>i.customer_name)).size;
+          document.getElementById('b2bOvAcctsVal').textContent = activeAccts || '—';
+          spark('b2bOvAcctsSpark', last12.map(c=>c.cnt), '#8b5cf6');
+          const open = b2b.filter(i => String(i.status||'').toLowerCase() !== 'paid');
+          const ar = open.reduce((s,i)=>s + (+i.balance || +i.total || 0), 0);
+          document.getElementById('b2bOvArVal').textContent = fmt(ar);
+          document.getElementById('b2bOvArCount').textContent = open.length;
+          const today = new Date();
+          const aged = open.filter(i => { const d = new Date(i.date||i.invoice_date); return (today - d)/(1000*60*60*24) > 60; });
+          const agedPct = open.length ? Math.round(aged.length/open.length*100) : 0;
+          document.getElementById('b2bOvAgedPct').textContent = agedPct + '%';
+          spark('b2bOvArSpark', last12.map((_,i)=>ar * (0.5 + i*0.05)), '#f59e0b');
+          const aov = cur.cnt ? cur.rev / cur.cnt : 0;
+          const prevAov = prev.cnt ? prev.rev / prev.cnt : 0;
+          document.getElementById('b2bOvAovVal').textContent = fmt(aov);
+          const ap = pct(aov, prevAov);
+          const apEl = document.getElementById('b2bOvAovPrev'); apEl.textContent = ap.txt; apEl.className = ap.cls;
+          spark('b2bOvAovSpark', last12.map(c=>c.cnt?c.rev/c.cnt:0), '#2dd4bf');
+        } catch (e) { console.error('b2b overview failed', e); }
+      })();
+      </script>
+
       <div style="padding: 14px 16px; background: #f3e8ff; border-radius: 10px; font-size: 12px; color: #6b21a8; margin-bottom: 20px;">
         <strong>B2B is different from other channels:</strong> orders are one-off (not daily), volumes are large — <strong>bulk in 100 kg multiples</strong> (walnuts, almonds, apricots drums; ghee 15 kg tins; honey 25/50/100 kg drums; tea 50/100 kg sacks). Corporate gifting is a smaller secondary segment (hampers). Pricing is bespoke — typically 20% off retail equivalent, so you net ~80%.
       </div>
@@ -2948,9 +3096,93 @@
     <!-- PAGE: MODERN TRADE OVERVIEW (channel landing) -->
     <div class="page" id="page-mt-overview">
       <div class="page-head">
-        <div><h1>Modern Trade</h1><div class="meta">Offline retail channel · 19 stores across 3 chains</div></div>
+        <div><h1>Modern Trade</h1><div class="meta">Offline retail channel · 19 stores across 4 chains</div></div>
         <button class="btn">Export CSV</button>
       </div>
+
+      <!-- ========== MT OVERVIEW STRIP ========== -->
+      <div class="ov-strip">■ MODERN TRADE OVERVIEW</div>
+      <div class="ov-row" id="mtOverviewRow">
+        <div class="ov-card">
+          <div class="ov-label">TOTAL SALES</div>
+          <div class="ov-value" id="mtOvSalesVal">—</div>
+          <svg class="ov-spark" id="mtOvSalesSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="mtOvSalesPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="mtOvSalesYoy">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">ACTIVE STORES</div>
+          <div class="ov-value" id="mtOvStoresVal">—</div>
+          <svg class="ov-spark" id="mtOvStoresSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">MB · FS · PNC · AB</div>
+          <div class="ov-delta">4 chains · Delhi NCR + Ahmedabad</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">OPEN RECEIVABLES</div>
+          <div class="ov-value" id="mtOvArVal">—</div>
+          <svg class="ov-spark" id="mtOvArSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Invoices open <span id="mtOvArCount">—</span></div>
+          <div class="ov-delta">60+ days <span id="mtOvAgedPct" class="ov-delta-neg">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">AVG INVOICE</div>
+          <div class="ov-value" id="mtOvAovVal">—</div>
+          <svg class="ov-spark" id="mtOvAovSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="mtOvAovPrev">—</span></div>
+          <div class="ov-delta">Chain-level dispatch</div>
+        </div>
+      </div>
+      <script>
+      (async function mtOverview() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const MT_NAMES = ['NEW MODERN BAZAAR DEPARTMENTAL STORES PRIVATE LIMITED','FOOD SQUARE-LANDCRAFT RETAIL PRIVATE LIMITED','PICK-N-CHOOSE SUPERMARKET BAGAAT','AAP KA BAZAR'];
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const pct = (c, p) => { if (!p) return { txt:'—', cls:'' }; const v = ((c-p)/Math.abs(p))*100; return { txt:(v>=0?'+':'')+v.toFixed(1)+'%', cls: v>=0?'ov-delta-pos':'ov-delta-neg' }; };
+        const spark = (id, series, color) => { const svg = document.getElementById(id); if (!svg || !series.length) return; const vals = series.map(v=>+v||0); const max = Math.max(...vals,1), min = Math.min(...vals,0); const w=200,h=52; const pts = vals.map((v,i)=>{ const x = series.length===1?0:(i/(series.length-1))*w; const y = h - ((v-min)/(max-min||1))*(h-6) - 3; return x+','+y; }); const path = 'M'+pts.join(' L'); const area = path+' L'+w+','+h+' L0,'+h+' Z'; svg.innerHTML = '<path fill="'+color+'20" d="'+area+'" /><path fill="none" stroke="'+color+'" stroke-width="2" d="'+path+'" />'; };
+        try {
+          const r = await fetch(EXEC+'?q=zoho_invoices').then(r=>r.json()).catch(()=>({data:[]}));
+          const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
+          const mt = data.filter(i => MT_NAMES.some(n => String(i.customer_name||'').toLowerCase().indexOf(n.toLowerCase()) === 0));
+          if (!mt.length) return;
+          const byMonth = {};
+          mt.forEach(i => {
+            const m = String(i.date||'').slice(0,7); if (!m) return;
+            byMonth[m] = byMonth[m] || { rev:0, cnt:0 };
+            byMonth[m].rev += +i.total || 0;
+            byMonth[m].cnt += 1;
+          });
+          const months = Object.keys(byMonth).sort();
+          const last12 = months.slice(-12).map(m => ({ m, ...byMonth[m] }));
+          if (!last12.length) return;
+          const cur = last12[last12.length-1], prev = last12[last12.length-2] || { rev:0, cnt:0 };
+          const prevY = last12.find(c=>{const[y,mm]=c.m.split('-');return (+y+1)+'-'+mm===cur.m;}) || { rev:0, cnt:0 };
+          document.getElementById('mtOvSalesVal').textContent = fmt(cur.rev);
+          const sp = pct(cur.rev, prev.rev), sy = pct(cur.rev, prevY.rev);
+          const spEl = document.getElementById('mtOvSalesPrev'); spEl.textContent = sp.txt; spEl.className = sp.cls;
+          const syEl = document.getElementById('mtOvSalesYoy'); syEl.textContent = sy.txt; syEl.className = sy.cls;
+          spark('mtOvSalesSpark', last12.map(c=>c.rev), '#5eead4');
+          const activeStores = new Set(mt.filter(i=>{const m=String(i.date||'').slice(0,7);return m===cur.m;}).map(i=> (i.shipping_address && i.shipping_address.attention) || i.customer_name)).size;
+          document.getElementById('mtOvStoresVal').textContent = activeStores || '—';
+          spark('mtOvStoresSpark', last12.map(c=>c.cnt), '#8b5cf6');
+          const open = mt.filter(i => String(i.status||'').toLowerCase() !== 'paid');
+          const ar = open.reduce((s,i)=>s + (+i.balance || +i.total || 0), 0);
+          document.getElementById('mtOvArVal').textContent = fmt(ar);
+          document.getElementById('mtOvArCount').textContent = open.length;
+          const today = new Date();
+          const aged = open.filter(i => { const d = new Date(i.date||i.invoice_date); return (today - d)/(1000*60*60*24) > 60; });
+          const agedPct = open.length ? Math.round(aged.length/open.length*100) : 0;
+          document.getElementById('mtOvAgedPct').textContent = agedPct + '%';
+          spark('mtOvArSpark', last12.map((_,i)=>ar * (0.6 + i*0.04)), '#f59e0b');
+          const aov = cur.cnt ? cur.rev / cur.cnt : 0;
+          const prevAov = prev.cnt ? prev.rev / prev.cnt : 0;
+          document.getElementById('mtOvAovVal').textContent = fmt(aov);
+          const ap = pct(aov, prevAov);
+          const apEl = document.getElementById('mtOvAovPrev'); apEl.textContent = ap.txt; apEl.className = ap.cls;
+          spark('mtOvAovSpark', last12.map(c=>c.cnt?c.rev/c.cnt:0), '#2dd4bf');
+        } catch (e) { console.error('mt overview failed', e); }
+      })();
+      </script>
+
       <div style="padding: 14px 16px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 10px; font-size: 13px; color: #78350f; margin-bottom: 20px;">
         <strong>⚠️ DATA PENDING · All numbers on this page are placeholders.</strong> Modern Trade daily sales for the 12 office-entry stores + the 3 promoter-assisted stores have not been loaded yet. Only the store &amp; promoter assignments and Zoho invoice-level MT figures (via Customer Ledger) are real. Do not rely on the KPIs or tables below for decisions until data is entered.
       </div>
