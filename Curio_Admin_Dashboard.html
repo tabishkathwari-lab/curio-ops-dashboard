@@ -1648,6 +1648,78 @@
         </div>
       </div>
 
+      <!-- ========== BLINKIT ADS DEEP DIVE ========== -->
+      <div class="card" id="blkAdsCard" style="border-left: 4px solid #f59e0b;">
+        <h2>📢 Blinkit Ads · Spend · ROAS · TACoS <span class="badge ok" id="blkAdsBadge">Loading…</span></h2>
+        <div class="meta" style="margin-bottom:16px;">Monthly ad performance pulled live from <code>blinkit_monthly</code>. ROAS = Ad Sales ÷ Ad Spend. TACoS = Ad Spend ÷ Total Sales.</div>
+        <div class="kpi-row" id="blkAdsKpis" style="margin-bottom:14px;">
+          <div class="kpi"><div class="label">Ad spend (latest)</div><div class="value" id="blkAdsSpend">—</div><div class="sub" id="blkAdsSpendSub">—</div></div>
+          <div class="kpi"><div class="label">Ad sales (latest)</div><div class="value" id="blkAdsAdSales">—</div><div class="sub" id="blkAdsAdSalesSub">—</div></div>
+          <div class="kpi"><div class="label">Organic sales (latest)</div><div class="value" id="blkAdsOrgSales">—</div><div class="sub" id="blkAdsOrgSalesSub">—</div></div>
+          <div class="kpi"><div class="label">ROAS (latest)</div><div class="value" id="blkAdsRoas">—</div><div class="sub" id="blkAdsRoasSub">—</div></div>
+          <div class="kpi"><div class="label">TACoS (latest)</div><div class="value" id="blkAdsTacos">—</div><div class="sub">Ad spend as % of total</div></div>
+        </div>
+        <div style="margin-top:8px;">
+          <table style="font-size:12px; width:100%;" id="blkAdsTable">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Month</th>
+                <th class="num">Total sales</th>
+                <th class="num">Ad spend</th>
+                <th class="num">Ad sales</th>
+                <th class="num">Organic sales</th>
+                <th class="num">ROAS</th>
+                <th class="num">TACoS</th>
+                <th class="num">AOV</th>
+              </tr>
+            </thead>
+            <tbody id="blkAdsTbody"><tr><td colspan="8" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <script>
+      (async function blinkitAdsCard() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        try {
+          const r = await fetch(EXEC+'?q=blinkit_monthly').then(r=>r.json()).catch(()=>({data:[]}));
+          const rows = (Array.isArray(r.data) ? r.data : Object.values(r.data||{})).filter(x => x.Month).sort((a,b) => String(a.Month).localeCompare(String(b.Month)));
+          if (!rows.length) {
+            document.getElementById('blkAdsBadge').textContent = 'No data';
+            document.getElementById('blkAdsTbody').innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#94a3b8;">No Blinkit ad data in sheet</td></tr>';
+            return;
+          }
+          const latest = rows[rows.length-1];
+          const prev = rows[rows.length-2] || {};
+          const pct = (c,p) => { if (!p) return '—'; const v = ((+c-+p)/Math.abs(+p))*100; return (v>=0?'+':'')+v.toFixed(1)+'%'; };
+          document.getElementById('blkAdsBadge').textContent = 'Live · ' + rows.length + ' months';
+          document.getElementById('blkAdsSpend').textContent = fmt(latest.Ad_Spend);
+          document.getElementById('blkAdsSpendSub').textContent = latest.Month + ' · ' + pct(latest.Ad_Spend, prev.Ad_Spend) + ' vs prev';
+          document.getElementById('blkAdsAdSales').textContent = fmt(latest.Direct_Ad_Sales);
+          document.getElementById('blkAdsAdSalesSub').textContent = pct(latest.Direct_Ad_Sales, prev.Direct_Ad_Sales) + ' vs prev';
+          document.getElementById('blkAdsOrgSales').textContent = fmt(latest.Organic_Sales);
+          document.getElementById('blkAdsOrgSalesSub').textContent = pct(latest.Organic_Sales, prev.Organic_Sales) + ' vs prev';
+          document.getElementById('blkAdsRoas').textContent = (+latest.ROAS || 0).toFixed(2) + 'x';
+          document.getElementById('blkAdsRoasSub').textContent = pct(latest.ROAS, prev.ROAS) + ' vs prev';
+          document.getElementById('blkAdsTacos').textContent = (+latest.TACOS_Pct || 0).toFixed(1) + '%';
+          document.getElementById('blkAdsTbody').innerHTML = rows.slice().reverse().map(x => {
+            const roas = +x.ROAS || 0;
+            const roasColor = roas >= 3 ? '#166534' : roas >= 1.5 ? '#92400e' : '#991b1b';
+            return '<tr>' +
+              '<td style="padding:7px 0;">' + x.Month + '</td>' +
+              '<td class="num">' + fmt(x.Total_Sales) + '</td>' +
+              '<td class="num" style="color:#f59e0b; font-weight:600;">' + fmt(x.Ad_Spend) + '</td>' +
+              '<td class="num" style="color:#60a5fa;">' + fmt(x.Direct_Ad_Sales) + '</td>' +
+              '<td class="num" style="color:#2dd4bf;">' + fmt(x.Organic_Sales) + '</td>' +
+              '<td class="num" style="color:' + roasColor + '; font-weight:700;">' + roas.toFixed(2) + 'x</td>' +
+              '<td class="num">' + (+x.TACOS_Pct || 0).toFixed(1) + '%</td>' +
+              '<td class="num">' + fmt(x.AOV) + '</td>' +
+              '</tr>';
+          }).join('');
+        } catch (e) { console.error('blinkit ads card failed', e); document.getElementById('blkAdsBadge').textContent = 'Error'; }
+      })();
+      </script>
+
       <!-- Unsellable alert -->
       <div class="card" style="border-left: 4px solid var(--danger-500);">
         <h2 style="color: var(--danger-800);">Unsellable stock at Blinkit · needs recovery</h2>
