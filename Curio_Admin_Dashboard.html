@@ -8714,6 +8714,40 @@
         <div class="kpi"><div class="label">Last shipment</div><div class="value" style="font-size:18px;">${esc(lastShipment)}</div><div class="sub">${ageOf(lastShipment)}d ago</div></div>
       </div>
 
+      <!-- ========== PRIMARY vs SECONDARY (like Blinkit) ========== -->
+      <div class="card" id="mtPrimarySecondaryCard" style="padding:0; overflow:hidden; margin-bottom:20px;">
+        <div style="padding:16px 20px 12px; background:linear-gradient(90deg,#f8fafc,#fff); border-bottom:1px solid #e5e7eb;">
+          <div style="font-size:11px; letter-spacing:1.5px; color:#64748b; font-weight:600;">■ PRIMARY vs SECONDARY SALES</div>
+          <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Primary = Curio → MT chains (Zoho invoices) · Secondary = MT chains → end consumer (store reports)</div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0;">
+          <div style="padding:20px 24px; border-right:1px solid #f1f5f9;">
+            <div style="font-size:11px; letter-spacing:1px; color:#64748b; font-weight:600;">PRIMARY (SHIPPED)</div>
+            <div style="font-size:28px; font-weight:700; color:#0f172a; margin-top:8px;">${fmt(totalShipped)}</div>
+            <div style="font-size:12px; color:#64748b; margin-top:6px;">${totalInv} invoices · last 12 mo</div>
+            <div style="font-size:11px; color:#2dd4bf; margin-top:4px; font-weight:600;">● From Zoho</div>
+          </div>
+          <div style="padding:20px 24px; border-right:1px solid #f1f5f9;">
+            <div style="font-size:11px; letter-spacing:1px; color:#64748b; font-weight:600;">SECONDARY (SOLD-THROUGH)</div>
+            <div style="font-size:28px; font-weight:700; color:#0f172a; margin-top:8px;" id="mtSecondaryVal">—</div>
+            <div style="font-size:12px; color:#64748b; margin-top:6px;" id="mtSecondaryMeta">Loading store reports…</div>
+            <div style="font-size:11px; color:#f59e0b; margin-top:4px; font-weight:600;">● From store reports</div>
+          </div>
+          <div style="padding:20px 24px;">
+            <div style="font-size:11px; letter-spacing:1px; color:#64748b; font-weight:600;">SELL-THROUGH %</div>
+            <div style="font-size:28px; font-weight:700; color:#0f172a; margin-top:8px;" id="mtSellThroughVal">—</div>
+            <div style="font-size:12px; color:#64748b; margin-top:6px;" id="mtSellThroughMeta">Secondary ÷ Primary</div>
+            <div style="font-size:11px; color:#8b5cf6; margin-top:4px; font-weight:600;">● Store velocity</div>
+          </div>
+        </div>
+        <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e5e7eb;">
+          <div style="height:24px; background:#f1f5f9; border-radius:12px; overflow:hidden; display:flex; align-items:center; position:relative;">
+            <div id="mtSTBar" style="height:100%; background:linear-gradient(90deg,#2dd4bf,#60a5fa); width:0%; transition:width 0.5s;"></div>
+            <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:11px; font-weight:600; color:#0f172a;" id="mtSTBarLabel">—</div>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Chains · Shipped vs outstanding</h2>
         <table>
@@ -8863,6 +8897,45 @@
     document.getElementById('mtStoreReportBtn').addEventListener('click', () => {
       document.getElementById('mtUploadSlot').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
+
+    // ===== Populate Primary vs Secondary card (sell-through) =====
+    (async () => {
+      try {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const extras = await loadMtExtras().catch(()=>({}));
+        let totalSec = 0, totalUnits = 0, storesSet = new Set();
+        // Prefer store reports; fall back to promoter rows
+        const rows = (extras.mtStoreReports || extras.promoterRows || []);
+        rows.forEach(r => {
+          const units = +r.Units || +r.Qty || +r.Sold || +r.Units_Sold || 0;
+          const val = +r.Value || +r.Revenue || +r.Sold_Value || 0;
+          const store = String(r.Store || r.Store_Name || r.store || '').trim();
+          totalUnits += units;
+          totalSec += val;
+          if (store) storesSet.add(store);
+        });
+        // If still no sales value but we have units, try multiplying by Blinkit-average MRP (~₹900) as rough estimate
+        if (totalSec === 0 && totalUnits > 0) totalSec = totalUnits * 900;
+        const primary = ${totalShipped};
+        const pct = primary > 0 ? (totalSec / primary * 100) : 0;
+        const _fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const secEl = document.getElementById('mtSecondaryVal');
+        const secMetaEl = document.getElementById('mtSecondaryMeta');
+        const stEl = document.getElementById('mtSellThroughVal');
+        const stMetaEl = document.getElementById('mtSellThroughMeta');
+        const barEl = document.getElementById('mtSTBar');
+        const barLblEl = document.getElementById('mtSTBarLabel');
+        if (!secEl) return;
+        secEl.textContent = totalSec > 0 ? _fmt(totalSec) : '₹0';
+        secMetaEl.textContent = (totalUnits > 0 ? totalUnits + ' units · ' : '') + (storesSet.size > 0 ? storesSet.size + ' stores reporting' : 'No reports yet');
+        stEl.textContent = pct > 0 ? pct.toFixed(1) + '%' : '—';
+        stMetaEl.textContent = totalSec > 0 ? _fmt(totalSec) + ' / ' + _fmt(primary) : 'Add store reports to compute';
+        barEl.style.width = Math.min(pct, 100) + '%';
+        barLblEl.textContent = pct > 0 ? pct.toFixed(1) + '% sold through' : 'Awaiting store reports';
+      } catch(e) {
+        console.warn('MT primary/secondary populate failed', e);
+      }
+    })();
 
     // Per-store table (uses mt_invoices endpoint)
     // Explicit allow-list — Blinkit is excluded (it's quick-commerce, NOT MT)
