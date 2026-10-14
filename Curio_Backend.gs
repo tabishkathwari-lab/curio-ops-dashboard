@@ -293,6 +293,7 @@ function doPost(e) {
       case 'blinkit_add_city':      result = saveBlinkitAddCity(ts, user, payload); break;
       case 'blinkit_availability_bulk_load': result = saveBlinkitAvailability(ts, user, payload); break;
       case 'blinkit_live_inventory_bulk_load': result = saveBlinkitLiveInventory(ts, user, payload); break;
+      case 'mt_store_reports_bulk_load': result = saveMtStoreReportsBulk(ts, user, payload); break;
       case 'sku_add_alias':         result = saveSkuAddAlias(ts, user, payload); break;
       case 'mt_invoices_bulk_load': result = saveMtInvoicesBulkLoad(ts, user, payload); break;
       case 'factory_inventory_bulk_load': result = saveFactoryInventorySnapshot(ts, user, payload); break;
@@ -345,6 +346,7 @@ function doGet(e) {
       case 'blinkit_custom_cities':   return respond({ ok: true, data: readSheet('Blinkit_Custom_Cities') });
       case 'blinkit_availability':    return respond({ ok: true, data: readSheet('Blinkit_Availability') });
       case 'blinkit_live_inventory':  return respond({ ok: true, data: readSheet('Blinkit_Live_Inventory') });
+      case 'mt_store_reports':        return respond({ ok: true, data: readSheet('MT_Store_Reports') });
       case 'blinkit_business_metrics_daily': return respond({ ok: true, data: readSheet('Blinkit_Business_Metrics_Daily') });
       // Employee attendance (all non-promoter staff — Check IN / Check OUT with GPS + selfie)
       case 'employee_checkins_today': return respond({ ok: true, data: filterByDate('Log_Employee_Attendance', todayIST()) });
@@ -909,6 +911,27 @@ function saveBlinkitLiveInventory(ts, user, p) {
   ]);
   if (rows.length) sh.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   return { id: 'blinkit-live-inv-' + ts.getTime(), message: 'Blinkit live inventory: ' + rows.length + ' SKUs saved for snapshot ' + snapshotDate };
+}
+
+// Modern Trade store reports — bulk load secondary (store-level) sales per month, store, SKU.
+// Payload: { chain: 'Food Square', records: [{ month, store, sku, units, value }, ...] }
+// Append-only — each upload adds rows. Dashboard groups by chain/store/sku/month.
+function saveMtStoreReportsBulk(ts, user, p) {
+  p = p || {};
+  const chain = p.chain || '';
+  let sh = SS.getSheetByName('MT_Store_Reports');
+  if (!sh) {
+    sh = SS.insertSheet('MT_Store_Reports');
+    sh.appendRow(['Uploaded_At','Uploaded_By','Chain','Month','Store','SKU','Units','Value']);
+    sh.setFrozenRows(1);
+  }
+  const rows = (p.records || []).map(r => [
+    ts, user, chain || r.chain || '',
+    r.month || '', r.store || '', r.sku || '',
+    Number(r.units || 0), Number(r.value || 0)
+  ]);
+  if (rows.length) sh.getRange(sh.getLastRow()+1, 1, rows.length, rows[0].length).setValues(rows);
+  return { id: 'mt-store-reports-' + ts.getTime(), message: 'MT store reports: ' + rows.length + ' rows saved for ' + (chain || 'chain') };
 }
 
 // Modern Trade primary sales — bulk load from parsed Zoho invoice PDFs.
