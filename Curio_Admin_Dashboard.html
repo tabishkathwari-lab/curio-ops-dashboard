@@ -5029,17 +5029,63 @@
           return;
         }
 
-        // ---- FEEDER WAREHOUSE INVENTORY ----
+        // ---- FEEDER WAREHOUSE INVENTORY (live from Blinkit_Live_Inventory snapshot) ----
         if (/feeder warehouse/i.test(title)) {
-          if (feeder.length === 0) {
-            card.innerHTML = `<h2 style="color:#991b1b;">🚨 Blinkit feeder warehouse inventory <span class="badge">Live from Blinkit_Feeder_Inventory</span></h2><div style="padding:24px; color:#999; text-align:center;">No feeder inventory entries yet. Populate the <code>Blinkit_Feeder_Inventory</code> sheet with your warehouse counts.</div>`;
-            return;
-          }
-          const cols = Object.keys(feeder[0]);
-          card.innerHTML = `<h2 style="color:#991b1b;">🚨 Blinkit feeder warehouse inventory <span class="badge ok">Live · ${feeder.length} entries</span></h2>
-            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Live from Blinkit_Feeder_Inventory sheet. OOS items block sales.</p>
-            <table style="font-size:12px;"><thead><tr>${cols.map(c => `<th style="text-align:left;">${c}</th>`).join('')}</tr></thead>
-            <tbody>${feeder.slice(0, 30).map(row => `<tr>${cols.map(c => `<td>${row[c] != null ? String(row[c]) : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+          // Fetch Blinkit_Live_Inventory async + populate the card
+          card.innerHTML = `<h2 style="color:#991b1b;">🚨 Blinkit feeder warehouse inventory <span class="badge">Loading…</span></h2><p style="font-size:12px; color:#999;">Fetching live warehouse + in-transit stock…</p>`;
+          const EXEC_URL = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+          fetch(EXEC_URL + '?q=blinkit_live_inventory').then(r=>r.json()).then(resp => {
+            const rows = Array.isArray(resp.data) ? resp.data : Object.values(resp.data||{});
+            if (!rows.length) {
+              card.innerHTML = `<h2 style="color:#991b1b;">🚨 Blinkit feeder warehouse inventory <span class="badge">Empty</span></h2><div style="padding:24px; color:#999; text-align:center;">No live inventory snapshot. Upload latest Blinkit inventory CSV.</div>`;
+              return;
+            }
+            const sorted = rows.slice().sort((a,b)=>(+b.SOH_Warehouse||0)+(+b.SOH_InBetween||0) - ((+a.SOH_Warehouse||0)+(+a.SOH_InBetween||0)));
+            const totalWH = rows.reduce((s,r)=>s+(+r.SOH_Warehouse||0),0);
+            const totalIT = rows.reduce((s,r)=>s+(+r.SOH_InBetween||0),0);
+            const totalIncoming = rows.reduce((s,r)=>s+(+r.Incoming_Scheduled||0),0);
+            const snapshot = rows[0]?.Snapshot_Date ? String(rows[0].Snapshot_Date).slice(0,10) : '—';
+            const outCount = rows.filter(r => (+r.SOH_Warehouse||0)+(+r.SOH_InBetween||0) === 0).length;
+            card.innerHTML = `
+              <h2 style="color:#991b1b;">🚨 Blinkit feeder warehouse inventory <span class="badge ok">Live · ${rows.length} SKUs</span></h2>
+              <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Snapshot ${snapshot} · Live from Blinkit_Live_Inventory. Zero-stock SKUs are blocked for new Blinkit orders.</p>
+              <div class="kpi-row" style="margin-bottom:14px;">
+                <div class="kpi"><div class="label">Warehouse (ready to ship)</div><div class="value">${totalWH.toLocaleString('en-IN')}</div><div class="sub">units in Blinkit WH</div></div>
+                <div class="kpi"><div class="label">In-transit</div><div class="value">${totalIT.toLocaleString('en-IN')}</div><div class="sub">en route WH → darkstore</div></div>
+                <div class="kpi"><div class="label">Incoming scheduled</div><div class="value">${totalIncoming.toLocaleString('en-IN')}</div><div class="sub">pending dispatch</div></div>
+                <div class="kpi" style="background:${outCount>0?'#fee2e2':'#f0fdf4'};"><div class="label">SKUs with 0 feeder stock</div><div class="value" style="color:${outCount>0?'#991b1b':'#166534'};">${outCount}</div><div class="sub">${outCount>0?'sales blocked':'all SKUs flowing'}</div></div>
+              </div>
+              <div style="max-height:480px; overflow:auto; margin:0 -24px;">
+                <table style="font-size:12px; width:100%;">
+                  <thead><tr>
+                    <th style="text-align:left; padding:8px 12px;">SKU</th>
+                    <th class="num" style="padding:8px 12px;">Warehouse</th>
+                    <th class="num" style="padding:8px 12px;">In-transit</th>
+                    <th class="num" style="padding:8px 12px;">Darkstore</th>
+                    <th class="num" style="padding:8px 12px;">Incoming</th>
+                    <th class="num" style="padding:8px 12px;">30d sales</th>
+                    <th style="padding:8px 12px;">Status</th>
+                  </tr></thead>
+                  <tbody>${sorted.map(r => {
+                    const wh=+r.SOH_Warehouse||0, it=+r.SOH_InBetween||0, feederStock=wh+it;
+                    const name = String(r.Product_Name||'').replace(/^Curio Lifestyle /i,'');
+                    const bgRow = feederStock===0 ? 'background:#fee2e2;' : (feederStock<30 ? 'background:#fef3c7;' : '');
+                    const statusBadge = feederStock===0 ? '<span class="badge danger">OUT</span>' : (feederStock<30 ? '<span class="badge warn">Low</span>' : '<span class="badge ok">OK</span>');
+                    return `<tr style="${bgRow}">
+                      <td style="padding:7px 12px; font-weight:500;">${name}</td>
+                      <td class="num" style="padding:7px 12px; font-weight:600; ${wh===0?'color:#991b1b;':''}">${wh}</td>
+                      <td class="num" style="padding:7px 12px;">${it}</td>
+                      <td class="num" style="padding:7px 12px; color:#64748b;">${+r.SOH_Darkstore||0}</td>
+                      <td class="num" style="padding:7px 12px;">${+r.Incoming_Scheduled||0}</td>
+                      <td class="num" style="padding:7px 12px;">${+r.Sales_30day||0}</td>
+                      <td style="padding:7px 12px;">${statusBadge}</td>
+                    </tr>`;
+                  }).join('')}</tbody>
+                </table>
+              </div>`;
+          }).catch(err => {
+            card.innerHTML = `<h2 style="color:#991b1b;">🚨 Blinkit feeder warehouse inventory</h2><div style="padding:24px; color:#999;">Error loading: ${err.message||err}</div>`;
+          });
           return;
         }
 
@@ -7857,6 +7903,16 @@
     }
     if (cfg.secondarySource === 'bl') {
       RAW.bl.forEach(r => { const d=toIso(r.Date); if(inFy(d)){ const amt=Number(r.Net_Sales||r.Total_Sales||0); sT+=amt; sC++; const m=d.slice(0,7); sByMo[m]=(sByMo[m]||0)+amt; }});
+      // Fallback: if no daily entries, use Blinkit_Live_Inventory 30-day rev as a current-month proxy
+      if (sT === 0 && Array.isArray(RAW.bli) && RAW.bli.length) {
+        const sum30 = RAW.bli.reduce((s,r)=>s+(+r.Rev_30day||0),0);
+        if (sum30 > 0) {
+          sT = sum30; sC = RAW.bli.length;
+          // Attribute to current month label
+          const nowMo = new Date().toISOString().slice(0,7);
+          sByMo[nowMo] = sum30;
+        }
+      }
     } else if (cfg.secondarySource === 'mo') {
       RAW.mo.forEach(r => { const d=toIso(r.Date); if(inFy(d)){ const amt=Number(r.Revenue||0); sT+=amt; sC++; const m=d.slice(0,7); sByMo[m]=(sByMo[m]||0)+amt; }});
     } else if (cfg.secondarySource === 'am') {
@@ -8748,12 +8804,12 @@
         </div>
       </div>
 
-      <!-- ========== SKU-WISE SELL-THROUGH (MT) ========== -->
+      <!-- ========== SKU-WISE SECONDARY SALES (MT) ========== -->
       <div class="card" style="padding:0; overflow:hidden; margin-bottom:20px;">
         <div style="padding:16px 20px 12px; background:linear-gradient(90deg,#f8fafc,#fff); border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:baseline;">
           <div>
-            <div style="font-size:11px; letter-spacing:1.5px; color:#64748b; font-weight:600;">■ SKU-WISE SELL-THROUGH</div>
-            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Primary shipped vs secondary sold-through per SKU</div>
+            <div style="font-size:11px; letter-spacing:1.5px; color:#64748b; font-weight:600;">■ SKU-WISE SECONDARY SALES</div>
+            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Units sold at MT stores (secondary) · from store reports</div>
           </div>
           <div style="font-size:11px; color:#94a3b8;" id="mtSkuPeriod">—</div>
         </div>
@@ -8762,13 +8818,13 @@
             <thead>
               <tr style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #f1f5f9;">
                 <th style="text-align:left; padding:10px 20px;">SKU</th>
-                <th style="text-align:right; padding:10px 10px;">Shipped (units)</th>
                 <th style="text-align:right; padding:10px 10px;">Sold (units)</th>
-                <th style="text-align:left; padding:10px 20px; width:34%;">Sell-through</th>
+                <th style="text-align:left; padding:10px 20px; width:50%;">Volume share</th>
               </tr>
             </thead>
-            <tbody id="mtSkuSellThroughTbody"><tr><td colspan="4" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
+            <tbody id="mtSkuSellThroughTbody"><tr><td colspan="3" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
           </table>
+          <div style="padding:10px 20px 16px; font-size:11px; color:#94a3b8;">⚠ Primary (shipped) per SKU not shown — Zoho invoices are at invoice-level, not line-item level. Pending Sahil fix (handoff doc).</div>
         </div>
       </div>
 
@@ -9012,22 +9068,21 @@
         });
         const skuList = [...new Set([...Object.keys(skuPrimary), ...Object.keys(skuSec)])]
           .map(sku => ({ sku: skuNameMap[sku] || sku, shipped: skuPrimary[sku] || 0, sold: skuSec[sku] || 0, pct: (skuPrimary[sku] > 0 ? (skuSec[sku]||0)/skuPrimary[sku]*100 : 0) }))
-          .filter(x => x.shipped > 0 || x.sold > 0)
-          .sort((a,b) => b.shipped - a.shipped)
+          .filter(x => x.sold > 0)
+          .sort((a,b) => b.sold - a.sold)
           .slice(0, 15);
+        const maxSold = skuList[0]?.sold || 1;
         const skuTbody = document.getElementById('mtSkuSellThroughTbody');
         if (skuTbody) {
           if (!skuList.length) {
-            skuTbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center; color:#94a3b8;">No MT SKU data</td></tr>';
+            skuTbody.innerHTML = '<tr><td colspan="3" style="padding:20px; text-align:center; color:#94a3b8;">No MT SKU data</td></tr>';
           } else {
             skuTbody.innerHTML = skuList.map(x => {
-              const barW = Math.min(x.pct, 100);
-              const barColor = x.pct >= 80 ? '#10b981' : x.pct >= 40 ? '#f59e0b' : '#ef4444';
+              const barW = (x.sold / maxSold * 100).toFixed(1);
               return '<tr style="border-bottom:1px solid #f8fafc;">' +
                 '<td style="padding:9px 20px; font-weight:500;">' + x.sku + '</td>' +
-                '<td style="padding:9px 10px; text-align:right;">' + x.shipped + '</td>' +
                 '<td style="padding:9px 10px; text-align:right; color:#0f172a; font-weight:600;">' + x.sold + '</td>' +
-                '<td style="padding:9px 20px;"><div style="display:flex; align-items:center; gap:8px;"><div style="flex:1; height:16px; background:#f1f5f9; border-radius:8px; overflow:hidden;"><div style="height:100%; width:' + barW + '%; background:' + barColor + ';"></div></div><span style="font-weight:600; min-width:48px; text-align:right;">' + x.pct.toFixed(1) + '%</span></div></td>' +
+                '<td style="padding:9px 20px;"><div style="height:14px; background:#f1f5f9; border-radius:7px; overflow:hidden;"><div style="height:100%; width:' + barW + '%; background:linear-gradient(90deg,#2dd4bf,#60a5fa);"></div></div></td>' +
                 '</tr>';
             }).join('');
           }
