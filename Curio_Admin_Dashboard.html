@@ -436,6 +436,47 @@
 </head>
 <body>
 
+<!-- ============ GLOBAL FETCH CACHE (60s TTL) — speeds up repeat page nav ============ -->
+<script>
+(function() {
+  const EXEC_PREFIX = 'https://script.google.com/macros/s/';
+  const TTL_MS = 60000; // 60-second cache
+  const cache = new Map(); // url -> { ts, promise }
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = function(input, init) {
+    // Only cache GETs to the Apps Script /exec endpoint (never POSTs, never other hosts)
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    const method = (init && init.method ? init.method : 'GET').toUpperCase();
+    if (method !== 'GET' || !url.startsWith(EXEC_PREFIX)) {
+      return nativeFetch(input, init);
+    }
+    const now = Date.now();
+    const hit = cache.get(url);
+    if (hit && (now - hit.ts) < TTL_MS) {
+      // Return a fresh clone of the cached Response so consumers can .json()/.text() again
+      return hit.promise.then(r => r.clone());
+    }
+    const p = nativeFetch(input, init);
+    cache.set(url, { ts: now, promise: p });
+    // Allow next consumer to clone — hold the original in the cache
+    return p.then(r => r.clone());
+  };
+  // Expose a cache clearer for debugging (not used by UI)
+  window.__clearGasCache = () => cache.clear();
+})();
+</script>
+
+<!-- ============ WARM APPS SCRIPT (fires during password-gate typing) ============ -->
+<script>
+(function() {
+  // Pre-warm the 3 heaviest endpoints so cold-start happens in parallel with password entry
+  const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+  ['zoho_invoices', 'blinkit_monthly', 'amazon_monthly'].forEach(q => {
+    try { fetch(EXEC + '?q=' + q).catch(()=>{}); } catch(e) {}
+  });
+})();
+</script>
+
 <!-- ============ PASSWORD GATE (client-side, casual protection) ============ -->
 <div id="__pwGate" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#efefea;color:#0c1731;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:'Quicksand',-apple-system,BlinkMacSystemFont,sans-serif;">
   <form id="__pwForm" style="background:#ffffff;padding:40px 44px;border-radius:14px;box-shadow:0 10px 15px -3px rgba(12,23,49,0.08);width:360px;max-width:90vw;text-align:center;border:1px solid rgba(12,23,49,0.08);">
