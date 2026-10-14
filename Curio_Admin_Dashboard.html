@@ -8748,6 +8748,55 @@
         </div>
       </div>
 
+      <!-- ========== SKU-WISE SELL-THROUGH (MT) ========== -->
+      <div class="card" style="padding:0; overflow:hidden; margin-bottom:20px;">
+        <div style="padding:16px 20px 12px; background:linear-gradient(90deg,#f8fafc,#fff); border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:baseline;">
+          <div>
+            <div style="font-size:11px; letter-spacing:1.5px; color:#64748b; font-weight:600;">■ SKU-WISE SELL-THROUGH</div>
+            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Primary shipped vs secondary sold-through per SKU</div>
+          </div>
+          <div style="font-size:11px; color:#94a3b8;" id="mtSkuPeriod">—</div>
+        </div>
+        <div style="padding:4px 0;">
+          <table style="width:100%; font-size:12px;">
+            <thead>
+              <tr style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #f1f5f9;">
+                <th style="text-align:left; padding:10px 20px;">SKU</th>
+                <th style="text-align:right; padding:10px 10px;">Shipped (units)</th>
+                <th style="text-align:right; padding:10px 10px;">Sold (units)</th>
+                <th style="text-align:left; padding:10px 20px; width:34%;">Sell-through</th>
+              </tr>
+            </thead>
+            <tbody id="mtSkuSellThroughTbody"><tr><td colspan="4" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========== STORE-WISE SECONDARY PERFORMANCE (MT) ========== -->
+      <div class="card" style="padding:0; overflow:hidden; margin-bottom:20px;">
+        <div style="padding:16px 20px 12px; background:linear-gradient(90deg,#f8fafc,#fff); border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:baseline;">
+          <div>
+            <div style="font-size:11px; letter-spacing:1.5px; color:#64748b; font-weight:600;">■ STORE-WISE SECONDARY SALES</div>
+            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Secondary sales per store (what each store sold through to end consumer)</div>
+          </div>
+          <div style="font-size:11px; color:#94a3b8;" id="mtStorePeriod">—</div>
+        </div>
+        <div style="padding:4px 0;">
+          <table style="width:100%; font-size:12px;">
+            <thead>
+              <tr style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #f1f5f9;">
+                <th style="text-align:left; padding:10px 20px;">Store</th>
+                <th style="text-align:left; padding:10px 10px;">Chain</th>
+                <th style="text-align:right; padding:10px 10px;">Units sold</th>
+                <th style="text-align:right; padding:10px 10px;">Value</th>
+                <th style="text-align:left; padding:10px 20px; width:30%;">vs top store</th>
+              </tr>
+            </thead>
+            <tbody id="mtStorePerfTbody"><tr><td colspan="5" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Chains · Shipped vs outstanding</h2>
         <table>
@@ -8932,6 +8981,83 @@
         stMetaEl.textContent = totalSec > 0 ? _fmt(totalSec) + ' / ' + _fmt(primary) : 'Add store reports to compute';
         barEl.style.width = Math.min(pct, 100) + '%';
         barLblEl.textContent = pct > 0 ? pct.toFixed(1) + '% sold through' : 'Awaiting store reports';
+
+        // ===== SKU-wise sell-through =====
+        const MT_CHAIN_ALLOW = /^(pick\s*n\s*choose|landcraft\s*retail|new\s*modern\s*bazaar|modern\s*bazaar|aap\s*ka\s*bazar|aapka\s*bazar|food\s*square)$/i;
+        const MT_CHAIN_DENY = /blink|quick\s*commerce|zepto|instamart/i;
+        const skuPrimary = {}; // shipped qty per SKU
+        (extras.mtInvoices || []).forEach(inv => {
+          const chain = String(inv.Chain || '').trim();
+          if (MT_CHAIN_DENY.test(chain) || !MT_CHAIN_ALLOW.test(chain)) return;
+          const sku = String(inv.SKU || inv.Item || inv.Item_Name || '').trim();
+          if (!sku) return;
+          skuPrimary[sku] = (skuPrimary[sku] || 0) + (+inv.Total_Qty || +inv.Qty || 0);
+        });
+        const skuSec = {};
+        rows.forEach(r => {
+          const sku = String(r.SKU || r.Item || r.Item_Name || r.sku || '').trim();
+          if (!sku) return;
+          const u = +r.Units || +r.Qty || +r.Sold || +r.Units_Sold || 0;
+          skuSec[sku] = (skuSec[sku] || 0) + u;
+        });
+        const skuList = [...new Set([...Object.keys(skuPrimary), ...Object.keys(skuSec)])]
+          .map(sku => ({ sku, shipped: skuPrimary[sku] || 0, sold: skuSec[sku] || 0, pct: (skuPrimary[sku] > 0 ? (skuSec[sku]||0)/skuPrimary[sku]*100 : 0) }))
+          .filter(x => x.shipped > 0 || x.sold > 0)
+          .sort((a,b) => b.shipped - a.shipped)
+          .slice(0, 15);
+        const skuTbody = document.getElementById('mtSkuSellThroughTbody');
+        if (skuTbody) {
+          if (!skuList.length) {
+            skuTbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center; color:#94a3b8;">No MT SKU data</td></tr>';
+          } else {
+            skuTbody.innerHTML = skuList.map(x => {
+              const barW = Math.min(x.pct, 100);
+              const barColor = x.pct >= 80 ? '#10b981' : x.pct >= 40 ? '#f59e0b' : '#ef4444';
+              return '<tr style="border-bottom:1px solid #f8fafc;">' +
+                '<td style="padding:9px 20px; font-weight:500;">' + x.sku + '</td>' +
+                '<td style="padding:9px 10px; text-align:right;">' + x.shipped + '</td>' +
+                '<td style="padding:9px 10px; text-align:right; color:#0f172a; font-weight:600;">' + x.sold + '</td>' +
+                '<td style="padding:9px 20px;"><div style="display:flex; align-items:center; gap:8px;"><div style="flex:1; height:16px; background:#f1f5f9; border-radius:8px; overflow:hidden;"><div style="height:100%; width:' + barW + '%; background:' + barColor + ';"></div></div><span style="font-weight:600; min-width:48px; text-align:right;">' + x.pct.toFixed(1) + '%</span></div></td>' +
+                '</tr>';
+            }).join('');
+          }
+        }
+        const skuPeriod = document.getElementById('mtSkuPeriod');
+        if (skuPeriod) skuPeriod.textContent = skuList.length + ' SKUs tracked';
+
+        // ===== Store-wise secondary =====
+        const storeAgg = {};
+        rows.forEach(r => {
+          const store = String(r.Store || r.Store_Name || r.store || '').trim();
+          const chain = String(r.Chain || r.chain || '').trim();
+          if (!store) return;
+          const u = +r.Units || +r.Qty || +r.Sold || +r.Units_Sold || 0;
+          const v = +r.Value || +r.Revenue || +r.Sold_Value || 0;
+          if (!storeAgg[store]) storeAgg[store] = { store, chain, units:0, value:0 };
+          storeAgg[store].units += u;
+          storeAgg[store].value += v;
+        });
+        let stores = Object.values(storeAgg).sort((a,b) => b.units - a.units);
+        const maxU = stores[0]?.units || 1;
+        const storeTbody = document.getElementById('mtStorePerfTbody');
+        if (storeTbody) {
+          if (!stores.length) {
+            storeTbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#94a3b8;">No store reports yet. Upload stock templates to populate.</td></tr>';
+          } else {
+            storeTbody.innerHTML = stores.map(s => {
+              const barW = (s.units / maxU * 100);
+              return '<tr style="border-bottom:1px solid #f8fafc;">' +
+                '<td style="padding:9px 20px; font-weight:500;">' + s.store + '</td>' +
+                '<td style="padding:9px 10px; color:#64748b;">' + (s.chain || '—') + '</td>' +
+                '<td style="padding:9px 10px; text-align:right; font-weight:600;">' + s.units + '</td>' +
+                '<td style="padding:9px 10px; text-align:right;">' + _fmt(s.value) + '</td>' +
+                '<td style="padding:9px 20px;"><div style="height:14px; background:#f1f5f9; border-radius:7px; overflow:hidden;"><div style="height:100%; width:' + barW + '%; background:linear-gradient(90deg,#2dd4bf,#60a5fa);"></div></div></td>' +
+                '</tr>';
+            }).join('');
+          }
+        }
+        const storePeriod = document.getElementById('mtStorePeriod');
+        if (storePeriod) storePeriod.textContent = stores.length + ' stores reporting';
       } catch(e) {
         console.warn('MT primary/secondary populate failed', e);
       }
