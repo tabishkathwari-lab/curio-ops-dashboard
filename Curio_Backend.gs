@@ -126,61 +126,76 @@ function shiprocketToken_() {
   return j.token;
 }
 
+// Manual-run wrapper so this appears in the Apps Script Run dropdown
+function runFetchShiprocketOrders() { fetchShiprocketShipments(); }
+
+// Pull all Shiprocket orders via the /orders endpoint (which includes product line items).
+// Full replace of Shipments_Shiprocket_Live using the same raw-order schema the CSV uploader writes.
 function fetchShiprocketShipments() {
   const token = shiprocketToken_();
   let sh = SS.getSheetByName('Shipments_Shiprocket_Live');
-  if (!sh) {
-    sh = SS.insertSheet('Shipments_Shiprocket_Live');
-    sh.appendRow(['Synced_At', 'Month', 'Total_Shipments', 'Delivered', 'In_Transit', 'RTO', 'Cancelled', 'Pending', 'COD_Count', 'Prepaid_Count', 'COD_Delivered', 'COD_RTO', 'Delivered_Pct', 'RTO_Pct']);
-    sh.setFrozenRows(1);
-  }
-  const MONTH_MAP = { Jan:'01', Feb:'02', Mar:'03', Apr:'04', May:'05', Jun:'06', Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12' };
-  function parseYm(raw) {
-    // Shiprocket returns "13th Aug 2025 03:54 PM" — need to convert to "YYYY-MM"
-    if (!raw) return null;
-    const m = String(raw).match(/(\d+)(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})/);
-    if (!m) return null;
-    const mon = MONTH_MAP[m[2].slice(0, 3)];
-    return mon ? m[3] + '-' + mon : null;
-  }
-  const monthly = {};
-  let page = 1, totalFetched = 0;
-  while (page <= 30) {
-    const url = 'https://apiv2.shiprocket.in/v1/external/shipments?per_page=100&page=' + page;
+  const HEADERS = ['Uploaded_At','Uploaded_By','OrderID','Date','Channel','Status','SKU','Product','Qty',
+      'Customer','City','State','Pincode','Payment','Order_Total','Product_Price','Weight',
+      'Courier','AWB','Zone','Freight','COD_Payable','COD_Remitted','Delivered_Date','RTO_Date','RTO_Risk','EDD','Picked_Up'];
+  if (!sh) sh = SS.insertSheet('Shipments_Shiprocket_Live');
+  // Pagination through /orders endpoint
+  const ts = new Date();
+  const rows = [];
+  let page = 1, totalFetched = 0, pagesWithData = 0;
+  const slice10 = v => v ? String(v).slice(0, 10) : '';
+  const n = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+  while (page <= 50) {
+    const url = 'https://apiv2.shiprocket.in/v1/external/orders?per_page=100&page=' + page;
     const res = UrlFetchApp.fetch(url, { method: 'get', headers: { 'Authorization': 'Bearer ' + token }, muteHttpExceptions: true });
-    if (res.getResponseCode() !== 200) { Logger.log('Shiprocket shipments page ' + page + ' err: ' + res.getContentText().slice(0, 200)); break; }
-    const data = JSON.parse(res.getContentText()).data || [];
+    if (res.getResponseCode() !== 200) { Logger.log('Shiprocket /orders page ' + page + ' err: ' + res.getContentText().slice(0, 200)); break; }
+    const body = JSON.parse(res.getContentText());
+    const data = body.data || [];
     if (!data.length) break;
-    data.forEach(s => {
-      const ym = parseYm(s.created_at);
-      if (!ym) return;
-      if (!monthly[ym]) monthly[ym] = { total: 0, delivered: 0, transit: 0, rto: 0, cancelled: 0, pending: 0, cod: 0, prepaid: 0, cod_delivered: 0, cod_rto: 0 };
-      const b = monthly[ym];
-      const status = String(s.status || '').toUpperCase();
-      const method = String(s.payment_method || '').toUpperCase();
-      b.total++;
-      if (method === 'COD') b.cod++;
-      else if (method === 'PREPAID') b.prepaid++;
-      if (status === 'DELIVERED') { b.delivered++; if (method === 'COD') b.cod_delivered++; }
-      else if (status.indexOf('RTO') >= 0) { b.rto++; if (method === 'COD') b.cod_rto++; }
-      else if (status.indexOf('CANCEL') >= 0) b.cancelled++;
-      else if (status.indexOf('TRANSIT') >= 0 || status === 'OUT FOR DELIVERY' || status === 'PICKED UP') b.transit++;
-      else b.pending++;
+    data.forEach(o => {
+      const products = o.products && o.products.length ? o.products : [{}];
+      products.forEach(p => {
+        rows.push([
+          ts, 'shiprocket-api',
+          o.channel_order_id || o.id || '',
+          slice10(o.created_at),
+          o.channel_name || '',
+          String(o.status || '').toUpperCase(),
+          p.channel_sku || p.sku || p.master_sku || '',
+          p.name || p.product_name || '',
+          Number(p.quantity || 0),
+          o.customer_name || o.customer_first_name || '',
+          o.customer_city || '',
+          o.customer_state || '',
+          o.customer_pincode || '',
+          String(o.payment_method || '').toLowerCase(),
+          n(o.total || o.order_total),
+          n(p.price || p.selling_price),
+          n(o.weight),
+          o.courier_name || o.courier_company || '',
+          o.awb_code || o.awb || '',
+          o.zone || '',
+          n(o.freight_charges || o.freight_total_amount),
+          n(o.cod_charges || o.cod_payble_amount),
+          n(o.remitted_amount),
+          slice10(o.delivered_date),
+          slice10(o.rto_delivered_date),
+          String(o.rto_risk || '').toLowerCase(),
+          slice10(o.edd || o.estimated_delivery_date),
+          slice10(o.picked_up_date || o.pickup_scheduled_date)
+        ]);
+      });
     });
     totalFetched += data.length;
+    pagesWithData++;
     page++;
     Utilities.sleep(300);
   }
-  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
-  const ts = new Date();
-  const rows = Object.keys(monthly).sort().map(m => {
-    const b = monthly[m];
-    const dpct = b.total > 0 ? (b.delivered / b.total * 100) : 0;
-    const rpct = b.total > 0 ? (b.rto / b.total * 100) : 0;
-    return [ts, m, b.total, b.delivered, b.transit, b.rto, b.cancelled, b.pending, b.cod, b.prepaid, b.cod_delivered, b.cod_rto, dpct, rpct];
-  });
+  // Full replace: clear + rewrite headers + write all rows
+  sh.clear();
+  sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  sh.setFrozenRows(1);
   if (rows.length) sh.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
-  Logger.log('Shiprocket sync: ' + totalFetched + ' shipments -> ' + rows.length + ' months');
+  Logger.log('Shiprocket API sync: ' + totalFetched + ' orders -> ' + rows.length + ' order-lines across ' + pagesWithData + ' pages');
 }
 
 function createAdsMetaLiveTab() {
@@ -898,15 +913,16 @@ function saveBlinkitAvailability(ts, user, p) {
 function saveShiprocketBulkLoad(ts, user, p) {
   p = p || {};
   let sh = SS.getSheetByName('Shipments_Shiprocket_Live');
+  const HEADERS = ['Uploaded_At','Uploaded_By','OrderID','Date','Channel','Status','SKU','Product','Qty',
+      'Customer','City','State','Pincode','Payment','Order_Total','Product_Price','Weight',
+      'Courier','AWB','Zone','Freight','COD_Payable','COD_Remitted','Delivered_Date','RTO_Date','RTO_Risk','EDD','Picked_Up'];
   if (!sh) {
     sh = SS.insertSheet('Shipments_Shiprocket_Live');
-    sh.appendRow(['Uploaded_At','Uploaded_By','OrderID','Date','Channel','Status','SKU','Product','Qty',
-      'Customer','City','State','Pincode','Payment','Order_Total','Product_Price','Weight',
-      'Courier','AWB','Zone','Freight','COD_Payable','COD_Remitted','Delivered_Date','RTO_Date','RTO_Risk','EDD','Picked_Up']);
-    sh.setFrozenRows(1);
   }
-  // Full replace — treat as a snapshot of all Shiprocket orders
-  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow()-1, sh.getLastColumn()).clearContent();
+  // Always full-clear and rewrite headers (handles schema changes from old aggregated layout)
+  sh.clear();
+  sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  sh.setFrozenRows(1);
   const rows = (p.records || []).map(r => [
     ts, user,
     r.OrderID || '', r.Date || '', r.Channel || '', r.Status || '',
