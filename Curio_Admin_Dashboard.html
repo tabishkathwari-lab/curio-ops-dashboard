@@ -544,10 +544,141 @@
       <div class="page-head">
         <div>
           <h1>Dashboard</h1>
-          <div class="meta">Data as of 6 Aug 2026 · UI prototype · Backend not yet wired</div>
+          <div class="meta">Live from Zoho, Shopify, Blinkit, Amazon, Meta Ads & Google Ads</div>
         </div>
         <button class="btn">Export report</button>
       </div>
+
+      <!-- ========== OVERVIEW STRIP ========== -->
+      <style>
+        .ov-strip { background:#2c3e50; color:#fff; padding:8px 16px; border-radius:10px 10px 0 0; font-size:11px; letter-spacing:1.5px; font-weight:600; margin-top:4px; }
+        .ov-row { display:grid; grid-template-columns:repeat(4,1fr); gap:0; background:#fff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 10px 10px; margin-bottom:20px; overflow:hidden; }
+        .ov-card { padding:16px 18px 14px; border-right:1px solid #f1f5f9; }
+        .ov-card:last-child { border-right:none; }
+        .ov-label { font-size:11px; letter-spacing:1.2px; color:#64748b; font-weight:600; }
+        .ov-value { font-size:26px; font-weight:300; color:#0f172a; margin:4px 0 10px; letter-spacing:-0.5px; }
+        .ov-spark { height:52px; margin-bottom:10px; }
+        .ov-delta { font-size:11px; color:#94a3b8; line-height:1.6; }
+        .ov-delta-pos { color:#059669; font-weight:600; }
+        .ov-delta-neg { color:#dc2626; font-weight:600; }
+      </style>
+      <div class="ov-strip">■ OVERVIEW</div>
+      <div class="ov-row" id="homeOverviewRow">
+        <div class="ov-card">
+          <div class="ov-label">TOTAL STORE SALES</div>
+          <div class="ov-value" id="ovSalesVal">—</div>
+          <svg class="ov-spark" id="ovSalesSpark" viewBox="0 0 200 52" preserveAspectRatio="none"><path fill="none" stroke="#5eead4" stroke-width="2" d=""></path></svg>
+          <div class="ov-delta">Previous period <span id="ovSalesPrev" class="ov-delta-pos">—</span></div>
+          <div class="ov-delta">Previous year <span id="ovSalesYoy" class="ov-delta-pos">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">TOTAL ADVERTISING COST</div>
+          <div class="ov-value" id="ovAdsVal">—</div>
+          <svg class="ov-spark" id="ovAdsSpark" viewBox="0 0 200 52" preserveAspectRatio="none"><path fill="none" stroke="#5eead4" stroke-width="2" d=""></path></svg>
+          <div class="ov-delta">Previous period <span id="ovAdsPrev" class="ov-delta-pos">—</span></div>
+          <div class="ov-delta">Previous year <span id="ovAdsYoy" class="ov-delta-pos">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">ORDERS</div>
+          <div class="ov-value" id="ovOrdersVal">—</div>
+          <svg class="ov-spark" id="ovOrdersSpark" viewBox="0 0 200 52" preserveAspectRatio="none"><path fill="none" stroke="#5eead4" stroke-width="2" d=""></path></svg>
+          <div class="ov-delta">Previous period <span id="ovOrdersPrev" class="ov-delta-pos">—</span></div>
+          <div class="ov-delta">Previous year <span id="ovOrdersYoy" class="ov-delta-pos">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">BLENDED ROAS</div>
+          <div class="ov-value" id="ovRoasVal">—</div>
+          <svg class="ov-spark" id="ovRoasSpark" viewBox="0 0 200 52" preserveAspectRatio="none"><path fill="none" stroke="#5eead4" stroke-width="2" d=""></path></svg>
+          <div class="ov-delta">Previous period <span id="ovRoasPrev" class="ov-delta-pos">—</span></div>
+          <div class="ov-delta">Previous year <span id="ovRoasYoy" class="ov-delta-pos">—</span></div>
+        </div>
+      </div>
+
+      <script>
+      (async function homeOverview() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const pct = (cur, prev) => { if (!prev || prev === 0) return { txt:'—', cls:'' }; const p = ((cur - prev) / Math.abs(prev)) * 100; const sign = p >= 0 ? '+' : ''; return { txt: sign + p.toFixed(1) + '%', cls: p >= 0 ? 'ov-delta-pos' : 'ov-delta-neg' }; };
+        const spark = (id, series, color) => {
+          const svg = document.getElementById(id); if (!svg || !series.length) return;
+          const vals = series.map(v => +v || 0);
+          const max = Math.max(...vals, 1), min = Math.min(...vals, 0);
+          const w = 200, h = 52;
+          const pts = vals.map((v, i) => {
+            const x = series.length === 1 ? 0 : (i / (series.length - 1)) * w;
+            const y = h - ((v - min) / (max - min || 1)) * (h - 6) - 3;
+            return x + ',' + y;
+          });
+          const path = 'M' + pts.join(' L');
+          const area = path + ' L' + w + ',' + h + ' L0,' + h + ' Z';
+          svg.innerHTML = '<path fill="' + color + '20" d="' + area + '" /><path fill="none" stroke="' + color + '" stroke-width="2" d="' + path + '" />';
+        };
+        try {
+          const [shM, bkM, amM] = await Promise.all([
+            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json()).catch(e=>({data:[]})),
+            fetch(EXEC + '?q=blinkit_monthly').then(r=>r.json()).catch(e=>({data:[]})),
+            fetch(EXEC + '?q=amazon_monthly').then(r=>r.json()).catch(e=>({data:[]}))
+          ]);
+          const normalize = j => {
+            const d = j && j.data;
+            if (!d) return [];
+            return Array.isArray(d) ? d : Object.values(d);
+          };
+          const sh = normalize(shM).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Revenue || 0, orders: +r.Orders || 0 }));
+          const bk = normalize(bkM).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Revenue || +r.revenue || 0, orders: +r.Orders || +r.orders || 0 }));
+          const am = normalize(amM).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Revenue || +r.OrderedProductSales || +r.revenue || 0, orders: +r.Orders || 0 }));
+          // Merge by month → combined channel totals
+          const monthSet = new Set([...sh, ...bk, ...am].map(r => r.month).filter(Boolean));
+          const months = [...monthSet].sort();
+          const combined = months.map(m => {
+            const s = sh.find(x => x.month === m) || { rev:0, orders:0 };
+            const b = bk.find(x => x.month === m) || { rev:0, orders:0 };
+            const a = am.find(x => x.month === m) || { rev:0, orders:0 };
+            return { month: m, rev: s.rev + b.rev + a.rev, orders: s.orders + b.orders + a.orders };
+          });
+          const last12 = combined.slice(-12);
+          const curIdx = last12.length - 1;
+          const curM = last12[curIdx], prevM = last12[curIdx - 1], prevYM = combined.find(c => { const [y, mm] = c.month.split('-'); return (+y + 1) + '-' + mm === curM.month; }) || { rev:0, orders:0 };
+          // Sales
+          document.getElementById('ovSalesVal').textContent = fmt(curM.rev);
+          const sp = pct(curM.rev, prevM ? prevM.rev : 0), sy = pct(curM.rev, prevYM.rev);
+          const spEl = document.getElementById('ovSalesPrev'); spEl.textContent = sp.txt; spEl.className = sp.cls;
+          const syEl = document.getElementById('ovSalesYoy'); syEl.textContent = sy.txt; syEl.className = sy.cls;
+          spark('ovSalesSpark', last12.map(c => c.rev), '#5eead4');
+          // Orders
+          document.getElementById('ovOrdersVal').textContent = (+curM.orders || 0).toLocaleString('en-IN');
+          const op = pct(curM.orders, prevM ? prevM.orders : 0), oy = pct(curM.orders, prevYM.orders);
+          const opEl = document.getElementById('ovOrdersPrev'); opEl.textContent = op.txt; opEl.className = op.cls;
+          const oyEl = document.getElementById('ovOrdersYoy'); oyEl.textContent = oy.txt; oyEl.className = oy.cls;
+          spark('ovOrdersSpark', last12.map(c => c.orders), '#5eead4');
+          // Ads: pull from Meta + Amazon ads endpoints if available
+          try {
+            const [metaR, amAds] = await Promise.all([
+              fetch(EXEC + '?q=meta_monthly').then(r=>r.json()).catch(e=>({data:[]})),
+              fetch(EXEC + '?q=amazon_ads_live').then(r=>r.json()).catch(e=>({data:[]}))
+            ]);
+            const metaMo = normalize(metaR).map(r => ({ month: String(r.Month || '').slice(0,7), spend: +r.Spend || +r.spend || 0 }));
+            const adsLast12 = last12.map(c => {
+              const m = metaMo.find(x => x.month === c.month);
+              return m ? m.spend : 0;
+            });
+            const curA = adsLast12[curIdx] || 0, prevA = adsLast12[curIdx - 1] || 0;
+            document.getElementById('ovAdsVal').textContent = fmt(curA);
+            const ap = pct(curA, prevA), ay = pct(curA, 0);
+            const apEl = document.getElementById('ovAdsPrev'); apEl.textContent = ap.txt; apEl.className = ap.cls;
+            spark('ovAdsSpark', adsLast12, '#f59e0b');
+            // ROAS = Sales / Ad spend
+            const roas = curA > 0 ? curM.rev / curA : 0;
+            document.getElementById('ovRoasVal').textContent = roas > 0 ? roas.toFixed(1) + 'x' : '—';
+            const roasSeries = last12.map((c, i) => adsLast12[i] > 0 ? c.rev / adsLast12[i] : 0);
+            spark('ovRoasSpark', roasSeries, '#8b5cf6');
+            const prevRoas = prevA > 0 ? prevM.rev / prevA : 0;
+            const rp = pct(roas, prevRoas);
+            const rpEl = document.getElementById('ovRoasPrev'); rpEl.textContent = rp.txt; rpEl.className = rp.cls;
+          } catch (e) { console.warn('ads overview failed', e); }
+        } catch (e) { console.error('home overview failed', e); }
+      })();
+      </script>
 
       <!-- Today's operations pulse — kept small, not the main event -->
       <div class="kpi-row" style="grid-template-columns:repeat(5,1fr);">
@@ -2239,6 +2370,103 @@
           <button class="btn" style="background: #5E8E3E;">Export</button>
         </div>
       </div>
+
+      <!-- ========== SHOPIFY OVERVIEW STRIP ========== -->
+      <div class="ov-strip">■ SHOPIFY OVERVIEW</div>
+      <div class="ov-row" id="shopifyOverviewRow">
+        <div class="ov-card">
+          <div class="ov-label">TOTAL STORE SALES</div>
+          <div class="ov-value" id="shOvSalesVal">—</div>
+          <svg class="ov-spark" id="shOvSalesSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="shOvSalesPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="shOvSalesYoy">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">TOTAL ADVERTISING COST</div>
+          <div class="ov-value" id="shOvAdsVal">—</div>
+          <svg class="ov-spark" id="shOvAdsSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="shOvAdsPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="shOvAdsYoy">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">ORDERS</div>
+          <div class="ov-value" id="shOvOrdersVal">—</div>
+          <svg class="ov-spark" id="shOvOrdersSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="shOvOrdersPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="shOvOrdersYoy">—</span></div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">ROAS</div>
+          <div class="ov-value" id="shOvRoasVal">—</div>
+          <svg class="ov-spark" id="shOvRoasSpark" viewBox="0 0 200 52" preserveAspectRatio="none"></svg>
+          <div class="ov-delta">Previous period <span id="shOvRoasPrev">—</span></div>
+          <div class="ov-delta">Previous year <span id="shOvRoasYoy">—</span></div>
+        </div>
+      </div>
+
+      <script>
+      (async function shopifyOverview() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const pct = (cur, prev) => { if (!prev || prev === 0) return { txt:'—', cls:'' }; const p = ((cur - prev) / Math.abs(prev)) * 100; const sign = p >= 0 ? '+' : ''; return { txt: sign + p.toFixed(1) + '%', cls: p >= 0 ? 'ov-delta-pos' : 'ov-delta-neg' }; };
+        const spark = (id, series, color) => {
+          const svg = document.getElementById(id); if (!svg || !series.length) return;
+          const vals = series.map(v => +v || 0);
+          const max = Math.max(...vals, 1), min = Math.min(...vals, 0);
+          const w = 200, h = 52;
+          const pts = vals.map((v, i) => {
+            const x = series.length === 1 ? 0 : (i / (series.length - 1)) * w;
+            const y = h - ((v - min) / (max - min || 1)) * (h - 6) - 3;
+            return x + ',' + y;
+          });
+          const path = 'M' + pts.join(' L');
+          const area = path + ' L' + w + ',' + h + ' L0,' + h + ' Z';
+          svg.innerHTML = '<path fill="' + color + '20" d="' + area + '" /><path fill="none" stroke="' + color + '" stroke-width="2" d="' + path + '" />';
+        };
+        try {
+          const [shR, metaR] = await Promise.all([
+            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json()).catch(e=>({data:[]})),
+            fetch(EXEC + '?q=meta_monthly').then(r=>r.json()).catch(e=>({data:[]}))
+          ]);
+          const normalize = j => Array.isArray(j && j.data) ? j.data : (j && j.data ? Object.values(j.data) : []);
+          const sh = normalize(shR).map(r => ({ month: String(r.Month || '').slice(0,7), rev: +r.Revenue || 0, orders: +r.Orders || 0 })).filter(r => r.month);
+          sh.sort((a,b) => a.month.localeCompare(b.month));
+          const metaMo = normalize(metaR).map(r => ({ month: String(r.Month || '').slice(0,7), spend: +r.Spend || +r.spend || 0 }));
+          const last12 = sh.slice(-12);
+          const curIdx = last12.length - 1;
+          if (curIdx < 0) return;
+          const curM = last12[curIdx], prevM = last12[curIdx - 1] || { rev:0, orders:0 };
+          const prevYM = sh.find(c => { const [y, mm] = c.month.split('-'); return (+y + 1) + '-' + mm === curM.month; }) || { rev:0, orders:0 };
+          // Sales
+          document.getElementById('shOvSalesVal').textContent = fmt(curM.rev);
+          const sp = pct(curM.rev, prevM.rev), sy = pct(curM.rev, prevYM.rev);
+          const spEl = document.getElementById('shOvSalesPrev'); spEl.textContent = sp.txt; spEl.className = sp.cls;
+          const syEl = document.getElementById('shOvSalesYoy'); syEl.textContent = sy.txt; syEl.className = sy.cls;
+          spark('shOvSalesSpark', last12.map(c => c.rev), '#5eead4');
+          // Orders
+          document.getElementById('shOvOrdersVal').textContent = (+curM.orders || 0).toLocaleString('en-IN');
+          const op = pct(curM.orders, prevM.orders), oy = pct(curM.orders, prevYM.orders);
+          const opEl = document.getElementById('shOvOrdersPrev'); opEl.textContent = op.txt; opEl.className = op.cls;
+          const oyEl = document.getElementById('shOvOrdersYoy'); oyEl.textContent = oy.txt; oyEl.className = oy.cls;
+          spark('shOvOrdersSpark', last12.map(c => c.orders), '#5eead4');
+          // Ads
+          const adsLast12 = last12.map(c => { const m = metaMo.find(x => x.month === c.month); return m ? m.spend : 0; });
+          const curA = adsLast12[curIdx] || 0, prevA = adsLast12[curIdx - 1] || 0;
+          document.getElementById('shOvAdsVal').textContent = fmt(curA);
+          const ap = pct(curA, prevA);
+          const apEl = document.getElementById('shOvAdsPrev'); apEl.textContent = ap.txt; apEl.className = ap.cls;
+          spark('shOvAdsSpark', adsLast12, '#f59e0b');
+          // ROAS
+          const roas = curA > 0 ? curM.rev / curA : 0;
+          document.getElementById('shOvRoasVal').textContent = roas > 0 ? roas.toFixed(2) + 'x' : '—';
+          const roasSeries = last12.map((c, i) => adsLast12[i] > 0 ? c.rev / adsLast12[i] : 0);
+          spark('shOvRoasSpark', roasSeries, '#8b5cf6');
+          const prevRoas = prevA > 0 ? prevM.rev / prevA : 0;
+          const rp = pct(roas, prevRoas);
+          const rpEl = document.getElementById('shOvRoasPrev'); rpEl.textContent = rp.txt; rpEl.className = rp.cls;
+        } catch (e) { console.error('shopify overview failed', e); }
+      })();
+      </script>
 
       <!-- ===== SHOPIFY DAILY SALES (last 50 orders live from Shopify Admin API) ===== -->
       <div class="card" id="shopifyDailyCard" style="margin-bottom:20px;">
