@@ -7967,16 +7967,46 @@
       const payloads = Object.values(byDateChainStore);
       if (!payloads.length) { csvStatus.textContent = '⚠ No valid rows found. Check header + date format.'; csvBtn.disabled = false; return; }
       csvStatus.textContent = `Uploading ${payloads.length} store-days (${bad > 0 ? bad + ' skipped' : 'all valid'})…`;
-      let done = 0, errs = 0;
+      let done = 0, errs = 0, unknownAction = false;
       for (const p of payloads) {
         try {
           const r = await fetch(EXEC, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action:'mt_store_report', user:'csv-upload', payload: p }) });
-          const j = await r.json(); if (!j.ok) errs++;
+          const j = await r.json();
+          if (!j.ok) { errs++; if (j.error && /Unknown action/.test(j.error)) unknownAction = true; }
           done++;
         } catch(e) { errs++; done++; }
         csvStatus.textContent = `Uploaded ${done}/${payloads.length}…`;
       }
-      csvStatus.textContent = `✓ Done. ${payloads.length - errs} store-days saved${errs ? ', ' + errs + ' failed' : ''}. Reload to see in table.`;
+      if (unknownAction && errs === payloads.length) {
+        // Backend endpoint not live yet — fallback: build a tab-separated block for direct paste into Sales_MT_Store_Reports
+        const header = 'Timestamp\tDate\tUser\tChain\tStore\tSKU\tSold\tSource';
+        const now = new Date().toISOString();
+        const tsvRows = [header];
+        payloads.forEach(p => p.items.forEach(i => tsvRows.push([now, p.date, 'csv-upload', p.chain, p.store, i.sku, i.sold, 'manual'].join('\t'))));
+        const tsv = tsvRows.join('\n');
+        // Create a modal with the content and a copy button
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; display:flex; align-items:center; justify-content:center;';
+        modal.innerHTML = `
+          <div style="background:#fff; border-radius:12px; padding:24px; max-width:900px; width:92%; max-height:88vh; overflow:auto;">
+            <h3 style="margin:0 0 10px;">Backend action not live — manual paste fallback</h3>
+            <p style="font-size:13px; color:#666; margin:0 0 14px;">The <code>mt_store_report</code> action hasn't been deployed to Apps Script yet. Copy the rows below and paste into the <strong>Sales_MT_Store_Reports</strong> tab of your Google Sheet (starting at row 2). Columns match the sheet headers exactly.</p>
+            <textarea readonly style="width:100%; height:360px; font-family:monospace; font-size:12px; padding:10px; border:1px solid #ccc; border-radius:6px;">${tsv}</textarea>
+            <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end;">
+              <button id="mtCopyBtn" class="btn">Copy to clipboard</button>
+              <button id="mtCloseBtn" class="btn ghost">Close</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+        modal.querySelector('#mtCopyBtn').addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(tsv); modal.querySelector('#mtCopyBtn').textContent = '✓ Copied'; } catch(e) { alert('Copy failed, select-all + copy manually.'); }
+        });
+        modal.querySelector('#mtCloseBtn').addEventListener('click', () => modal.remove());
+        csvStatus.textContent = `⚠ Backend endpoint not live — paste fallback opened. Sahil needs to deploy mt_store_report action (see MT_B2B_Patch.gs).`;
+      } else {
+        csvStatus.textContent = `✓ Done. ${payloads.length - errs} store-days saved${errs ? ', ' + errs + ' failed' : ''}. Reload to see in table.`;
+      }
       csvBtn.disabled = false;
       csvInput.value = '';
     });
