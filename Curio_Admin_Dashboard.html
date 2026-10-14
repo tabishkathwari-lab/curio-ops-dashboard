@@ -638,9 +638,11 @@
             if (!d) return [];
             return Array.isArray(d) ? d : Object.values(d);
           };
-          const sh = normalize(shM).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Revenue || 0, orders: +r.Orders || 0 }));
-          const bk = normalize(bkM).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Total_Sales || +r.Net_Sales || +r.Revenue || +r.revenue || 0, orders: +r.Total_Units || +r.Units || +r.Orders || +r.orders || 0 }));
-          const am = normalize(amM).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Revenue || +r.Total_Sales || +r.OrderedProductSales || +r.revenue || 0, orders: +r.Orders || +r.Units || +r.Total_Units || 0 }));
+          // Skip partial-month rows (anything with "(" like "2026-08 (partial)" or "2026-08 (4d)")
+          const isPartial = raw => /\(/.test(String(raw||''));
+          const sh = normalize(shM).filter(r => !isPartial(r.Month||r.month)).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Revenue || 0, orders: +r.Orders || 0 }));
+          const bk = normalize(bkM).filter(r => !isPartial(r.Month||r.month)).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Total_Sales || +r.Net_Sales || +r.Revenue || +r.revenue || 0, orders: +r.Total_Units || +r.Units || +r.Orders || +r.orders || 0 }));
+          const am = normalize(amM).filter(r => !isPartial(r.Month||r.month)).map(r => ({ month: String(r.Month || r.month || '').slice(0, 7), rev: +r.Revenue || +r.Total_Sales || +r.OrderedProductSales || +r.revenue || 0, orders: +r.Orders || +r.Units || +r.Total_Units || 0 }));
           // Merge by month → combined channel totals (Shopify + Blinkit + Amazon + MT + B2B)
           const monthSet = new Set([...sh, ...bk, ...am].map(r => r.month).filter(Boolean).concat(Object.keys(zByMonth)));
           const months = [...monthSet].sort();
@@ -652,10 +654,16 @@
             return { month: m, rev: s.rev + b.rev + a.rev + z, orders: s.orders + b.orders + a.orders };
           });
           const last12 = combined.slice(-12);
-          const curIdx = last12.length - 1;
+          // Pick the latest month with cross-channel data (at least 2 channels reporting) — avoids partial Blinkit-only reads
+          const channelCount = m => (sh.find(x=>x.month===m)?1:0) + (bk.find(x=>x.month===m)?1:0) + (am.find(x=>x.month===m)?1:0) + ((zByMonth[m]||0)>0?1:0);
+          let curIdx = last12.length - 1;
+          while (curIdx >= 0 && channelCount(last12[curIdx].month) < 2) curIdx--;
+          if (curIdx < 0) curIdx = last12.length - 1;
           const curM = last12[curIdx], prevM = last12[curIdx - 1], prevYM = combined.find(c => { const [y, mm] = c.month.split('-'); return (+y + 1) + '-' + mm === curM.month; }) || { rev:0, orders:0 };
-          // Sales
+          // Sales — label with the month we're actually reporting
           document.getElementById('ovSalesVal').textContent = fmt(curM.rev);
+          const salesLabelEl = document.querySelectorAll('#homeOverviewRow .ov-label')[0];
+          if (salesLabelEl) salesLabelEl.textContent = 'TOTAL STORE SALES · ' + curM.month;
           const sp = pct(curM.rev, prevM ? prevM.rev : 0), sy = pct(curM.rev, prevYM.rev);
           const spEl = document.getElementById('ovSalesPrev'); spEl.textContent = sp.txt; spEl.className = sp.cls;
           const syEl = document.getElementById('ovSalesYoy'); syEl.textContent = sy.txt; syEl.className = sy.cls;
