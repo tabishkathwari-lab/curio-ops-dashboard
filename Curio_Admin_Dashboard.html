@@ -8916,7 +8916,7 @@
         });
         // If still no sales value but we have units, try multiplying by Blinkit-average MRP (~₹900) as rough estimate
         if (totalSec === 0 && totalUnits > 0) totalSec = totalUnits * 900;
-        const primary = ${totalShipped};
+        const primary = totalShipped;
         const pct = primary > 0 ? (totalSec / primary * 100) : 0;
         const _fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
         const secEl = document.getElementById('mtSecondaryVal');
