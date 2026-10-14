@@ -1565,27 +1565,14 @@
       })();
       </script>
 
-      <!-- ========== BLINKIT PERFORMANCE (sales source + top SKUs) ========== -->
-      <div class="ov-strip">■ BLINKIT PERFORMANCE</div>
-      <div style="display:grid; grid-template-columns:1fr 2fr; gap:0; background:#fff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 10px 10px; margin-bottom:20px; overflow:hidden;">
-        <div style="padding:16px 18px; border-right:1px solid #f1f5f9;">
-          <div class="ov-label">SALES SOURCE</div>
-          <div style="display:flex; align-items:center; gap:16px; margin-top:16px;">
-            <svg id="blkPerfDonut" viewBox="0 0 100 100" width="120" height="120">
-              <circle cx="50" cy="50" r="35" fill="none" stroke="#f1f5f9" stroke-width="14"/>
-            </svg>
-            <div id="blkPerfLegend" style="font-size:11px; color:#64748b;">—</div>
-          </div>
-        </div>
-        <div style="padding:16px 18px;">
-          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
-            <div class="ov-label">BLINKIT TRACKING · ROAS, TACOS, AOV</div>
-            <div style="font-size:11px; color:#94a3b8;" id="blkPerfPeriod">—</div>
-          </div>
-          <table style="width:100%; font-size:12px;">
-            <tbody id="blkPerfTable"><tr><td style="padding:7px 0; color:#94a3b8;">Loading…</td></tr></tbody>
-          </table>
-        </div>
+      <!-- ========== BLINKIT PERFORMANCE (sales source donut) ========== -->
+      <div class="ov-strip">■ BLINKIT PERFORMANCE · PAID vs ORGANIC MIX <span id="blkPerfPeriod" style="font-weight:400; font-size:10px; color:#94a3b8; margin-left:10px;">—</span></div>
+      <div style="padding:20px 24px; background:#fff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 10px 10px; margin-bottom:20px; display:flex; align-items:center; gap:28px;">
+        <svg id="blkPerfDonut" viewBox="0 0 100 100" width="140" height="140">
+          <circle cx="50" cy="50" r="35" fill="none" stroke="#f1f5f9" stroke-width="14"/>
+        </svg>
+        <div id="blkPerfLegend" style="font-size:13px; color:#64748b;">—</div>
+        <div style="margin-left:auto; font-size:11px; color:#94a3b8; max-width:280px; text-align:right;">Full monthly table below in <strong>Blinkit Ads · Spend · ROAS · TACoS</strong>.</div>
       </div>
       <script>
       (async function blinkitPerf() {
@@ -1596,7 +1583,7 @@
           const data = Array.isArray(r.data)?r.data:Object.values(r.data||{});
           const rows = data.map(x=>({ m:String(x.Month||'').slice(0,7), total:+x.Total_Sales||0, ad:+x.Direct_Ad_Sales||0, organic:+x.Organic_Sales||0, spend:+x.Ad_Spend||0, roas:+x.ROAS||0, tacos:+x.TACOS_Pct||0, aov:+x.AOV||0, units:+x.Total_Units||0 })).filter(r=>r.m).sort((a,b)=>a.m.localeCompare(b.m));
           const last12 = rows.slice(-12);
-          if (!last12.length) { document.getElementById('blkPerfTable').innerHTML = '<tr><td style="padding:7px 0; color:#94a3b8;">No data</td></tr>'; return; }
+          if (!last12.length) { return; }
           const sumAd = last12.reduce((s,r)=>s+r.ad,0);
           const sumOrg = last12.reduce((s,r)=>s+r.organic,0);
           const sumTotal = sumAd + sumOrg || 1;
@@ -1615,18 +1602,6 @@
             '<div style="margin-bottom:4px;"><span style="display:inline-block;width:9px;height:9px;background:#60a5fa;border-radius:50%;margin-right:6px;"></span>Paid ads — '+adPct.toFixed(0)+'%</div>' +
             '<div><span style="display:inline-block;width:9px;height:9px;background:#2dd4bf;border-radius:50%;margin-right:6px;"></span>Organic — '+orgPct.toFixed(0)+'%</div>';
           document.getElementById('blkPerfPeriod').textContent = 'Last ' + last12.length + ' months';
-          // table — per month breakdown
-          document.getElementById('blkPerfTable').innerHTML = last12.slice().reverse().map(r =>
-            '<tr><td style="padding:6px 0; font-weight:500;">' + r.m + '</td>' +
-            '<td style="text-align:right;">' + fmt(r.total) + '</td>' +
-            '<td style="text-align:right; color:#60a5fa; padding-left:16px;">' + fmt(r.ad) + '</td>' +
-            '<td style="text-align:right; color:#2dd4bf; padding-left:16px;">' + fmt(r.organic) + '</td>' +
-            '<td style="text-align:right; color:#8b5cf6; padding-left:16px;">' + (r.roas ? r.roas.toFixed(2)+'x' : '—') + '</td>' +
-            '<td style="text-align:right; color:#94a3b8; padding-left:16px;">' + (r.tacos ? r.tacos.toFixed(1)+'%' : '—') + '</td></tr>'
-          ).join('');
-          // add header row
-          const head = '<tr style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;"><th style="text-align:left; padding:6px 0;">Month</th><th style="text-align:right;">Total</th><th style="text-align:right; padding-left:16px;">Paid</th><th style="text-align:right; padding-left:16px;">Organic</th><th style="text-align:right; padding-left:16px;">ROAS</th><th style="text-align:right; padding-left:16px;">TACoS</th></tr>';
-          document.getElementById('blkPerfTable').innerHTML = head + document.getElementById('blkPerfTable').innerHTML;
         } catch(e) { console.error('blinkit perf failed', e); }
       })();
       </script>
@@ -1806,70 +1781,7 @@
         <div class="kpi"><div class="label">Growth</div><div class="value">…</div><div class="sub">Loading</div></div>
       </div>
 
-      <!-- ===== BLINKIT COVERAGE SNAPSHOT — populated live from Blinkit_Availability ===== -->
-      <div class="card" id="blinkitCoverageCard" style="border-left: 4px solid #FF9800; background:#fffbf0;">
-        <h2 id="blinkitCoverageTitle">🎯 Coverage snapshot · Loading… <span class="badge">Source: Blinkit_Availability (live)</span></h2>
-        <p style="font-size: 12px; color: #666; margin: -6px 0 12px;">All 15 SKUs are now live on Blinkit — up from just 3 last month. 4 SKUs are still at Level 2 (only 3 cities each) and are the biggest expansion opportunity.</p>
-
-        <div class="kpi-row" style="margin-bottom: 14px;">
-          <div class="kpi"><div class="label">SKUs live</div><div class="value">15 / 15</div><div class="sub">Full catalog on Blinkit</div></div>
-          <div class="kpi"><div class="label">Cities live</div><div class="value">85</div><div class="sub">Across 28 states/UTs</div></div>
-          <div class="kpi"><div class="label">Total darkstore slots</div><div class="value">2,873</div><div class="sub">Sum of all SKU × store combinations</div></div>
-          <div class="kpi"><div class="label">Widest reach</div><div class="value">SIDR Honey</div><div class="sub">73 cities · 340 darkstores</div></div>
-        </div>
-
-        <div class="grid-2" style="margin-top: 8px;">
-          <div>
-            <h3 style="font-size: 13px; margin: 12px 0 6px;">SKU coverage · by Level</h3>
-            <table style="font-size: 12px;">
-              <thead><tr><th style="text-align:left;">SKU</th><th class="num">Level</th><th class="num">Cities</th><th class="num">Darkstores</th><th class="num">MRP</th></tr></thead>
-              <tbody>
-                <tr style="background:#dcfce7;"><td>SIDR Honey</td><td class="num"><span class="badge ok">L4</span></td><td class="num">73</td><td class="num">340</td><td class="num">₹1,400</td></tr>
-                <tr style="background:#dcfce7;"><td>Kashmir Almonds (Premium Mamra)</td><td class="num"><span class="badge ok">L4</span></td><td class="num">72</td><td class="num">318</td><td class="num">₹1,300</td></tr>
-                <tr style="background:#dcfce7;"><td>Kashmir Saffron Mongra</td><td class="num"><span class="badge ok">L4</span></td><td class="num">51</td><td class="num">199</td><td class="num">₹545</td></tr>
-                <tr><td>Kashmir Walnuts</td><td class="num"><span class="badge">L3</span></td><td class="num">41</td><td class="num">293</td><td class="num">₹1,200</td></tr>
-                <tr><td>Cold Pressed Apricot Oil</td><td class="num"><span class="badge">L3</span></td><td class="num">37</td><td class="num">246</td><td class="num">₹1,200</td></tr>
-                <tr><td>Cold Pressed Walnut Oil</td><td class="num"><span class="badge">L3</span></td><td class="num">35</td><td class="num">212</td><td class="num">₹1,200</td></tr>
-                <tr><td>Wild Floral Honey</td><td class="num"><span class="badge">L3</span></td><td class="num">34</td><td class="num">236</td><td class="num">₹650</td></tr>
-                <tr><td>Black Forest Honey</td><td class="num"><span class="badge">L3</span></td><td class="num">32</td><td class="num">240</td><td class="num">₹1,100</td></tr>
-                <tr><td>Ladakh Apricots (Sun Dried)</td><td class="num"><span class="badge">L3</span></td><td class="num">31</td><td class="num">143</td><td class="num">₹1,150</td></tr>
-                <tr><td>Zafrani Kehwa Green Tea</td><td class="num"><span class="badge">L3</span></td><td class="num">28</td><td class="num">170</td><td class="num">₹550</td></tr>
-                <tr><td>Chamomile Herbal Infusion</td><td class="num"><span class="badge">L3</span></td><td class="num">26</td><td class="num">161</td><td class="num">₹550</td></tr>
-                <tr style="background:#fef3c7;"><td>Cow Ghee (Himalayan Badri)</td><td class="num"><span class="badge warn">L2</span></td><td class="num">3</td><td class="num">88</td><td class="num">₹1,400</td></tr>
-                <tr style="background:#fef3c7;"><td>Qahwa Green Tea (Saffron Spice)</td><td class="num"><span class="badge warn">L2</span></td><td class="num">3</td><td class="num">81</td><td class="num">₹550</td></tr>
-                <tr style="background:#fef3c7;"><td>Raw Monofloral Honey</td><td class="num"><span class="badge warn">L2</span></td><td class="num">3</td><td class="num">80</td><td class="num">₹750</td></tr>
-                <tr style="background:#fef3c7;"><td>Cold Pressed Almond Oil</td><td class="num"><span class="badge warn">L2</span></td><td class="num">3</td><td class="num">66</td><td class="num">₹1,155</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <h3 style="font-size: 13px; margin: 12px 0 6px;">Top cities · by total darkstore density</h3>
-            <table style="font-size: 12px;">
-              <thead><tr><th style="text-align:left;">City</th><th class="num">Total DS</th><th class="num">SKUs</th><th>Bar</th></tr></thead>
-              <tbody>
-                <tr style="background:#fef3c7;"><td>Bengaluru</td><td class="num" style="font-weight:700;">619</td><td class="num">15</td><td><span class="bar" style="width:100px; background:#f59e0b;"></span></td></tr>
-                <tr><td>Hyderabad</td><td class="num">309</td><td class="num">15</td><td><span class="bar" style="width:50px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Chennai</td><td class="num">206</td><td class="num">15</td><td><span class="bar" style="width:33px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Kolkata</td><td class="num">192</td><td class="num">10</td><td><span class="bar" style="width:31px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Delhi</td><td class="num">185</td><td class="num">11</td><td><span class="bar" style="width:30px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Ghaziabad (Noida/NCR)</td><td class="num">163</td><td class="num">11</td><td><span class="bar" style="width:26px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Mumbai</td><td class="num">144</td><td class="num">11</td><td><span class="bar" style="width:23px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Pune</td><td class="num">127</td><td class="num">8</td><td><span class="bar" style="width:21px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Gurgaon</td><td class="num">109</td><td class="num">11</td><td><span class="bar" style="width:18px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Ahmedabad</td><td class="num">80</td><td class="num">10</td><td><span class="bar" style="width:13px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Jaipur</td><td class="num">69</td><td class="num">10</td><td><span class="bar" style="width:11px; background:#5E8E3E;"></span></td></tr>
-                <tr><td>Lucknow</td><td class="num">54</td><td class="num">11</td><td><span class="bar" style="width:9px; background:#5E8E3E;"></span></td></tr>
-                <tr style="color:#666;"><td colspan="4" style="text-align:center; font-style:italic;">73 more cities with 1-46 darkstores each</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style="margin-top: 14px; padding: 12px 14px; background: #fff3cd; border-radius: 8px; font-size: 12px; color: #856404;">
-          <strong>💡 Reading the coverage:</strong>
-          Bengaluru alone has 619 darkstore slots across all 15 SKUs — 6% of India's Blinkit universe. Top 5 cities (Bengaluru, Hyderabad, Chennai, Kolkata, Delhi) hold 1,511 slots = 53% of your reach. The 4 Level-2 SKUs (Cow Ghee, Qahwa Tea, Monofloral Honey, Almond Oil) are stuck in only Bengaluru/Hyderabad/Chennai — pushing these into Level 3 is the highest-leverage expansion request to Blinkit.
-        </div>
-      </div>
+      <!-- Coverage snapshot card removed — use "Coverage · live cities & darkstore fill rate" above (fresher per-SKU live inventory) -->
 
       <!-- FULL monthly trend — Dec 2025 to Aug 2026 (real from Upriver Blinkit Tracker) -->
       <div class="card">
@@ -4986,61 +4898,7 @@
           return;
         }
 
-        // ---- COVERAGE SNAPSHOT — full live rewrite from Blinkit_Availability ----
-        if (/Coverage snapshot/i.test(title) && card.id === 'blinkitCoverageCard') {
-          if (avail.length === 0) {
-            card.innerHTML = `<h2>🎯 Coverage snapshot <span class="badge">Live</span></h2><div style="padding:24px; color:#999; text-align:center;">No entries in Blinkit_Availability yet.</div>`;
-            return;
-          }
-          const uploadedAt = avail[0].Uploaded_At || avail[0].uploaded_at || '';
-          const upDate = new Date(uploadedAt);
-          const daysAgo = Math.floor((Date.now() - upDate.getTime()) / 86400000);
-          const upBy = avail[0].Uploaded_By || avail[0].uploaded_by || '—';
-          const upDateStr = isNaN(upDate) ? '—' : upDate.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
-          // City×SKU is a monthly refresh — green up to 35 days, amber 35-45, red >45
-          const staleColor = daysAgo <= 35 ? '#166534' : daysAgo <= 45 ? '#92400e' : '#991b1b';
-          const staleLabel = daysAgo <= 1 ? 'fresh' : daysAgo + ' days ago';
-
-          // Aggregate by SKU
-          const bySku = {};
-          const cityByDS = {};
-          avail.forEach(r => {
-            const skuKey = r.SKU_Key || r.sku_key;
-            const skuName = r.SKU_Name || r.sku_name || skuKey;
-            const city = r.City || r.city;
-            const ds = Number(r.Darkstores || r.darkstores || 0);
-            if (!bySku[skuKey]) bySku[skuKey] = { name: skuName, cities: new Set(), darkstores: 0 };
-            if (ds > 0) { bySku[skuKey].cities.add(city); bySku[skuKey].darkstores += ds; }
-            if (!cityByDS[city]) cityByDS[city] = { totalDs: 0, skus: new Set(), cityTotalDs: Number(r.City_Total_DS || r.city_total_ds || 0) };
-            if (ds > 0) { cityByDS[city].skus.add(skuKey); cityByDS[city].totalDs += ds; }
-          });
-          const skusLive = Object.values(bySku).filter(s => s.cities.size > 0).length;
-          const citiesLive = Object.keys(cityByDS).filter(c => cityByDS[c].totalDs > 0).length;
-          const totalDsSlots = avail.reduce((s,r) => s + Number(r.Darkstores || r.darkstores || 0), 0);
-          const skuList = Object.entries(bySku).map(([k,v]) => ({ key:k, name:v.name, cities:v.cities.size, darkstores:v.darkstores })).sort((a,b) => b.darkstores - a.darkstores);
-          const cityList = Object.entries(cityByDS).map(([c,v]) => ({ city:c, totalDs:v.totalDs, skus:v.skus.size, cityCap:v.cityTotalDs })).filter(x => x.totalDs > 0).sort((a,b) => b.totalDs - a.totalDs).slice(0, 15);
-          const maxDs = cityList[0]?.totalDs || 1;
-          const widest = skuList[0];
-
-          card.innerHTML = `
-            <h2>🎯 Coverage snapshot · <span style="color:${staleColor};">${upDateStr}</span> <span class="badge ok">Live from Blinkit_Availability</span></h2>
-            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">City × SKU breakdown · last synced ${staleLabel} by ${upBy} · ${avail.length.toLocaleString('en-IN')} records${daysAgo > 45 ? ' <span style="color:#991b1b; font-weight:600;">⚠️ Over 45 days old — Faraaz re-upload Blinkit coverage CSV</span>' : (daysAgo > 35 ? ' <span style="color:#92400e;">· monthly refresh due</span>' : '')}<br><span style="color:#166534;">● Per-SKU stock is fresher — see "Blinkit feeder warehouse inventory" below (Oct 13 snapshot)</span></p>
-            <div class="kpi-row" style="margin-bottom:14px;">
-              <div class="kpi"><div class="label">Cities live</div><div class="value">${citiesLive}</div><div class="sub">Distinct cities with ≥1 SKU</div></div>
-              <div class="kpi"><div class="label">Total darkstores</div><div class="value">${totalDsSlots.toLocaleString('en-IN')}</div><div class="sub">Sum across all cities</div></div>
-              <div class="kpi"><div class="label">Catalog on Blinkit</div><div class="value">15 SKUs</div><div class="sub">Per Faraaz's coverage CSV</div></div>
-              <div class="kpi"><div class="label">Avg DS per city</div><div class="value">${citiesLive ? Math.round(totalDsSlots/citiesLive) : 0}</div><div class="sub">Density</div></div>
-            </div>
-            <div style="margin-top:8px;">
-              <h3 style="font-size:13px; margin:12px 0 6px;">Top cities · by total darkstore density</h3>
-              <table style="font-size:12px; width:100%;">
-                <thead><tr><th style="text-align:left;">City</th><th class="num">Total DS</th><th class="num">SKUs</th><th style="width:40%;">Bar</th></tr></thead>
-                <tbody>${cityList.map(c => `<tr><td>${c.city}</td><td class="num" style="font-weight:600;">${c.totalDs.toLocaleString('en-IN')}</td><td class="num">${c.skus}</td><td><span class="bar" style="display:inline-block; height:8px; width:${Math.max(4, Math.round(c.totalDs/maxDs*100))}%; background:${c.totalDs>=200?'#f59e0b':'#5E8E3E'};"></span></td></tr>`).join('')}</tbody>
-              </table>
-            </div>
-          `;
-          return;
-        }
+        // ---- Coverage snapshot renderer removed — static card deleted ----
 
         // ---- BUSINESS METRICS ----
         if (/Business metrics/i.test(title)) {
