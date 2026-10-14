@@ -4951,7 +4951,7 @@
 
           card.innerHTML = `
             <h2>🎯 Coverage snapshot · <span style="color:${staleColor};">${upDateStr}</span> <span class="badge ok">Live from Blinkit_Availability</span></h2>
-            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Uploaded ${staleLabel} by ${upBy} · ${avail.length.toLocaleString('en-IN')} city × SKU records${daysAgo > 7 ? ' <span style="color:#991b1b; font-weight:600;">⚠️ Data is stale — Faraaz should re-upload the latest Blinkit coverage export</span>' : ''}</p>
+            <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Uploaded ${staleLabel} by ${upBy} · ${avail.length.toLocaleString('en-IN')} city × SKU records${daysAgo > 14 ? ' <span style="color:#991b1b; font-weight:600;">⚠️ Data over 2 weeks old — upload latest Blinkit coverage export</span>' : ''}</p>
             <div class="kpi-row" style="margin-bottom:14px;">
               <div class="kpi"><div class="label">SKUs live</div><div class="value">${skusLive} / ${Object.keys(bySku).length}</div><div class="sub">Catalog reach on Blinkit</div></div>
               <div class="kpi"><div class="label">Cities live</div><div class="value">${citiesLive}</div><div class="sub">Distinct cities with ≥1 SKU</div></div>
@@ -8982,25 +8982,36 @@
         barLblEl.textContent = pct > 0 ? pct.toFixed(1) + '% sold through' : 'Awaiting store reports';
 
         // ===== SKU-wise sell-through =====
-        const MT_CHAIN_ALLOW = /^(pick\s*n\s*choose|landcraft\s*retail|new\s*modern\s*bazaar|modern\s*bazaar|aap\s*ka\s*bazar|aapka\s*bazar|food\s*square)$/i;
+        // Substring match (chain names are long customer names from Zoho, not short labels)
+        const MT_CHAIN_ALLOW = /(pick\s*n\s*choose|landcraft|new\s*modern\s*bazaar|modern\s*bazaar|aap\s*ka\s*bazar|aapka\s*bazar|food\s*square)/i;
         const MT_CHAIN_DENY = /blink|quick\s*commerce|zepto|instamart/i;
-        const skuPrimary = {}; // shipped qty per SKU
+        // Normalize SKU names for matching: lowercase, strip "CURIO" prefix, remove special chars/whitespace variations
+        const normSku = s => String(s||'').toLowerCase().replace(/^curio\s+/,'').replace(/\(.*?\)/g,'').replace(/[^a-z0-9]/g,'');
+        const skuPrimary = {}; // shipped qty per normalized SKU
+        const skuNameMap = {}; // normalized -> display name
         (extras.mtInvoices || []).forEach(inv => {
-          const chain = String(inv.Chain || '').trim();
-          if (MT_CHAIN_DENY.test(chain) || !MT_CHAIN_ALLOW.test(chain)) return;
-          const sku = String(inv.SKU || inv.Item || inv.Item_Name || '').trim();
+          const chain = String(inv.Chain || inv.chain || '').trim();
+          if (chain && MT_CHAIN_DENY.test(chain)) return;
+          if (chain && !MT_CHAIN_ALLOW.test(chain)) return;
+          const skuRaw = String(inv.SKU || inv.Item || inv.Item_Name || inv.Line_Item || inv.sku_desc || '').trim();
+          if (!skuRaw) return;
+          const sku = normSku(skuRaw);
           if (!sku) return;
-          skuPrimary[sku] = (skuPrimary[sku] || 0) + (+inv.Total_Qty || +inv.Qty || 0);
+          skuPrimary[sku] = (skuPrimary[sku] || 0) + (+inv.Qty || +inv.Total_Qty || +inv.qty || 0);
+          if (!skuNameMap[sku]) skuNameMap[sku] = skuRaw;
         });
         const skuSec = {};
         rows.forEach(r => {
-          const sku = String(r.SKU || r.Item || r.Item_Name || r.sku || '').trim();
+          const skuRaw = String(r.SKU || r.Item || r.Item_Name || r.sku || '').trim();
+          if (!skuRaw) return;
+          const sku = normSku(skuRaw);
           if (!sku) return;
           const u = +r.Units || +r.Qty || +r.Sold || +r.Units_Sold || 0;
           skuSec[sku] = (skuSec[sku] || 0) + u;
+          if (!skuNameMap[sku]) skuNameMap[sku] = skuRaw;
         });
         const skuList = [...new Set([...Object.keys(skuPrimary), ...Object.keys(skuSec)])]
-          .map(sku => ({ sku, shipped: skuPrimary[sku] || 0, sold: skuSec[sku] || 0, pct: (skuPrimary[sku] > 0 ? (skuSec[sku]||0)/skuPrimary[sku]*100 : 0) }))
+          .map(sku => ({ sku: skuNameMap[sku] || sku, shipped: skuPrimary[sku] || 0, sold: skuSec[sku] || 0, pct: (skuPrimary[sku] > 0 ? (skuSec[sku]||0)/skuPrimary[sku]*100 : 0) }))
           .filter(x => x.shipped > 0 || x.sold > 0)
           .sort((a,b) => b.shipped - a.shipped)
           .slice(0, 15);
