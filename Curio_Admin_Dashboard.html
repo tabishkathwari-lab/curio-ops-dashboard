@@ -8450,6 +8450,29 @@
                               .sort((a,b) => (a._date||'').localeCompare(b._date||''));
     const syncTime = lastSync ? lastSync.toLocaleString('en-IN', { timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short' }) : '—';
 
+    // ===== OVERVIEW STRIP DATA (computed from already-fetched invoices) =====
+    const _fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+    const _byMonth = {};
+    invoices.forEach(i => {
+      const custLc = String(i.customer_name||'').toLowerCase();
+      if (!Object.keys(MT_CUSTOMERS).some(n => custLc.indexOf(n.toLowerCase())===0)) return;
+      const m = String(i.date||'').slice(0,7); if (!m) return;
+      _byMonth[m] = _byMonth[m] || { rev:0, cnt:0 };
+      _byMonth[m].rev += +i.total || 0;
+      _byMonth[m].cnt += 1;
+    });
+    const _months = Object.keys(_byMonth).sort();
+    const _last12 = _months.slice(-12).map(m => ({ m, ..._byMonth[m] }));
+    const _cur = _last12[_last12.length-1] || { rev:0, cnt:0 };
+    const _prev = _last12[_last12.length-2] || { rev:0, cnt:0 };
+    const _ovSales = _fmt(_cur.rev);
+    const _ovInv = _cur.cnt;
+    const _ovAov = _cur.cnt ? _fmt(_cur.rev / _cur.cnt) : '—';
+    const _spStores = chains.filter(c => (+c.shipped||0) > 0).length;
+    const _pct = (c,p) => { if (!p) return '—'; const v = ((c-p)/Math.abs(p))*100; return (v>=0?'+':'')+v.toFixed(1)+'%'; };
+    const _salesDelta = _pct(_cur.rev, _prev.rev);
+    const _aovDelta = _pct(_cur.cnt?_cur.rev/_cur.cnt:0, _prev.cnt?_prev.rev/_prev.cnt:0);
+
     page.innerHTML = `
       <div class="page-head">
         <div>
@@ -8460,6 +8483,35 @@
         <div style="display:flex; gap:8px;">
           <button class="btn ghost" id="mtSyncBtn">↻ Sync from Zoho</button>
           <button class="btn" id="mtStoreReportBtn">+ Record store report</button>
+        </div>
+      </div>
+
+      <!-- ========== MT OVERVIEW STRIP ========== -->
+      <div class="ov-strip">■ MODERN TRADE OVERVIEW</div>
+      <div class="ov-row">
+        <div class="ov-card">
+          <div class="ov-label">TOTAL SALES (${_cur.m||'—'})</div>
+          <div class="ov-value">${_ovSales}</div>
+          <div class="ov-delta">Previous period <span class="${_salesDelta.startsWith('+')?'ov-delta-pos':'ov-delta-neg'}">${_salesDelta}</span></div>
+          <div class="ov-delta">${_cur.cnt} invoices this month</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">ACTIVE STORES</div>
+          <div class="ov-value">${_spStores}</div>
+          <div class="ov-delta">${chains.length} chains tracked</div>
+          <div class="ov-delta">${totalInv} total invoices</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">OPEN RECEIVABLES</div>
+          <div class="ov-value">${_fmt(totalOut)}</div>
+          <div class="ov-delta">Open invoices <span>${openInvoices.length}</span></div>
+          <div class="ov-delta">Last shipment ${esc(lastShipment)}</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">AVG INVOICE</div>
+          <div class="ov-value">${_ovAov}</div>
+          <div class="ov-delta">Previous period <span class="${_aovDelta.startsWith('+')?'ov-delta-pos':'ov-delta-neg'}">${_aovDelta}</span></div>
+          <div class="ov-delta">Total shipped ${_fmt(totalShipped)}</div>
         </div>
       </div>
 
@@ -8828,6 +8880,28 @@
                                  .sort((a,b) => (a._date||'').localeCompare(b._date||''));
     const syncTime = lastSync ? lastSync.toLocaleString('en-IN', { timeZone:'Asia/Kolkata', dateStyle:'medium', timeStyle:'short' }) : '—';
 
+    // ===== OVERVIEW STRIP DATA (computed from already-fetched invoices) =====
+    const _fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+    const _byMonth = {};
+    invoices.forEach(i => {
+      const custLc = String(i.customer_name||'').toLowerCase();
+      if (!Object.keys(B2B_CUSTOMERS).some(n => custLc === n.toLowerCase())) return;
+      const m = String(i.date||'').slice(0,7); if (!m) return;
+      _byMonth[m] = _byMonth[m] || { rev:0, cnt:0 };
+      _byMonth[m].rev += +i.total || 0;
+      _byMonth[m].cnt += 1;
+    });
+    const _months = Object.keys(_byMonth).sort();
+    const _last12 = _months.slice(-12).map(m => ({ m, ..._byMonth[m] }));
+    const _cur = _last12[_last12.length-1] || { rev:0, cnt:0 };
+    const _prev = _last12[_last12.length-2] || { rev:0, cnt:0 };
+    const _activeAccts = accounts.filter(a => a.invoices.length).length;
+    const _pct = (c,p) => { if (!p) return '—'; const v = ((c-p)/Math.abs(p))*100; return (v>=0?'+':'')+v.toFixed(1)+'%'; };
+    const _salesDelta = _pct(_cur.rev, _prev.rev);
+    const _aovCur = _cur.cnt ? _cur.rev/_cur.cnt : 0;
+    const _aovPrev = _prev.cnt ? _prev.rev/_prev.cnt : 0;
+    const _aovDelta = _pct(_aovCur, _aovPrev);
+
     page.innerHTML = `
       <div class="page-head">
         <div>
@@ -8837,6 +8911,35 @@
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn ghost" id="b2bSyncBtn">↻ Sync from Zoho</button>
+        </div>
+      </div>
+
+      <!-- ========== B2B OVERVIEW STRIP ========== -->
+      <div class="ov-strip">■ B2B OVERVIEW</div>
+      <div class="ov-row">
+        <div class="ov-card">
+          <div class="ov-label">TOTAL SALES (${_cur.m||'—'})</div>
+          <div class="ov-value">${_fmt(_cur.rev)}</div>
+          <div class="ov-delta">Previous period <span class="${_salesDelta.startsWith('+')?'ov-delta-pos':'ov-delta-neg'}">${_salesDelta}</span></div>
+          <div class="ov-delta">${_cur.cnt} invoices this month</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">ACTIVE ACCOUNTS</div>
+          <div class="ov-value">${_activeAccts}</div>
+          <div class="ov-delta">of ${accounts.length} tracked</div>
+          <div class="ov-delta">${totalInv} total invoices</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">OPEN RECEIVABLES</div>
+          <div class="ov-value">${_fmt(totalOut)}</div>
+          <div class="ov-delta">Open invoices <span>${openInvoices.length}</span></div>
+          <div class="ov-delta">${totalShipped > 0 ? ((totalOut/totalShipped*100).toFixed(1) + '% of invoiced') : '—'}</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">AVG ORDER VALUE</div>
+          <div class="ov-value">${_fmt(_aovCur)}</div>
+          <div class="ov-delta">Previous period <span class="${_aovDelta.startsWith('+')?'ov-delta-pos':'ov-delta-neg'}">${_aovDelta}</span></div>
+          <div class="ov-delta">100kg+ bulk · 80% of MRP</div>
         </div>
       </div>
 
