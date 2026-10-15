@@ -2574,6 +2574,67 @@ window.syncNow = async function(channel, btn) {
         </div>
       </div>
 
+      <!-- ========== SHOPIFY TODAY VS MONTH ========== -->
+      <div class="card" style="background:linear-gradient(135deg,#f0fdf4,#fff);border:1px solid #86efac;margin-bottom:20px;">
+        <h2 style="display:flex;align-items:center;gap:10px;">📅 Today vs this month <span class="badge ok" id="shTodayLiveBadge">Live</span></h2>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="label">Today's Shopify sales</div>
+            <div class="value" id="shTodayVal">—</div>
+            <div class="sub" id="shTodayOrders">— orders</div>
+          </div>
+          <div class="kpi">
+            <div class="label">This month so far</div>
+            <div class="value" id="shMonthVal">—</div>
+            <div class="sub" id="shMonthOrders">— orders</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Daily avg (month)</div>
+            <div class="value" id="shDailyAvgVal">—</div>
+            <div class="sub">this month's run-rate</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Today vs daily avg</div>
+            <div class="value" id="shTodayVsAvgVal">—</div>
+            <div class="sub" id="shTodayVsAvgSub">—</div>
+          </div>
+        </div>
+      </div>
+      <script>
+      (async function shopifyTodayVsMonth() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => '₹' + Math.round(+n||0).toLocaleString('en-IN');
+        try {
+          const [kpisR, todaysR] = await Promise.all([
+            fetch(EXEC + '?q=kpis').then(r=>r.json()),
+            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json())
+          ]);
+          const today = kpisR?.data?.shopify_today || 0;
+          const monthly = Array.isArray(todaysR?.data) ? todaysR.data : Object.values(todaysR?.data || {});
+          const now = new Date();
+          const curMonth = now.toISOString().slice(0,7);
+          const currentMonthRow = monthly.find(r => String(r.Month||'').slice(0,7) === curMonth);
+          const monthRev = +currentMonthRow?.Revenue || 0;
+          const monthOrders = +currentMonthRow?.Orders || 0;
+          const dayOfMonth = now.getDate();
+          const dailyAvg = dayOfMonth > 0 ? monthRev / dayOfMonth : 0;
+          const vsAvgPct = dailyAvg > 0 ? ((today - dailyAvg) / dailyAvg * 100) : 0;
+          const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+          set('shTodayVal', fmt(today));
+          set('shMonthVal', fmt(monthRev));
+          set('shMonthOrders', monthOrders + ' orders');
+          set('shDailyAvgVal', fmt(dailyAvg));
+          set('shTodayVsAvgVal', (vsAvgPct >= 0 ? '+' : '') + vsAvgPct.toFixed(1) + '%');
+          const sub = document.getElementById('shTodayVsAvgSub');
+          if (sub) { sub.textContent = today >= dailyAvg ? 'above pace' : 'below pace'; sub.style.color = today >= dailyAvg ? '#166534' : '#991b1b'; }
+          // Fetch today's order count from todays_sales
+          const tsR = await fetch(EXEC + '?q=todays_sales').then(r=>r.json()).catch(()=>({data:{}}));
+          const todayCount = (tsR?.data?.shopify || []).length;
+          set('shTodayOrders', todayCount + ' orders');
+        } catch(e) { console.warn('Shopify today vs month failed:', e); }
+      })();
+      </script>
+
       <!-- ========== SHOPIFY OVERVIEW STRIP ========== -->
       <div class="ov-strip">■ SHOPIFY OVERVIEW</div>
       <div class="ov-row" id="shopifyOverviewRow">
@@ -5691,7 +5752,7 @@ window.syncNow = async function(channel, btn) {
       const chSum = (rows, ...fields) => (rows||[]).reduce((s,r) => { for (const f of fields) if (r[f] != null) return s + (Number(r[f])||0); return s; }, 0);
       const blinkitToday = chSum(ts.blinkit, 'Revenue','Total_Sales','Amount');
       const amazonToday = chSum(ts.amazon, 'Revenue','Ordered_Product_Sales','Amount');
-      const shopifyToday = chSum(ts.shopify, 'Revenue','Amount');
+      const shopifyToday = chSum(ts.shopify, 'Revenue','Amount','Total');
       const b2bToday = chSum(ts.b2b, 'Amount','Revenue');
       const totalRev = mtSellRev + mtReportRev + blinkitToday + amazonToday + shopifyToday + b2bToday;
       const totalUnits = mtSellUnits + mtReportUnits;
