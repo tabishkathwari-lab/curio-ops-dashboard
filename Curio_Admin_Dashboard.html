@@ -642,6 +642,153 @@ window.syncNow = async function(channel, btn) {
         .ov-delta-neg { color:#dc2626; font-weight:600; }
       </style>
       <div class="ov-strip">■ OVERVIEW</div>
+      <!-- ========== CHANNEL BREAKDOWN · TODAY VS MONTH ========== -->
+      <div class="card" style="margin-bottom:20px;">
+        <h2 style="display:flex;align-items:center;gap:10px;">💰 Sales by channel <span class="badge ok" id="cbLiveBadge">Live</span><span style="margin-left:auto;font-size:12px;color:#64748b;font-weight:400;">Updated <span id="cbUpdated">—</span></span></h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <th style="text-align:left;padding:10px 12px;font-weight:600;color:#475569;">Channel</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Today</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">This month (MTD)</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Daily avg (month)</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Last month</th>
+                <th style="text-align:left;padding:10px 12px;font-weight:600;color:#475569;">Last 7 days</th>
+              </tr>
+            </thead>
+            <tbody id="cbTbody">
+              <tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">Loading channel breakdown…</td></tr>
+            </tbody>
+            <tfoot>
+              <tr id="cbTotalRow" style="background:#f0fdf4;font-weight:700;border-top:2px solid #86efac;">
+                <td style="padding:12px;">Total</td>
+                <td id="cbTotToday" style="text-align:right;padding:12px;">—</td>
+                <td id="cbTotMonth" style="text-align:right;padding:12px;">—</td>
+                <td id="cbTotAvg" style="text-align:right;padding:12px;">—</td>
+                <td id="cbTotLast" style="text-align:right;padding:12px;">—</td>
+                <td style="padding:12px;"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      <script>
+      (async function channelBreakdown() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const miniBar = (vals, color) => {
+          if (!vals.length) return '';
+          const max = Math.max(...vals, 1);
+          const w = 70, h = 24;
+          const barW = Math.floor(w / vals.length) - 1;
+          return '<svg width="' + w + '" height="' + h + '" style="display:inline-block;vertical-align:middle;">' +
+            vals.map((v, i) => {
+              const barH = Math.max(1, (v / max) * h);
+              return '<rect x="' + (i * (barW + 1)) + '" y="' + (h - barH) + '" width="' + barW + '" height="' + barH + '" fill="' + color + '" opacity="0.85" />';
+            }).join('') + '</svg>';
+        };
+        try {
+          const now = new Date();
+          const today = now.toISOString().slice(0,10);
+          const curMonth = now.toISOString().slice(0,7);
+          const dayOfMonth = now.getDate();
+          // Last month YYYY-MM
+          const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const lastMonth = lastMonthDate.toISOString().slice(0,7);
+          // Last 7 days
+          const last7Days = Array.from({length:7}, (_,i) => { const d = new Date(now); d.setDate(d.getDate()-(6-i)); return d.toISOString().slice(0,10); });
+          const [kpisR, bkMR, amMR, shLR, shMR, tsR, shRawR, bkRawR, amRawR] = await Promise.all([
+            fetch(EXEC + '?q=kpis').then(r=>r.json()).catch(()=>({data:{}})),
+            fetch(EXEC + '?q=blinkit_monthly').then(r=>r.json()).catch(()=>({data:[]})),
+            fetch(EXEC + '?q=amazon_monthly').then(r=>r.json()).catch(()=>({data:[]})),
+            fetch(EXEC + '?q=shopify_live').then(r=>r.json()).catch(()=>({data:[]})),
+            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json()).catch(()=>({data:[]})),
+            fetch(EXEC + '?q=todays_sales').then(r=>r.json()).catch(()=>({data:{}})),
+            fetch(EXEC + '?q=blinkit_raw').then(r=>r.json()).catch(()=>({data:[]})),
+            fetch(EXEC + '?q=amazon_raw').then(r=>r.json()).catch(()=>({data:[]})),
+            fetch(EXEC + '?q=mt_office_entries').then(r=>r.json()).catch(()=>({data:[]}))
+          ]);
+          const kpis = kpisR?.data || {};
+          const ts = tsR?.data || {};
+          const monthKey = r => String(r.Month || r.month || '').slice(0,7);
+          const findMonth = (arr, m) => (Array.isArray(arr?.data) ? arr.data : []).find(r => monthKey(r) === m);
+          // SHOPIFY
+          const shToday = kpis.shopify_today || 0;
+          const shLiveArr = Array.isArray(shLR?.data) ? shLR.data : [];
+          const shMArr = Array.isArray(shMR?.data) ? shMR.data : [];
+          const shCurRow = shLiveArr.find(r => monthKey(r) === curMonth) || shMArr.find(r => monthKey(r) === curMonth);
+          const shLastRow = shLiveArr.find(r => monthKey(r) === lastMonth) || shMArr.find(r => monthKey(r) === lastMonth);
+          const shMTD = shCurRow ? (+shCurRow.Revenue || 0) : shToday;
+          const shLast = shLastRow ? (+shLastRow.Revenue || 0) : 0;
+          const shToday7 = (ts.shopify || []).reduce((s,r) => s + (+r.Total || +r.Revenue || 0), 0);
+          // Daily totals from Sales_Shopify today's rows only — fallback: fill the last day
+          const shDaily = last7Days.map(d => d === today ? shToday7 : 0);
+          // BLINKIT
+          const bkToday = kpis.blinkit_today || 0;
+          const bkMArr = Array.isArray(bkMR?.data) ? bkMR.data : [];
+          const bkCurRow = bkMArr.find(r => monthKey(r) === curMonth);
+          const bkLastRow = bkMArr.find(r => monthKey(r) === lastMonth);
+          const bkMTD = bkCurRow ? (+bkCurRow.Revenue || +bkCurRow.Primary_Revenue || +bkCurRow.Secondary_Revenue || 0) : bkToday;
+          const bkLast = bkLastRow ? (+bkLastRow.Revenue || +bkLastRow.Primary_Revenue || +bkLastRow.Secondary_Revenue || 0) : 0;
+          // Blinkit daily from raw
+          const bkRaw = Array.isArray(bkRawR?.data) ? bkRawR.data : [];
+          const bkDaily = last7Days.map(d => bkRaw.filter(r => String(r.Order_Date||r.Date||'').slice(0,10) === d).reduce((s,r) => s + (+r.Revenue || +r.Amount || +r.Total || 0), 0));
+          // AMAZON
+          const amToday = kpis.amazon_today || 0;
+          const amMArr = Array.isArray(amMR?.data) ? amMR.data : [];
+          const amCurRow = amMArr.find(r => monthKey(r) === curMonth);
+          const amLastRow = amMArr.find(r => monthKey(r) === lastMonth);
+          const amMTD = amCurRow ? (+amCurRow.Revenue || +amCurRow.Ordered_Product_Sales || 0) : amToday;
+          const amLast = amLastRow ? (+amLastRow.Revenue || +amLastRow.Ordered_Product_Sales || 0) : 0;
+          const amRaw = Array.isArray(amRawR?.data) ? amRawR.data : [];
+          const amDaily = last7Days.map(d => amRaw.filter(r => String(r.Order_Date||r.Date||'').slice(0,10) === d).reduce((s,r) => s + (+r.Ordered_Product_Sales || +r.Revenue || +r.Amount || 0), 0));
+          // MT (from mt_office_entries + today's KPI)
+          const mtToday = kpis.mt_today || 0;
+          const mtOffice = Array.isArray(shRawR?.data) ? shRawR.data : [];
+          const mtMTD = mtOffice.filter(r => String(r.Date||'').slice(0,7) === curMonth).reduce((s,r) => s + (+r.Revenue||0), 0);
+          const mtLast = mtOffice.filter(r => String(r.Date||'').slice(0,7) === lastMonth).reduce((s,r) => s + (+r.Revenue||0), 0);
+          const mtDaily = last7Days.map(d => mtOffice.filter(r => String(r.Date||'').slice(0,10) === d).reduce((s,r) => s + (+r.Revenue||0), 0));
+          // B2B
+          const b2bToday = kpis.b2b_today || 0;
+          // Build rows
+          const channels = [
+            { name: '🛒 Shopify',  color: '#5E8E3E', today: shToday,  mtd: shMTD,  last: shLast,  daily: shDaily },
+            { name: '⚡ Blinkit',   color: '#f59e0b', today: bkToday,  mtd: bkMTD,  last: bkLast,  daily: bkDaily },
+            { name: '📦 Amazon',   color: '#ff9900', today: amToday,  mtd: amMTD,  last: amLast,  daily: amDaily },
+            { name: '🏪 MT',       color: '#7c3aed', today: mtToday,  mtd: mtMTD,  last: mtLast,  daily: mtDaily },
+            { name: '🏢 B2B',      color: '#0ea5e9', today: b2bToday, mtd: 0,      last: 0,       daily: [0,0,0,0,0,0,0] }
+          ];
+          const tbody = document.getElementById('cbTbody');
+          tbody.innerHTML = channels.map(c => {
+            const avg = c.mtd / Math.max(1, dayOfMonth);
+            const todayStyle = c.today > 0 ? 'font-weight:700;color:#166534;' : 'color:#94a3b8;';
+            return `<tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:10px 12px;font-weight:600;">${c.name}</td>
+              <td style="text-align:right;padding:10px 12px;${todayStyle}">${c.today > 0 ? fmt(c.today) : '—'}</td>
+              <td style="text-align:right;padding:10px 12px;">${c.mtd > 0 ? fmt(c.mtd) : '—'}</td>
+              <td style="text-align:right;padding:10px 12px;color:#64748b;">${avg > 0 ? fmt(avg) : '—'}</td>
+              <td style="text-align:right;padding:10px 12px;color:#64748b;">${c.last > 0 ? fmt(c.last) : '—'}</td>
+              <td style="padding:6px 12px;">${miniBar(c.daily, c.color)}</td>
+            </tr>`;
+          }).join('');
+          const totToday = channels.reduce((s,c) => s + c.today, 0);
+          const totMTD = channels.reduce((s,c) => s + c.mtd, 0);
+          const totLast = channels.reduce((s,c) => s + c.last, 0);
+          const totAvg = totMTD / Math.max(1, dayOfMonth);
+          document.getElementById('cbTotToday').textContent = fmt(totToday);
+          document.getElementById('cbTotMonth').textContent = fmt(totMTD);
+          document.getElementById('cbTotAvg').textContent = fmt(totAvg);
+          document.getElementById('cbTotLast').textContent = fmt(totLast);
+          document.getElementById('cbUpdated').textContent = new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', hour12:false});
+        } catch(e) {
+          console.warn('Channel breakdown failed:', e);
+          const tbody = document.getElementById('cbTbody');
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#991b1b;">Failed to load channel breakdown</td></tr>';
+        }
+      })();
+      </script>
+
       <div class="ov-row" id="homeOverviewRow">
         <div class="ov-card">
           <div class="ov-label">TOTAL STORE SALES</div>
@@ -677,7 +824,7 @@ window.syncNow = async function(channel, btn) {
       (async function homeOverview() {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
         const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
-        const pct = (cur, prev) => { if (!prev || prev === 0) return { txt:'—', cls:'' }; const p = ((cur - prev) / Math.abs(prev)) * 100; const sign = p >= 0 ? '+' : ''; return { txt: sign + p.toFixed(1) + '%', cls: p >= 0 ? 'ov-delta-pos' : 'ov-delta-neg' }; };
+        const pct = (cur, prev) => { if (!prev || Math.abs(prev) < 1000) return { txt:'—', cls:'' }; const p = ((cur - prev) / Math.abs(prev)) * 100; if (Math.abs(p) > 999) return { txt:'—', cls:'' }; const sign = p >= 0 ? '+' : ''; return { txt: sign + p.toFixed(1) + '%', cls: p >= 0 ? 'ov-delta-pos' : 'ov-delta-neg' }; };
         const spark = (id, series, color) => {
           const svg = document.getElementById(id); if (!svg || !series.length) return;
           const vals = series.map(v => +v || 0);
@@ -2679,7 +2826,7 @@ window.syncNow = async function(channel, btn) {
       (async function shopifyOverview() {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
         const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
-        const pct = (cur, prev) => { if (!prev || prev === 0) return { txt:'—', cls:'' }; const p = ((cur - prev) / Math.abs(prev)) * 100; const sign = p >= 0 ? '+' : ''; return { txt: sign + p.toFixed(1) + '%', cls: p >= 0 ? 'ov-delta-pos' : 'ov-delta-neg' }; };
+        const pct = (cur, prev) => { if (!prev || Math.abs(prev) < 1000) return { txt:'—', cls:'' }; const p = ((cur - prev) / Math.abs(prev)) * 100; if (Math.abs(p) > 999) return { txt:'—', cls:'' }; const sign = p >= 0 ? '+' : ''; return { txt: sign + p.toFixed(1) + '%', cls: p >= 0 ? 'ov-delta-pos' : 'ov-delta-neg' }; };
         const spark = (id, series, color) => {
           const svg = document.getElementById(id); if (!svg || !series.length) return;
           const vals = series.map(v => +v || 0);
