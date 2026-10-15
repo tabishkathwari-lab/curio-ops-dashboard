@@ -729,11 +729,23 @@ window.syncNow = async function(channel, btn) {
           const bkMArr = Array.isArray(bkMR?.data) ? bkMR.data : [];
           const bkCurRow = bkMArr.find(r => monthKey(r) === curMonth);
           const bkLastRow = bkMArr.find(r => monthKey(r) === lastMonth);
-          const bkMTD = bkCurRow ? (+bkCurRow.Revenue || +bkCurRow.Primary_Revenue || +bkCurRow.Secondary_Revenue || 0) : bkToday;
-          const bkLast = bkLastRow ? (+bkLastRow.Revenue || +bkLastRow.Primary_Revenue || +bkLastRow.Secondary_Revenue || 0) : 0;
-          // Blinkit daily from raw
+          // Compute Blinkit MTD and last-month directly from raw (monthly aggregate is stale, stops at Aug)
           const bkRaw = Array.isArray(bkRawR?.data) ? bkRawR.data : [];
-          const bkDaily = last7Days.map(d => bkRaw.filter(r => String(r.Order_Date||r.Date||'').slice(0,10) === d).reduce((s,r) => s + (+r.Revenue || +r.Amount || +r.Total || 0), 0));
+          const bkRowVal = r => +r.Total_Sales || +r.Net_Sales || +r.Revenue || +r.Amount || 0;
+          let bkMTD = bkRaw.filter(r => String(r.Date||r.Order_Date||'').slice(0,7) === curMonth).reduce((s,r) => s + bkRowVal(r), 0);
+          let bkLast = bkRaw.filter(r => String(r.Date||r.Order_Date||'').slice(0,7) === lastMonth).reduce((s,r) => s + bkRowVal(r), 0);
+          // Fallback to Zoho Blink Commerce invoices if raw empty
+          if (bkMTD === 0 || bkLast === 0) {
+            try {
+              const zR = await fetch(EXEC + '?q=zoho_invoices').then(r=>r.json()).catch(()=>({data:{}}));
+              const zInvs = zR?.data?.invoices || zR?.data || [];
+              const blinkitInvs = (Array.isArray(zInvs) ? zInvs : []).filter(i => /blink\s*commerce/i.test(i.customer_name||''));
+              if (bkMTD === 0) bkMTD = blinkitInvs.filter(i => String(i.date||'').slice(0,7) === curMonth).reduce((s,i) => s + (+i.total||0), 0);
+              if (bkLast === 0) bkLast = blinkitInvs.filter(i => String(i.date||'').slice(0,7) === lastMonth).reduce((s,i) => s + (+i.total||0), 0);
+            } catch(e) {}
+          }
+          // Daily from raw
+          const bkDaily = last7Days.map(d => bkRaw.filter(r => String(r.Date||r.Order_Date||'').slice(0,10) === d).reduce((s,r) => s + bkRowVal(r), 0));
           // AMAZON
           const amToday = kpis.amazon_today || 0;
           const amMArr = Array.isArray(amMR?.data) ? amMR.data : [];
