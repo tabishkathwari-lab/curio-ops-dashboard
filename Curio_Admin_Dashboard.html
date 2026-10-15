@@ -700,16 +700,17 @@ window.syncNow = async function(channel, btn) {
           const lastMonth = lmY + '-' + String(lmM).padStart(2, '0');
           // Last 7 days
           const last7Days = Array.from({length:7}, (_,i) => { const d = new Date(now); d.setDate(d.getDate()-(6-i)); return d.toISOString().slice(0,10); });
-          const [kpisR, bkMR, amMR, shLR, shMR, tsR, shRawR, bkRawR, amRawR] = await Promise.all([
-            fetch(EXEC + '?q=kpis').then(r=>r.json()).catch(()=>({data:{}})),
-            fetch(EXEC + '?q=blinkit_monthly').then(r=>r.json()).catch(()=>({data:[]})),
-            fetch(EXEC + '?q=amazon_monthly').then(r=>r.json()).catch(()=>({data:[]})),
-            fetch(EXEC + '?q=shopify_live').then(r=>r.json()).catch(()=>({data:[]})),
-            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json()).catch(()=>({data:[]})),
-            fetch(EXEC + '?q=todays_sales').then(r=>r.json()).catch(()=>({data:{}})),
-            fetch(EXEC + '?q=blinkit_raw').then(r=>r.json()).catch(()=>({data:[]})),
-            fetch(EXEC + '?q=amazon_raw').then(r=>r.json()).catch(()=>({data:[]})),
-            fetch(EXEC + '?q=mt_office_entries').then(r=>r.json()).catch(()=>({data:[]}))
+          const fetchJson = q => fetch(EXEC + '?q=' + q).then(r=>r.json()).catch(()=>({data:[]}));
+          const [kpisR, tsR, bkMR, amMR, shLR, shMR, bkRawR, amRawR, mtOfficeR] = await Promise.all([
+            fetchJson('kpis'),
+            fetchJson('todays_sales'),
+            fetchJson('blinkit_monthly'),
+            fetchJson('amazon_monthly'),
+            fetchJson('shopify_live'),
+            fetchJson('shopify_monthly'),
+            fetchJson('blinkit_raw'),
+            fetchJson('amazon_raw'),
+            fetchJson('mt_office_entries')
           ]);
           const kpis = kpisR?.data || {};
           const ts = tsR?.data || {};
@@ -759,7 +760,7 @@ window.syncNow = async function(channel, btn) {
           const amDaily = last7Days.map(d => amRaw.filter(r => String(r.Order_Date||r.Date||'').slice(0,10) === d).reduce((s,r) => s + (+r.Ordered_Product_Sales || +r.Revenue || +r.Amount || 0), 0));
           // MT (from mt_office_entries + today's KPI)
           const mtToday = kpis.mt_today || 0;
-          const mtOffice = Array.isArray(shRawR?.data) ? shRawR.data : [];
+          const mtOffice = Array.isArray(mtOfficeR?.data) ? mtOfficeR.data : [];
           const mtMTD = mtOffice.filter(r => String(r.Date||'').slice(0,7) === curMonth).reduce((s,r) => s + (+r.Revenue||0), 0);
           const mtLast = mtOffice.filter(r => String(r.Date||'').slice(0,7) === lastMonth).reduce((s,r) => s + (+r.Revenue||0), 0);
           const mtDaily = last7Days.map(d => mtOffice.filter(r => String(r.Date||'').slice(0,10) === d).reduce((s,r) => s + (+r.Revenue||0), 0));
