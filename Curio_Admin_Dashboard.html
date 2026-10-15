@@ -3469,7 +3469,7 @@ window.syncNow = async function(channel, btn) {
       </div>
 
       <hr class="gold-rule" style="margin:32px 0;">
-      <div class="eyebrow" style="margin-bottom:16px;">Legacy snapshot (May – Jul 2026)</div>
+      <div class="eyebrow" style="margin-bottom:16px;">Historical reference · May – Jul 2026 (static)</div>
 
       <div style="padding: 14px 16px; background: #f0f7ff; border-radius: 10px; font-size: 12px; color: var(--brand-500); margin-bottom: 20px;">
         <strong>Full YTD from Zoho Books — 114 customers, ₹3.44Cr net revenue.</strong> Blinkit &amp; Kissansay together = 77% of business. 44 J&amp;K/Kashmir traders form a real distribution network worth ₹23.3L. D2C individuals surprisingly meaningful at ₹13.6L across 41 buyers.
@@ -7747,7 +7747,6 @@ window.syncNow = async function(channel, btn) {
 
         // ============ Live-refresh banner on hardcoded pages ============
         const stampPages = [
-          {id: 'page-customer-ledger', note: 'Hardcoded May–Jul 2026 Zoho export · live re-parse coming — for now, current invoices land in Sales log & Monthly totals.'},
           {id: 'page-profitability',    note: 'Hardcoded catalog · costing model updates via SKU_Master edits · live per-SKU margin refresh coming next.'},
         ];
         stampPages.forEach(p => {
@@ -8301,9 +8300,9 @@ window.syncNow = async function(channel, btn) {
         fetch(EXEC + '?q=zoho_pos').then(r=>r.json()),
         fetch(EXEC + '?q=zoho_sos').then(r=>r.json())
       ]);
-      const itemsArr = items?.data?.items || [];
-      const posArr = pos?.data?.pos || [];
-      const sosArr = sos?.data?.sos || [];
+      const itemsArr = Array.isArray(items?.data) ? items.data : (items?.data?.items || []);
+      const posArr = Array.isArray(pos?.data) ? pos.data : (pos?.data?.pos || []);
+      const sosArr = Array.isArray(sos?.data) ? sos.data : (sos?.data?.sos || []);
       renderStock(itemsArr);
       renderPos(posArr);
       renderSos(sosArr);
