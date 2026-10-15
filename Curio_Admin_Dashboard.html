@@ -693,9 +693,11 @@ window.syncNow = async function(channel, btn) {
           const today = now.toISOString().slice(0,10);
           const curMonth = now.toISOString().slice(0,7);
           const dayOfMonth = now.getDate();
-          // Last month YYYY-MM
-          const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          const lastMonth = lastMonthDate.toISOString().slice(0,7);
+          // Last month YYYY-MM (compute directly to avoid timezone shift bugs)
+          const [curY, curMo] = curMonth.split('-').map(Number);
+          const lmY = curMo === 1 ? curY - 1 : curY;
+          const lmM = curMo === 1 ? 12 : curMo - 1;
+          const lastMonth = lmY + '-' + String(lmM).padStart(2, '0');
           // Last 7 days
           const last7Days = Array.from({length:7}, (_,i) => { const d = new Date(now); d.setDate(d.getDate()-(6-i)); return d.toISOString().slice(0,10); });
           const [kpisR, bkMR, amMR, shLR, shMR, tsR, shRawR, bkRawR, amRawR] = await Promise.all([
