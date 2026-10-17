@@ -5605,20 +5605,24 @@ window.syncNow = async function(channel, btn) {
         sellT.forEach(r => {
           const p = r.Attributed_Promoter; if (!testFilter(p)) return;
           const u = Number(r.Units_Sold)||0; if (u <= 0) return;
-          if (!perf[p]) perf[p] = { name: p, checkins: 0, amCount: 0, pmCount: 0, leaveCount: 0, days: new Set(), stores: new Set(), lastActive: null, revenue: 0, units: 0, saleEvents: 0, skuMix: {}, dailyRev: {}, storeRev: {} };
+          if (!perf[p]) perf[p] = { name: p, checkins: 0, amCount: 0, pmCount: 0, leaveCount: 0, days: new Set(), stores: new Set(), lastActive: null, revenue: 0, units: 0, saleEvents: 0, skuMix: {}, dailyRev: {}, storeRev: {}, monthlyRev: {}, monthlyUnits: {} };
           const canon = promoterAlias[r.SKU];
           const rev = u * (canon ? (priceMap[canon]||0) : 0);
           perf[p].revenue += rev; perf[p].units += u; perf[p].saleEvents++;
           const d = String(r.To_Time||'').slice(0,10);
           if (d) perf[p].dailyRev[d] = (perf[p].dailyRev[d]||0) + rev;
+          if (d) { const mk = d.slice(0,7); perf[p].monthlyRev[mk] = (perf[p].monthlyRev[mk]||0) + rev; perf[p].monthlyUnits[mk] = (perf[p].monthlyUnits[mk]||0) + u; }
           if (r.Store_Code) perf[p].storeRev[r.Store_Code] = (perf[p].storeRev[r.Store_Code]||0) + rev;
           const skuName = canon ? (canonToName[canon] || canon) : r.SKU;
           perf[p].skuMix[skuName] = (perf[p].skuMix[skuName]||0) + u;
         });
         office.forEach(e => {
           const p = e.Entry_By; if (!testFilter(p) || /admin/i.test(p)) return;
-          if (!perf[p]) perf[p] = { name: p, checkins: 0, amCount: 0, pmCount: 0, leaveCount: 0, days: new Set(), stores: new Set(), lastActive: null, revenue: 0, units: 0, saleEvents: 0, skuMix: {}, dailyRev: {}, storeRev: {} };
-          perf[p].revenue += Number(e.Revenue)||0; perf[p].units += Number(e.Units_Sold)||0; perf[p].saleEvents++;
+          if (!perf[p]) perf[p] = { name: p, checkins: 0, amCount: 0, pmCount: 0, leaveCount: 0, days: new Set(), stores: new Set(), lastActive: null, revenue: 0, units: 0, saleEvents: 0, skuMix: {}, dailyRev: {}, storeRev: {}, monthlyRev: {}, monthlyUnits: {} };
+          const rev = Number(e.Revenue)||0; const u = Number(e.Units_Sold)||0;
+          perf[p].revenue += rev; perf[p].units += u; perf[p].saleEvents++;
+          const d = String(e.Date||e.Timestamp||'').slice(0,10);
+          if (d) { const mk = d.slice(0,7); perf[p].monthlyRev[mk] = (perf[p].monthlyRev[mk]||0) + rev; perf[p].monthlyUnits[mk] = (perf[p].monthlyUnits[mk]||0) + u; }
         });
         const promoters = Object.values(perf).sort((a,b) => b.revenue - a.revenue);
 
@@ -5647,11 +5651,16 @@ window.syncNow = async function(channel, btn) {
           html += `<div class="card"><h2>📊 Overall leaderboard</h2>
             <p style="font-size:12px; color:#666; margin:-6px 0 12px;">Ranked by revenue attributed. Includes both live-sale entries and stock-delta computed sales.</p>
             <table style="font-size:13px; width:100%;">
-              <thead><tr><th style="text-align:left;">Promoter</th><th class="num">Revenue</th><th class="num">Units</th><th class="num">Sale events</th><th class="num">Stores</th><th class="num">Days active</th><th class="num">AM / PM</th><th class="num">On leave</th><th>Last active</th></tr></thead>
-              <tbody>${promoters.map((p, i) => {
+              <thead><tr><th style="text-align:left;">Promoter</th><th class="num">Revenue (all time)</th><th class="num" style="background:#eff6ff;">This month</th><th class="num">Last month</th><th class="num">Units</th><th class="num">Sale events</th><th class="num">Stores</th><th class="num">Days active</th><th class="num">AM / PM</th><th class="num">On leave</th><th>Last active</th></tr></thead>
+              <tbody>${(() => { const curMo = new Date().toISOString().slice(0,7); const d0 = new Date(); const lm = new Date(d0.getFullYear(), d0.getMonth()-1, 1); const lastMo = lm.toISOString().slice(0,7); return promoters.map((p, i) => {
                 const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#'+(i+1);
-                return `<tr><td><strong>${medal} ${p.name}</strong></td><td class="num" style="font-weight:600; color:#166534;">${fmtL(p.revenue)}</td><td class="num">${p.units.toLocaleString('en-IN')}</td><td class="num">${p.saleEvents}</td><td class="num">${p.stores.size}</td><td class="num">${p.days.size}</td><td class="num">${p.amCount} / ${p.pmCount}</td><td class="num" style="${p.leaveCount > 0 ? 'color:#dc2626;' : ''}">${p.leaveCount}</td><td style="font-size:11px; color:#666;">${fmtRelative(p.lastActive)}</td></tr>`;
-              }).join('')}</tbody>
+                const curRev = p.monthlyRev[curMo] || 0;
+                const lastRev = p.monthlyRev[lastMo] || 0;
+                const delta = lastRev > 0 ? ((curRev - lastRev)/lastRev * 100) : 0;
+                const deltaTxt = lastRev > 0 ? (delta >= 0 ? '+' : '') + delta.toFixed(0) + '%' : '';
+                const deltaClr = delta >= 0 ? '#166534' : '#dc2626';
+                return `<tr><td><strong>${medal} ${p.name}</strong></td><td class="num" style="font-weight:600; color:#166534;">${fmtL(p.revenue)}</td><td class="num" style="background:#eff6ff; font-weight:700; color:#1e40af;">${fmtL(curRev)} ${deltaTxt ? `<span style="font-size:10px; color:${deltaClr};">${deltaTxt}</span>` : ''}</td><td class="num" style="color:#64748b;">${fmtL(lastRev)}</td><td class="num">${p.units.toLocaleString('en-IN')}</td><td class="num">${p.saleEvents}</td><td class="num">${p.stores.size}</td><td class="num">${p.days.size}</td><td class="num">${p.amCount} / ${p.pmCount}</td><td class="num" style="${p.leaveCount > 0 ? 'color:#dc2626;' : ''}">${p.leaveCount}</td><td style="font-size:11px; color:#666;">${fmtRelative(p.lastActive)}</td></tr>`;
+              }).join(''); })()}</tbody>
             </table>
           </div>`;
 
@@ -5681,6 +5690,17 @@ window.syncNow = async function(channel, btn) {
                   ${topSkus.length === 0 ? '<div style="color:#999; font-size:12px;">No SKU-attributed sales yet</div>' : topSkus.map(([sku, u]) => `<div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #f3f4f6; font-size:12px;"><span>${sku}</span><strong>${u} units</strong></div>`).join('')}
                 </div>
               </div>
+              ${(() => {
+                const monthEntries = Object.entries(p.monthlyRev).sort((a,b)=>a[0].localeCompare(b[0]));
+                if (!monthEntries.length) return '';
+                const maxM = Math.max(...monthEntries.map(e=>e[1]));
+                const monthName = m => { const [y,mo]=m.split('-'); const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[Number(mo)-1]+" '"+y.slice(2); };
+                const nowMo = new Date().toISOString().slice(0,7);
+                return `<div style="margin-top:14px; padding:12px 14px; background:#f9fafb; border-radius:10px;">
+                  <h3 style="font-size:12px; margin:0 0 10px; color:#666; text-transform:uppercase; letter-spacing:0.4px;">📈 Monthly trend (revenue · units)</h3>
+                  ${monthEntries.map(([m,rev])=>{ const u=p.monthlyUnits[m]||0; const bw=maxM>0?Math.round(rev/maxM*100):0; const isNow = m===nowMo; return `<div style="display:flex; align-items:center; padding:5px 0; border-bottom:1px solid #f3f4f6; font-size:12px;"><div style="width:70px; color:#0f172a; font-weight:${isNow?'700':'600'}; ${isNow?'color:#1e40af;':''}">${monthName(m)}${isNow?' •':''}</div><div style="flex:1; height:6px; border-radius:99px; background:#e5e7eb; margin:0 12px; overflow:hidden;"><div style="width:${bw}%; height:100%; background:${isNow?'#1e40af':'#64748b'};"></div></div><div style="font-weight:700; font-variant-numeric:tabular-nums; color:#0f172a; min-width:72px; text-align:right;">${fmtL(rev)}</div><div style="width:70px; text-align:right; color:#64748b; font-size:11px;">${u} units</div></div>`; }).join('')}
+                </div>`;
+              })()}
               <div style="margin-top:12px; padding:8px 12px; background:#f0f7ff; border-radius:8px; font-size:11px; color:#1e3a5f;">
                 📋 <strong>Activity:</strong> ${p.checkins} check-ins · ${p.amCount} AM · ${p.pmCount} PM · ${p.leaveCount} leaves · covering ${p.stores.size} store${p.stores.size !== 1 ? 's' : ''}
               </div>
