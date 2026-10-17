@@ -129,6 +129,22 @@ function shiprocketToken_() {
 // Manual-run wrapper so this appears in the Apps Script Run dropdown
 function runFetchShiprocketOrders() { fetchShiprocketShipments(); }
 
+// On-demand sync triggered by dashboard "Sync Now" button
+function doSyncNow(ts, user, p) {
+  const channel = String((p && p.channel) || 'all').toLowerCase();
+  const out = { ok: true, ran: [], errors: [] };
+  const run = (name, fn) => {
+    try { fn(); out.ran.push(name); }
+    catch (e) { out.errors.push(name + ': ' + (e && e.message ? e.message : String(e))); }
+  };
+  if (channel === 'shiprocket' || channel === 'all') run('shiprocket', fetchShiprocketShipments);
+  if (channel === 'shopify'    || channel === 'all') run('shopify',    fetchShopifyOrders);
+  if (channel === 'meta'       || channel === 'all') run('meta',       fetchMetaAds);
+  if (channel === 'zoho'       || channel === 'all') run('zoho',       syncZohoBooks);
+  const msg = 'ran:[' + out.ran.join(',') + ']' + (out.errors.length ? ' errors:' + out.errors.join('|') : '');
+  return { ok: true, id: 'sync_' + Date.now(), message: msg };
+}
+
 // Pull all Shiprocket orders via the /orders endpoint (which includes product line items).
 // Full replace of Shipments_Shiprocket_Live using the same raw-order schema the CSV uploader writes.
 function fetchShiprocketShipments() {
@@ -144,8 +160,12 @@ function fetchShiprocketShipments() {
   let page = 1, totalFetched = 0, pagesWithData = 0;
   const slice10 = v => v ? String(v).slice(0, 10) : '';
   const n = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
-  while (page <= 50) {
-    const url = 'https://apiv2.shiprocket.in/v1/external/orders?per_page=100&page=' + page;
+  // FY27 full-history pull: Apr 1 2026 → today
+  const FROM = '2026-04-01';
+  const TO = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+  while (page <= 200) {
+    const url = 'https://apiv2.shiprocket.in/v1/external/orders?per_page=100&page=' + page +
+                '&from=' + FROM + '&to=' + TO;
     const res = UrlFetchApp.fetch(url, { method: 'get', headers: { 'Authorization': 'Bearer ' + token }, muteHttpExceptions: true });
     if (res.getResponseCode() !== 200) { Logger.log('Shiprocket /orders page ' + page + ' err: ' + res.getContentText().slice(0, 200)); break; }
     const body = JSON.parse(res.getContentText());
@@ -309,7 +329,9 @@ function doPost(e) {
       case 'blinkit_availability_bulk_load': result = saveBlinkitAvailability(ts, user, payload); break;
       case 'blinkit_live_inventory_bulk_load': result = saveBlinkitLiveInventory(ts, user, payload); break;
       case 'shiprocket_bulk_load':  result = saveShiprocketBulkLoad(ts, user, payload); break;
+      case 'sync_now':              result = doSyncNow(ts, user, payload); break;
       case 'mt_store_reports_bulk_load': result = saveMtStoreReportsBulk(ts, user, payload); break;
+      case 'mt_store_report':            result = saveMtStoreReportCsv(ts, user, payload); break;
       case 'sku_add_alias':         result = saveSkuAddAlias(ts, user, payload); break;
       case 'mt_invoices_bulk_load': result = saveMtInvoicesBulkLoad(ts, user, payload); break;
       case 'factory_inventory_bulk_load': result = saveFactoryInventorySnapshot(ts, user, payload); break;
@@ -364,6 +386,11 @@ function doGet(e) {
       case 'blinkit_live_inventory':  return respond({ ok: true, data: readSheet('Blinkit_Live_Inventory') });
       case 'mt_store_reports':        return respond({ ok: true, data: readSheet('MT_Store_Reports') });
       case 'zoho_invoices':           return respond({ ok: true, data: { invoices: readSheet('Zoho_Invoices'), count: (readSheet('Zoho_Invoices')||[]).length } });
+      case 'zoho_sos':                return respond({ ok: true, data: readSheet('Zoho_SalesOrders') });
+      case 'zoho_pos':                return respond({ ok: true, data: readSheet('Zoho_PurchaseOrders') });
+      case 'zoho_items':              return respond({ ok: true, data: readSheet('Zoho_Items') });
+      case 'zoho_invoice_lines':      return respond({ ok: true, data: readSheet('Zoho_Invoice_Lines') });
+      case 'sync_zoho_all':           { try { syncZohoAllDeltas(); return respond({ ok: true, message: 'Zoho delta sync completed' }); } catch(e) { return respond({ ok: false, error: 'Zoho sync failed: ' + e.message }); } }
       case 'blinkit_raw':             return respond({ ok: true, data: readSheet('Sales_Blinkit') });
       case 'amazon_raw':              return respond({ ok: true, data: readSheet('Sales_Amazon') });
       case 'b2b_raw':                 return respond({ ok: true, data: readSheet('Sales_B2B') });
@@ -968,6 +995,33 @@ function saveBlinkitLiveInventory(ts, user, p) {
 // Modern Trade store reports — bulk load secondary (store-level) sales per month, store, SKU.
 // Payload: { chain: 'Food Square', records: [{ month, store, sku, units, value }, ...] }
 // Append-only — each upload adds rows. Dashboard groups by chain/store/sku/month.
+// CSV-upload handler: one POST per date+chain+store with items[]
+// payload: { date, chain, store, items: [{sku, stock_in_hand?, expired_returned?, sold?, _format}] }
+function saveMtStoreReportCsv(ts, user, p) {
+  p = p || {};
+  const date = p.date || '';
+  const chain = p.chain || '';
+  const store = p.store || '';
+  const items = p.items || [];
+  if (!date || !chain || !store || !items.length) throw new Error('mt_store_report: need date, chain, store, items');
+  let sh = SS.getSheetByName('Sales_MT_Store_Reports');
+  const HEADERS = ['Timestamp','Date','User','Chain','Store','SKU','Stock_In_Hand','Expired_Returned','Sold','Source'];
+  if (!sh) {
+    sh = SS.insertSheet('Sales_MT_Store_Reports');
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    sh.setFrozenRows(1);
+  }
+  const rows = items.map(i => [
+    ts, date, user || 'csv-upload', chain, store, i.sku || '',
+    i.stock_in_hand != null ? Number(i.stock_in_hand) : '',
+    i.expired_returned != null ? Number(i.expired_returned) : '',
+    i.sold != null ? Number(i.sold) : '',
+    'csv-upload manual'
+  ]);
+  sh.getRange(sh.getLastRow()+1, 1, rows.length, HEADERS.length).setValues(rows);
+  return { id: 'mt-store-' + ts.getTime(), message: 'MT store report: ' + rows.length + ' rows saved for ' + store + ' on ' + date };
+}
+
 function saveMtStoreReportsBulk(ts, user, p) {
   p = p || {};
   const chain = p.chain || '';

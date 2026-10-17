@@ -8180,10 +8180,13 @@ window.syncNow = async function(channel, btn) {
             <h2 style="margin:0; font-size:17px;">${cfg.title}</h2>
             <div style="font-size:11px; color:#64748b; margin-top:2px;" data-role="periodLabel">Loading…</div>
           </div>
-          <div class="ch-fy-toggle" style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:9px;">
-            <button data-fy="FY27" class="ch-fy-btn active">FY27</button>
-            <button data-fy="FY26" class="ch-fy-btn">FY26</button>
-            <button data-fy="FY25" class="ch-fy-btn">FY25</button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            ${cfg.primarySource === 'zi' ? `<button data-role="refreshZoho" style="padding:6px 12px; background:#10b981; color:#fff; border:0; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;" title="Pull latest Zoho invoices">🔄 Refresh from Zoho</button>` : ''}
+            <div class="ch-fy-toggle" style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:9px;">
+              <button data-fy="FY27" class="ch-fy-btn active">FY27</button>
+              <button data-fy="FY26" class="ch-fy-btn">FY26</button>
+              <button data-fy="FY25" class="ch-fy-btn">FY25</button>
+            </div>
           </div>
         </div>
         <div style="display:grid; grid-template-columns:${isDirect?'1fr':'1fr 1fr 1fr'}; gap:10px;">
@@ -8240,6 +8243,27 @@ window.syncNow = async function(channel, btn) {
     }
 
     panel.querySelectorAll('.ch-fy-btn').forEach(btn => { btn.addEventListener('click', () => { panel.querySelectorAll('.ch-fy-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); render(btn.dataset.fy); }); });
+    const refreshBtn = panel.querySelector('[data-role="refreshZoho"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async () => {
+        const orig = refreshBtn.innerHTML;
+        refreshBtn.disabled = true; refreshBtn.innerHTML = '⏳ Syncing Zoho…'; refreshBtn.style.opacity = 0.75;
+        try {
+          await window.syncNow('zoho', null);
+          // Re-fetch invoices and re-render
+          const zi = await CurioAPI.get('zoho_invoices').catch(()=>({}));
+          const ziData = zi?.data?.invoices || zi?.data || [];
+          RAW.zi = Array.isArray(ziData) ? ziData : [];
+          const activeFy = panel.querySelector('.ch-fy-btn.active')?.dataset.fy || 'FY27';
+          render(activeFy);
+          refreshBtn.innerHTML = '✓ Refreshed'; refreshBtn.style.background = '#059669';
+        } catch (e) {
+          refreshBtn.innerHTML = '⚠ Failed'; refreshBtn.style.background = '#f59e0b';
+          alert('Zoho refresh failed: ' + (e.message || e));
+        }
+        setTimeout(() => { refreshBtn.innerHTML = orig; refreshBtn.disabled = false; refreshBtn.style.opacity = 1; refreshBtn.style.background = '#10b981'; }, 2500);
+      });
+    }
     render('FY27');
   }
 
