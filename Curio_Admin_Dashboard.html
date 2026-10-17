@@ -5590,7 +5590,7 @@ window.syncNow = async function(channel, btn) {
         const perf = {};
         checkins.filter(c => testFilter(c.Promoter)).forEach(c => {
           const p = c.Promoter;
-          if (!perf[p]) perf[p] = { name: p, checkins: 0, amCount: 0, pmCount: 0, leaveCount: 0, days: new Set(), stores: new Set(), lastActive: null, revenue: 0, units: 0, saleEvents: 0, skuMix: {}, dailyRev: {}, storeRev: {} };
+          if (!perf[p]) perf[p] = { name: p, checkins: 0, amCount: 0, pmCount: 0, leaveCount: 0, days: new Set(), stores: new Set(), lastActive: null, revenue: 0, units: 0, saleEvents: 0, skuMix: {}, dailyRev: {}, storeRev: {}, monthlyRev: {}, monthlyUnits: {} };
           const s = String(c.Session||'').toUpperCase();
           if (s === 'LEAVE') { perf[p].leaveCount++; return; }
           perf[p].checkins++;
