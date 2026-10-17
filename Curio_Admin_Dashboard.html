@@ -2766,41 +2766,40 @@ window.syncNow = async function(channel, btn) {
       (async function shopifyTodayVsMonth() {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
         const fmt = n => '₹' + Math.round(+n||0).toLocaleString('en-IN');
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
         try {
           const now = new Date();
-          const curMonth = now.toISOString().slice(0,7);
-          const today = now.toISOString().slice(0,10);
-          // Fetch raw sales rows — compute today + MTD directly instead of relying on stale monthly aggregate
-          const salesR = await fetch(EXEC + '?q=shopify_live').then(r=>r.json()).catch(()=>({data:[]}));
-          // Also need the per-order raw rows. The health check showed shopify_live had 14 rows (monthly aggregates). Use /todays_sales + a shopify_raw endpoint fallback.
-          const tsR = await fetch(EXEC + '?q=todays_sales').then(r=>r.json()).catch(()=>({data:{}}));
-          const todayRows = (tsR?.data?.shopify) || [];
-          const todayRev = todayRows.reduce((s,r) => s + (+r.Total || +r.Revenue || 0), 0);
-          const todayCount = todayRows.length;
-          // For MTD compute: hit a fresh endpoint. Use kpis + fallback. Compute month-to-date from Sales_Shopify by fetching all shopify rows.
-          // There's no direct endpoint for raw Sales_Shopify. Use a workaround: hit shopify_live (monthly aggregates) and sum.
-          const liveData = Array.isArray(salesR?.data) ? salesR.data : [];
-          const curMonthRow = liveData.find(r => String(r.Month||'').slice(0,7) === curMonth);
-          let monthRev = +curMonthRow?.Revenue || 0;
-          let monthOrders = +curMonthRow?.Orders || 0;
-          // If live monthly doesn't have current month, fall back: today's rev is at least the MTD if nothing else logged
-          if (monthRev === 0 && todayRev > 0) {
-            monthRev = todayRev;
-            monthOrders = todayCount;
-          }
-          const dayOfMonth = now.getDate();
-          const dailyAvg = dayOfMonth > 0 ? monthRev / dayOfMonth : 0;
-          const vsAvgPct = dailyAvg > 0 ? ((todayRev - dailyAvg) / dailyAvg * 100) : 0;
-          const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-          set('shTodayVal', fmt(todayRev));
-          set('shTodayOrders', todayCount + ' orders');
-          set('shMonthVal', fmt(monthRev));
-          set('shMonthOrders', monthOrders + ' orders · day ' + dayOfMonth);
+          // IST today / month in local terms (Shopify Order_Date is UTC midnight for IST date already)
+          const istOffsetMs = 5.5 * 3600 * 1000;
+          const istNow = new Date(now.getTime() + istOffsetMs);
+          const curMonth = istNow.toISOString().slice(0,7);
+          const today = istNow.toISOString().slice(0,10);
+          // Pull raw order rows and compute Today + MTD directly
+          const r = await fetch(EXEC + '?q=shopify_raw').then(x=>x.json()).catch(()=>({data:[]}));
+          const rows = (r?.data || []).filter(x => x && (x.Order_Date || x.Date));
+          const dateOf = x => String(x.Order_Date || x.Date || '').slice(0,10);
+          const revOf = x => +x.Total || (+x.Units * +x.Unit_Price) || +x.Revenue || 0;
+          const todayRows  = rows.filter(x => dateOf(x) === today);
+          const monthRows  = rows.filter(x => dateOf(x).startsWith(curMonth));
+          // De-duplicate orders by Order_ID so revenue isn't double-counted across SKU rows
+          const sumUniqueOrders = arr => { const seen = new Set(); let s = 0; arr.forEach(x => { const id = x.Order_ID || JSON.stringify([dateOf(x), x.Customer_Email, x.Total]); if (!seen.has(id)) { seen.add(id); s += revOf(x); } }); return { total: s, orders: seen.size }; };
+          const t = sumUniqueOrders(todayRows);
+          const m = sumUniqueOrders(monthRows);
+          const dayOfMonth = istNow.getUTCDate();
+          const dailyAvg = dayOfMonth > 0 ? m.total / dayOfMonth : 0;
+          const vsAvgPct = dailyAvg > 0 ? ((t.total - dailyAvg) / dailyAvg * 100) : 0;
+          set('shTodayVal', fmt(t.total));
+          set('shTodayOrders', t.orders + ' orders');
+          set('shMonthVal', fmt(m.total));
+          set('shMonthOrders', m.orders + ' orders · day ' + dayOfMonth);
           set('shDailyAvgVal', fmt(dailyAvg));
           set('shTodayVsAvgVal', (vsAvgPct >= 0 ? '+' : '') + vsAvgPct.toFixed(1) + '%');
           const sub = document.getElementById('shTodayVsAvgSub');
-          if (sub) { sub.textContent = todayRev >= dailyAvg ? 'above pace' : 'below pace'; sub.style.color = todayRev >= dailyAvg ? '#166534' : '#991b1b'; }
-        } catch(e) { console.warn('Shopify today vs month failed:', e); }
+          if (sub) { sub.textContent = t.total >= dailyAvg ? 'above pace' : 'below pace'; sub.style.color = t.total >= dailyAvg ? '#166534' : '#991b1b'; }
+        } catch(e) {
+          console.warn('Shopify today vs month failed:', e);
+          set('shTodayVal','—'); set('shMonthVal','—'); set('shDailyAvgVal','—'); set('shTodayVsAvgVal','—');
+        }
       })();
       </script>
 
