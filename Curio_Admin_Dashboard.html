@@ -8702,9 +8702,9 @@ window.syncNow = async function(channel, btn) {
     if (e.target.id === 'btnZohoRefresh' || e.target.id === 'btnDispRefresh') {
       e.target.disabled = true;
       e.target.textContent = 'Syncing from Zoho…';
-      fetch(EXEC + '?q=sync_zoho_all').then(r=>r.json()).then(() => {
+      fetch(EXEC, {method:'POST', body: JSON.stringify({action:'sync_now', user:'dashboard', payload:{channel:'zoho'}})}).then(r=>r.json()).then(() => {
         return fetchZoho();
-      }).finally(() => {
+      }).catch(err => { console.warn('Zoho sync failed', err); }).finally(() => {
         e.target.disabled = false;
         e.target.textContent = 'Refresh from Zoho';
       });
@@ -8878,7 +8878,7 @@ window.syncNow = async function(channel, btn) {
     if (e.target.id === 'btnClRefresh') {
       e.target.disabled = true;
       e.target.textContent = 'Syncing…';
-      fetch(EXEC + '?q=sync_zoho_all').then(r=>r.json()).then(() => fetchZohoCustomerLedger()).finally(() => {
+      fetch(EXEC, {method:'POST', body: JSON.stringify({action:'sync_now', user:'dashboard', payload:{channel:'zoho'}})}).then(r=>r.json()).then(() => fetchZohoCustomerLedger()).catch(err => { console.warn('Zoho sync failed', err); }).finally(() => {
         e.target.disabled = false;
         e.target.textContent = 'Refresh from Zoho';
       });
