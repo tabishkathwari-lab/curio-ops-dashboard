@@ -377,6 +377,7 @@ function doGet(e) {
       case 'amazon_fba_inventory':    return respond({ ok: true, data: readSheet('Amazon_FBA_Inventory') });
       case 'shopify_monthly':         return respond({ ok: true, data: readSheet('Sales_Shopify_Monthly') });
       case 'shopify_live':            return respond({ ok: true, data: readSheet('Sales_Shopify_Live') });
+      case 'shopify_raw':             return respond({ ok: true, data: readSheet('Sales_Shopify') });
       case 'shiprocket_live':         return respond({ ok: true, data: readSheet('Shipments_Shiprocket_Live') });
       case 'google_ads_live':         return respond({ ok: true, data: readSheet('Ads_Google_Live') });
       case 'amazon_ads_live':         return respond({ ok: true, data: readSheet('Ads_Amazon_Live') });
