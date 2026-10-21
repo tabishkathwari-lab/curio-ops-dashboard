@@ -8938,13 +8938,14 @@ window.syncNow = async function(channel, btn) {
   async function loadMtExtras(force) {
     if (!force && cachedMtExtras) return cachedMtExtras;
     const safe = async (q) => { try { const r = await fetch(EXEC + '?q=' + q); const j = await r.json(); return j && j.data ? j.data : []; } catch (e) { return []; } };
-    const [mtInvoices, promoterRows, storeReports] = await Promise.all([
+    const [mtInvoices, promoterRows, storeReports, officeEntries] = await Promise.all([
       safe('mt_invoices'),
       safe('mt_promoter'),
-      safe('mt_store_reports')
+      safe('mt_store_reports'),
+      safe('mt_office_entries')
     ]);
     const toArr = x => Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.values(x) : []);
-    cachedMtExtras = { mtInvoices: toArr(mtInvoices), promoterRows: toArr(promoterRows), storeReports: toArr(storeReports) };
+    cachedMtExtras = { mtInvoices: toArr(mtInvoices), promoterRows: toArr(promoterRows), storeReports: toArr(storeReports), officeEntries: toArr(officeEntries) };
     return cachedMtExtras;
   }
 
@@ -9464,6 +9465,26 @@ window.syncNow = async function(channel, btn) {
         const store = String(r.Store || r.store || '').trim();
         const chain = String(r.Chain || r.chain || '').trim();
         const qty = +(r.Units || r.units || r.Sold || r.sold || 0);
+        if (!qty) return;
+        let key = store && perStore[store] ? store : (chainToStoreKey[normChain(chain)] || store);
+        if (!key) return;
+        if (!perStore[key]) perStore[key] = { store: store || chain, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[key].sold_qty += qty;
+      });
+      // Add secondary from office entries (Modern Bazaar store reports etc. — logged via admin manual entry)
+      // These rows have Store_Name field, no explicit Chain — infer chain from store name prefix (MB → Modern Bazaar, FS → Food Square, etc.)
+      const inferChain = store => {
+        const s = String(store||'').toLowerCase();
+        if (/modern\s*bazaar|^mb\b/.test(s)) return 'Modern Bazaar';
+        if (/food\s*square|^fs\b/.test(s)) return 'Food Square';
+        if (/pick\s*n\s*choose|^pnc\b/.test(s)) return 'Pick N Choose';
+        if (/aap\s*ka\s*bazar|^ab\b/.test(s)) return 'AAP KA BAZAR';
+        return '';
+      };
+      (extras.officeEntries || []).forEach(r => {
+        const store = String(r.Store_Name || r.store || '').trim();
+        const chain = String(r.Chain || r.chain || inferChain(store) || '').trim();
+        const qty = +(r.Units_Sold || r.units_sold || r.Units || r.Sold || 0);
         if (!qty) return;
         let key = store && perStore[store] ? store : (chainToStoreKey[normChain(chain)] || store);
         if (!key) return;
