@@ -9434,21 +9434,41 @@ window.syncNow = async function(channel, btn) {
         const d = String(inv.Date || '').slice(0, 10);
         if (d > s.last) s.last = d;
       });
+      // Chain-match helper — invoice side uses Customer_Raw ("FOOD SQUARE-LANDCRAFT RETAIL PRIVATE LIMITED"),
+      // secondary side uses friendly chain names ("Food Square", "Landcraft Retail"). Normalize both.
+      const chainKey = c => String(c||'').toLowerCase().replace(/[^a-z]/g,'');
+      const CHAIN_ALIAS = {
+        'foodsquare':'foodsquare', 'landcraftretail':'foodsquare', 'landcraftretailprivatelimited':'foodsquare', 'foodsquarelandcraftretailprivatelimited':'foodsquare',
+        'modernbazaar':'modernbazaar', 'newmodernbazaar':'modernbazaar', 'newmodernbazaardepartmentalstoresprivatelimited':'modernbazaar',
+        'picknchoose':'picknchoose', 'picknchoosesupermarket':'picknchoose',
+        'aapkabazar':'aapkabazar', 'aapkabazaar':'aapkabazar',
+      };
+      const normChain = c => CHAIN_ALIAS[chainKey(c)] || chainKey(c);
+      // Build chain → first-perStore-row index so secondary can roll into the same chain row
+      const chainToStoreKey = {};
+      Object.keys(perStore).forEach(k => { const n = normChain(perStore[k].chain); if (!chainToStoreKey[n]) chainToStoreKey[n] = k; });
       // Add secondary from promoter sales if available
       (extras.promoterRows || []).forEach(r => {
         const store = String(r.Store || r.store || '').trim();
+        const chain = String(r.Chain || r.chain || '').trim();
         const qty = +(r.Sold || r.sold || r.Units || 0);
-        if (!store || !qty) return;
-        if (!perStore[store]) perStore[store] = { store, chain: String(r.Chain||r.chain||'').trim(), invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
-        perStore[store].sold_qty += qty;
+        if (!qty) return;
+        // Prefer exact store match; else roll into chain's primary invoice bucket
+        let key = store && perStore[store] ? store : (chainToStoreKey[normChain(chain)] || store);
+        if (!key) return;
+        if (!perStore[key]) perStore[key] = { store: store || chain, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[key].sold_qty += qty;
       });
-      // Add secondary from manual store reports
+      // Add secondary from manual store reports (MT_Store_Reports sheet uses `Units` field)
       (extras.storeReports || []).forEach(r => {
         const store = String(r.Store || r.store || '').trim();
-        const qty = +(r.Sold || r.sold || 0);
-        if (!store || !qty) return;
-        if (!perStore[store]) perStore[store] = { store, chain: String(r.Chain||r.chain||'').trim(), invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
-        perStore[store].sold_qty += qty;
+        const chain = String(r.Chain || r.chain || '').trim();
+        const qty = +(r.Units || r.units || r.Sold || r.sold || 0);
+        if (!qty) return;
+        let key = store && perStore[store] ? store : (chainToStoreKey[normChain(chain)] || store);
+        if (!key) return;
+        if (!perStore[key]) perStore[key] = { store: store || chain, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[key].sold_qty += qty;
       });
 
       const stores = Object.values(perStore).sort((a,b) => b.billed_val - a.billed_val);
