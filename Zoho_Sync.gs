@@ -106,6 +106,41 @@ function fetchZohoPurchaseOrdersAll() {
   return rows.length;
 }
 
+function fetchZohoBillsAll() {
+  const H = ['bill_id','bill_number','vendor_name','vendor_id','date','due_date','status','total','balance','currency','reference_number','created_time'];
+  const MAP = { currency:'currency_code' };
+  const rows = [];
+  let page = 1;
+  while (page <= 100) {
+    const r = zohoFetch_('/bills?page=' + page + '&per_page=200');
+    const list = r.bills || [];
+    if (!list.length) break;
+    list.forEach(b => rows.push(H.map(h => { const k = MAP[h] || h; return b[k] != null ? b[k] : ''; })));
+    if (!r.page_context || !r.page_context.has_more_page) break;
+    page++;
+    Utilities.sleep(300);
+  }
+  _writeZohoSheet_('Zoho_Bills', H, rows);
+  return rows.length;
+}
+
+function fetchZohoExpensesAll() {
+  const H = ['expense_id','date','account_name','paid_through_account_name','vendor_name','customer_name','total','status','reference_number','description','created_time'];
+  const rows = [];
+  let page = 1;
+  while (page <= 100) {
+    const r = zohoFetch_('/expenses?page=' + page + '&per_page=200');
+    const list = r.expenses || [];
+    if (!list.length) break;
+    list.forEach(e => rows.push(H.map(h => e[h] != null ? e[h] : '')));
+    if (!r.page_context || !r.page_context.has_more_page) break;
+    page++;
+    Utilities.sleep(300);
+  }
+  _writeZohoSheet_('Zoho_Expenses', H, rows);
+  return rows.length;
+}
+
 function fetchZohoItemsAll() {
   const H = ['item_id','sku','name','rate','stock_on_hand','available_stock','status','unit','item_type'];
   const rows = [];
@@ -129,6 +164,8 @@ function syncZohoBooks() {
   try { out.sos = fetchZohoSalesOrdersAll(); } catch(e) { out.sos_err = e.message; }
   try { out.pos = fetchZohoPurchaseOrdersAll(); } catch(e) { out.pos_err = e.message; }
   try { out.items = fetchZohoItemsAll(); } catch(e) { out.items_err = e.message; }
+  try { out.bills = fetchZohoBillsAll(); } catch(e) { out.bills_err = e.message; }
+  try { out.expenses = fetchZohoExpensesAll(); } catch(e) { out.expenses_err = e.message; }
   Logger.log('Zoho sync: ' + JSON.stringify(out));
   return out;
 }

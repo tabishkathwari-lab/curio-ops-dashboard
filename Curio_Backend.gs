@@ -390,6 +390,8 @@ function doGet(e) {
       case 'zoho_sos':                return respond({ ok: true, data: readSheet('Zoho_SalesOrders') });
       case 'zoho_pos':                return respond({ ok: true, data: readSheet('Zoho_PurchaseOrders') });
       case 'zoho_items':              return respond({ ok: true, data: readSheet('Zoho_Items') });
+      case 'zoho_bills':              return respond({ ok: true, data: readSheet('Zoho_Bills') });
+      case 'zoho_expenses':           return respond({ ok: true, data: readSheet('Zoho_Expenses') });
       case 'zoho_invoice_lines':      return respond({ ok: true, data: readSheet('Zoho_Invoice_Lines') });
       case 'sync_zoho_all':           { try { syncZohoAllDeltas(); return respond({ ok: true, message: 'Zoho delta sync completed' }); } catch(e) { return respond({ ok: false, error: 'Zoho sync failed: ' + e.message }); } }
       case 'blinkit_raw':             return respond({ ok: true, data: readSheet('Sales_Blinkit') });
