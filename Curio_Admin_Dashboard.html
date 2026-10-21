@@ -673,6 +673,98 @@ window.syncNow = async function(channel, btn) {
           </table>
         </div>
       </div>
+      <!-- ========== CHANNEL ROI · OFFTAKE vs SPEND ========== -->
+      <div class="card" style="margin-bottom:20px;">
+        <h2 style="display:flex;align-items:center;gap:10px;">📊 Channel ROI · Lifetime offtake vs spend <span class="badge ok" id="croiLiveBadge">Live</span><span style="margin-left:auto;font-size:11px;color:#64748b;font-weight:400;">Spend = platform bills + display fees + ads · Offtake = secondary consumer sales</span></h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <th style="text-align:left;padding:10px 12px;font-weight:600;color:#475569;">Channel</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Offtake (₹)</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Spend (₹)</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Net (₹)</th>
+                <th style="text-align:center;padding:10px 12px;font-weight:600;color:#475569;">Ratio</th>
+                <th style="text-align:left;padding:10px 12px;font-weight:600;color:#475569;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="croiTbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">Loading channel ROI…</td></tr></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;padding:8px 12px;background:#f8fafc;border-radius:6px;font-size:11px;color:#64748b;">
+          <strong>Ratio</strong> = offtake ÷ spend. <strong>Status</strong>: 🟢 >1.5x · 🟡 0.8–1.5x · 🔴 &lt;0.8x. B2B/Shopify have no middleman fees so "spend" here is minimal.
+        </div>
+      </div>
+      <script>
+      (async function channelROI() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const sum = (a, f) => (a||[]).reduce((s, r) => s + (Number(f(r)) || 0), 0);
+        try {
+          const [bl, bm, am, bills, mtInv, mtSR, mtOff, shM] = await Promise.all([
+            fetch(EXEC + '?q=blinkit_raw').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=blinkit_monthly').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=amazon_ads_live').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=zoho_bills').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=mt_invoices').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=mt_store_reports').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=mt_office_entries').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json()).catch(()=>({})),
+          ]);
+          const allBills = bills?.data || [];
+          // Blinkit
+          const blOfftake = sum(bl?.data, r => r.Total_Sales || r.Net_Sales);
+          const blBills = allBills.filter(b => /blink/i.test(String(b.vendor_name||'')));
+          const blBillSpend = sum(blBills, b => b.total);
+          const blAds = sum(bm?.data, r => r.Ad_Spend);
+          const blSpend = blBillSpend + blAds;
+          // Amazon (ad-attributed only — raw sales not loaded)
+          const amOfftake = sum(am?.data, r => r.Sales);
+          const amAdCost = sum(am?.data, r => r.Cost);
+          const amBills = allBills.filter(b => /amazon|clicktech/i.test(String(b.vendor_name||'')));
+          const amBillSpend = sum(amBills, b => b.total);
+          const amSpend = amBillSpend + amAdCost;
+          // Shopify (fees embedded in payout — no bills)
+          const shOfftake = sum(shM?.data, r => r.Revenue || r.Total);
+          const shSpend = 0;
+          // Modern Trade (all chains combined)
+          const mtOfftake = sum(mtSR?.data, r => r.Value) + sum(mtOff?.data, r => r.Revenue);
+          const mtDisplayBills = allBills.filter(b => /land\s*craft|modern\s*bazaar|new\s*modern|pick\s*n\s*choose|aap\s*ka\s*bazar/i.test(String(b.vendor_name||'')));
+          const mtSpend = sum(mtDisplayBills, b => b.total);
+          const rows = [
+            { name: 'Blinkit', offtake: blOfftake, spend: blSpend, note: 'Platform + ads (Dec 25 → now)' },
+            { name: 'Shopify', offtake: shOfftake, spend: shSpend, note: 'Fees in payout; no bills' },
+            { name: 'Amazon', offtake: amOfftake, spend: amSpend, note: 'Ad-attributed only; organic missing' },
+            { name: 'Modern Trade', offtake: mtOfftake, spend: mtSpend, note: 'FS + MB + others combined' },
+          ];
+          const statusFor = r => {
+            if (r.spend < 1000) return { emoji: '🟢', label: 'No fee channel', color: '#059669' };
+            const ratio = r.offtake / r.spend;
+            if (ratio >= 1.5) return { emoji: '🟢', label: 'Profitable', color: '#059669' };
+            if (ratio >= 0.8) return { emoji: '🟡', label: 'Breakeven', color: '#b45309' };
+            return { emoji: '🔴', label: 'Loss-making', color: '#dc2626' };
+          };
+          const tbody = document.getElementById('croiTbody');
+          tbody.innerHTML = rows.map(r => {
+            const net = r.offtake - r.spend;
+            const ratio = r.spend > 0 ? (r.offtake / r.spend).toFixed(2) + 'x' : '—';
+            const st = statusFor(r);
+            return `<tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:11px 12px;"><strong>${r.name}</strong><div style="font-size:11px;color:#94a3b8;">${r.note}</div></td>
+              <td style="text-align:right;padding:11px 12px;font-weight:600;">${fmt(r.offtake)}</td>
+              <td style="text-align:right;padding:11px 12px;color:#64748b;">${fmt(r.spend)}</td>
+              <td style="text-align:right;padding:11px 12px;font-weight:700;color:${net >= 0 ? '#059669' : '#dc2626'};">${net >= 0 ? '+' : ''}${fmt(net)}</td>
+              <td style="text-align:center;padding:11px 12px;font-weight:600;color:${st.color};">${ratio}</td>
+              <td style="padding:11px 12px;"><span style="color:${st.color};font-size:12px;">${st.emoji} ${st.label}</span></td>
+            </tr>`;
+          }).join('');
+        } catch (e) {
+          console.warn('Channel ROI failed:', e);
+          document.getElementById('croiTbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Failed to load: ' + e.message + '</td></tr>';
+        }
+      })();
+      </script>
+
       <script>
       (async function channelBreakdown() {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
