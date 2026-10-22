@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  /* Belt-and-braces: force <script> and <template> to never display, even if a print stylesheet or extension tries to reveal them. Fixes the raw-JS-leak issue at bottom of pages. */
+  script, template, noscript { display: none !important; visibility: hidden !important; }
+  @media print { script, template, noscript, style { display: none !important; visibility: hidden !important; } }
+</style>
 <title>Curio Admin Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -673,6 +678,100 @@ window.syncNow = async function(channel, btn) {
           </table>
         </div>
       </div>
+      <!-- ========== CHANNEL ROI · OFFTAKE vs SPEND ========== -->
+      <div class="card" style="margin-bottom:20px;">
+        <h2 style="display:flex;align-items:center;gap:10px;">📊 Channel ROI · Lifetime offtake vs spend <span class="badge ok" id="croiLiveBadge">Live</span><span style="margin-left:auto;font-size:11px;color:#64748b;font-weight:400;">Spend = platform bills + display fees + ads · Offtake = secondary consumer sales</span></h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <th style="text-align:left;padding:10px 12px;font-weight:600;color:#475569;">Channel</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Offtake (₹)</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Spend (₹)</th>
+                <th style="text-align:right;padding:10px 12px;font-weight:600;color:#475569;">Net (₹)</th>
+                <th style="text-align:center;padding:10px 12px;font-weight:600;color:#475569;">Ratio</th>
+                <th style="text-align:left;padding:10px 12px;font-weight:600;color:#475569;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="croiTbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">Loading channel ROI…</td></tr></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;padding:8px 12px;background:#f8fafc;border-radius:6px;font-size:11px;color:#64748b;">
+          <strong>Ratio</strong> = offtake ÷ spend. <strong>Status</strong>: 🟢 >1.5x · 🟡 0.8–1.5x · 🔴 &lt;0.8x. B2B/Shopify have no middleman fees so "spend" here is minimal.
+        </div>
+      </div>
+      <script>
+      (async function channelROI() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const sum = (a, f) => (a||[]).reduce((s, r) => s + (Number(f(r)) || 0), 0);
+        try {
+          const [bl, bm, am, bills, mtInv, mtSR, mtOff, shM] = await Promise.all([
+            fetch(EXEC + '?q=blinkit_raw').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=blinkit_monthly').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=amazon_ads_live').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=zoho_bills').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=mt_invoices').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=mt_store_reports').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=mt_office_entries').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=shopify_monthly').then(r=>r.json()).catch(()=>({})),
+          ]);
+          const allBills = bills?.data || [];
+          // Blinkit
+          const blOfftake = sum(bl?.data, r => r.Total_Sales || r.Net_Sales);
+          const blBills = allBills.filter(b => /blink/i.test(String(b.vendor_name||'')));
+          const blBillSpend = sum(blBills, b => b.total);
+          const blAds = sum(bm?.data, r => r.Ad_Spend);
+          const blSpend = blBillSpend + blAds;
+          // Amazon (ad-attributed only — raw sales not loaded)
+          const amOfftake = sum(am?.data, r => r.Sales);
+          const amAdCost = sum(am?.data, r => r.Cost);
+          const amBills = allBills.filter(b => /amazon|clicktech/i.test(String(b.vendor_name||'')));
+          const amBillSpend = sum(amBills, b => b.total);
+          const amSpend = amBillSpend + amAdCost;
+          // Shopify (fees embedded in payout — no bills)
+          const shOfftake = sum(shM?.data, r => r.Revenue || r.Total);
+          const shSpend = 0;
+          // Modern Trade (all chains combined)
+          const mtOfftake = sum(mtSR?.data, r => r.Value) + sum(mtOff?.data, r => r.Revenue);
+          const mtDisplayBills = allBills.filter(b => /land\s*craft|modern\s*bazaar|new\s*modern|pick\s*n\s*choose|aap\s*ka\s*bazar/i.test(String(b.vendor_name||'')));
+          const mtSpend = sum(mtDisplayBills, b => b.total);
+          const rows = [
+            { name: 'Blinkit', offtake: blOfftake, spend: blSpend, note: 'Platform + ads (Dec 25 → now)' },
+            { name: 'Shopify', offtake: shOfftake, spend: shSpend, note: 'Fees in payout; no bills' },
+            { name: 'Amazon', offtake: amOfftake, spend: amSpend, note: 'Ad-attributed only; organic missing' },
+            { name: 'Modern Trade', offtake: mtOfftake, spend: mtSpend, note: 'FS + MB + others combined' },
+          ];
+          const statusFor = r => {
+            if (r.spend < 1000) return { emoji: '🟢', label: 'No fee channel', color: '#059669' };
+            const ratio = r.offtake / r.spend;
+            if (ratio >= 1.5) return { emoji: '🟢', label: 'Profitable', color: '#059669' };
+            if (ratio >= 0.8) return { emoji: '🟡', label: 'Breakeven', color: '#b45309' };
+            return { emoji: '🔴', label: 'Loss-making', color: '#dc2626' };
+          };
+          const tbody = document.getElementById('croiTbody');
+          tbody.innerHTML = rows.map(r => {
+            const net = r.offtake - r.spend;
+            const ratio = r.spend > 0 ? (r.offtake / r.spend).toFixed(2) + 'x' : '—';
+            const st = statusFor(r);
+            const netColor = net >= 0 ? '#059669' : '#dc2626';
+            const netSign = net >= 0 ? '+' : '';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:11px 12px;"><strong>' + r.name + '</strong><div style="font-size:11px;color:#94a3b8;">' + r.note + '</div></td>' +
+              '<td style="text-align:right;padding:11px 12px;font-weight:600;">' + fmt(r.offtake) + '</td>' +
+              '<td style="text-align:right;padding:11px 12px;color:#64748b;">' + fmt(r.spend) + '</td>' +
+              '<td style="text-align:right;padding:11px 12px;font-weight:700;color:' + netColor + ';">' + netSign + fmt(net) + '</td>' +
+              '<td style="text-align:center;padding:11px 12px;font-weight:600;color:' + st.color + ';">' + ratio + '</td>' +
+              '<td style="padding:11px 12px;"><span style="color:' + st.color + ';font-size:12px;">' + st.emoji + ' ' + st.label + '</span></td>' +
+              '</tr>';
+          }).join('');
+        } catch (e) {
+          console.warn('Channel ROI failed:', e);
+          document.getElementById('croiTbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Failed to load: ' + e.message + '</td></tr>';
+        }
+      })();
+      </script>
+
       <script>
       (async function channelBreakdown() {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
@@ -4165,13 +4264,173 @@ window.syncNow = async function(channel, btn) {
           <button class="btn">+ Record payment</button>
         </div>
       </div>
-      <div class="card">
-        <div style="padding: 60px 24px; text-align: center; color: #999;">
-          <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
-          <div style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 6px;">No data yet</div>
-          <div style="font-size: 12px;">This section populates as data flows in via the entry apps.</div>
+      <!-- KPI row -->
+      <div class="kpi-row" id="payKpiRow">
+        <div class="kpi"><div class="label">Total receivable (open invoices)</div><div class="value" id="payRecvTotal">—</div><div class="sub" id="payRecvCount">—</div></div>
+        <div class="kpi" style="background:#fef2f2;"><div class="label">90+ days overdue</div><div class="value" id="payRecv90p" style="color:#dc2626;">—</div><div class="sub">worst exposure</div></div>
+        <div class="kpi" style="background:#eff6ff;"><div class="label">Total payable (open bills)</div><div class="value" id="payPayblTotal" style="color:#1e40af;">—</div><div class="sub" id="payPayblCount">—</div></div>
+        <div class="kpi" style="background:#f0fdf4;"><div class="label">Net position</div><div class="value" id="payNetPos" style="color:#059669;">—</div><div class="sub">receivable − payable</div></div>
+      </div>
+
+      <!-- Receivables aging -->
+      <div class="card" style="margin-top:16px;">
+        <h2>Receivables aging <span class="badge" id="payRecvBadge">—</span></h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                <th style="text-align:left; padding:10px 12px;">Customer</th>
+                <th style="text-align:right; padding:10px 12px;">0-30 d</th>
+                <th style="text-align:right; padding:10px 12px;">31-60 d</th>
+                <th style="text-align:right; padding:10px 12px;">61-90 d</th>
+                <th style="text-align:right; padding:10px 12px; color:#dc2626;">90+ d</th>
+                <th style="text-align:right; padding:10px 12px;">Total due</th>
+                <th style="text-align:right; padding:10px 12px;">Oldest</th>
+              </tr>
+            </thead>
+            <tbody id="payRecvTbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Loading receivables…</td></tr></tbody>
+          </table>
         </div>
       </div>
+
+      <!-- Payables aging -->
+      <div class="card" style="margin-top:16px;">
+        <h2>Payables aging <span class="badge" id="payPayblBadge">—</span></h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                <th style="text-align:left; padding:10px 12px;">Vendor</th>
+                <th style="text-align:right; padding:10px 12px;">0-30 d</th>
+                <th style="text-align:right; padding:10px 12px;">31-60 d</th>
+                <th style="text-align:right; padding:10px 12px;">61-90 d</th>
+                <th style="text-align:right; padding:10px 12px; color:#dc2626;">90+ d</th>
+                <th style="text-align:right; padding:10px 12px;">Total owed</th>
+                <th style="text-align:right; padding:10px 12px;">Oldest</th>
+              </tr>
+            </thead>
+            <tbody id="payPayblTbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Loading payables…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Credit notes -->
+      <div class="card" style="margin-top:16px;">
+        <h2>Credit notes issued <span class="badge" id="payCNBadge">—</span></h2>
+        <div style="font-size:12px; color:#64748b; margin-bottom:12px;">Returns / MRP + constitution resets. These reduce receivables.</div>
+        <div style="overflow-x:auto; max-height:300px;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead style="position:sticky; top:0; background:#f8fafc;">
+              <tr><th style="text-align:left; padding:10px 12px;">CN #</th><th style="text-align:left; padding:10px 12px;">Date</th><th style="text-align:left; padding:10px 12px;">Customer</th><th style="text-align:right; padding:10px 12px;">Amount</th><th style="text-align:left; padding:10px 12px;">Status</th></tr>
+            </thead>
+            <tbody id="payCNTbody"><tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">Loading credit notes…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <script>
+      (async function paymentsPage() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const esc = s => String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+        try {
+          const [invR, billR, cnR] = await Promise.all([
+            fetch(EXEC + '?q=zoho_invoices').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=zoho_bills').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=zoho_credit_notes').then(r=>r.json()).catch(()=>({})),
+          ]);
+          const invs = (invR?.data?.invoices || invR?.data || []);
+          const bills = billR?.data || [];
+          const cns = cnR?.data || [];
+          const now = Date.now();
+          const ageOf = d => Math.floor((now - new Date(d).getTime()) / 86400000);
+          const bucket = age => age < 30 ? 'd0' : age < 60 ? 'd30' : age < 90 ? 'd60' : 'd90';
+
+          // RECEIVABLES
+          const openInvs = invs.filter(i => Number(i.balance||0) > 0);
+          const byCustomer = {};
+          openInvs.forEach(i => {
+            const c = i.customer_name || '—';
+            if (!byCustomer[c]) byCustomer[c] = {d0:0,d30:0,d60:0,d90:0,total:0,oldest:9999};
+            const age = ageOf(i.date);
+            byCustomer[c][bucket(age)] += Number(i.balance||0);
+            byCustomer[c].total += Number(i.balance||0);
+            if (age < byCustomer[c].oldest) byCustomer[c].oldest = age;
+          });
+          const sortedCust = Object.entries(byCustomer).sort((a,b) => b[1].total - a[1].total);
+          const totalRecv = sortedCust.reduce((s,[,v])=>s+v.total, 0);
+          const totalRecv90 = sortedCust.reduce((s,[,v])=>s+v.d90, 0);
+          document.getElementById('payRecvTotal').textContent = fmt(totalRecv);
+          document.getElementById('payRecvCount').textContent = openInvs.length + ' open invoices · ' + sortedCust.length + ' customers';
+          document.getElementById('payRecv90p').textContent = fmt(totalRecv90);
+          document.getElementById('payRecvBadge').textContent = sortedCust.length + ' customers';
+          document.getElementById('payRecvTbody').innerHTML = sortedCust.map(([c,v]) => {
+            const red = v.d90 > 0 ? 'color:#dc2626; font-weight:600;' : '';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:10px 12px;"><strong>' + esc(c) + '</strong></td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(v.d0) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(v.d30) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(v.d60) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;' + red + '">' + fmt(v.d90) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-weight:700;">' + fmt(v.total) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-size:11px; color:#64748b;">' + v.oldest + ' d</td>' +
+              '</tr>';
+          }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#059669;">All receivables cleared — nothing open.</td></tr>';
+
+          // PAYABLES
+          const openBills = bills.filter(b => Number(b.balance||0) > 0);
+          const byVendor = {};
+          openBills.forEach(b => {
+            const v = b.vendor_name || '—';
+            if (!byVendor[v]) byVendor[v] = {d0:0,d30:0,d60:0,d90:0,total:0,oldest:9999};
+            const age = ageOf(b.date);
+            byVendor[v][bucket(age)] += Number(b.balance||0);
+            byVendor[v].total += Number(b.balance||0);
+            if (age < byVendor[v].oldest) byVendor[v].oldest = age;
+          });
+          const sortedVend = Object.entries(byVendor).sort((a,b) => b[1].total - a[1].total);
+          const totalPaybl = sortedVend.reduce((s,[,v])=>s+v.total, 0);
+          document.getElementById('payPayblTotal').textContent = fmt(totalPaybl);
+          document.getElementById('payPayblCount').textContent = openBills.length + ' open bills · ' + sortedVend.length + ' vendors';
+          document.getElementById('payPayblBadge').textContent = sortedVend.length + ' vendors';
+          document.getElementById('payPayblTbody').innerHTML = sortedVend.slice(0,30).map(([v,x]) => {
+            const red = x.d90 > 0 ? 'color:#dc2626; font-weight:600;' : '';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:10px 12px;"><strong>' + esc(v) + '</strong></td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(x.d0) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(x.d30) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(x.d60) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;' + red + '">' + fmt(x.d90) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-weight:700;">' + fmt(x.total) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-size:11px; color:#64748b;">' + x.oldest + ' d</td>' +
+              '</tr>';
+          }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#059669;">All bills paid.</td></tr>';
+
+          // NET POSITION
+          const net = totalRecv - totalPaybl;
+          const netEl = document.getElementById('payNetPos');
+          netEl.textContent = (net >= 0 ? '+' : '') + fmt(net);
+          netEl.style.color = net >= 0 ? '#059669' : '#dc2626';
+
+          // CREDIT NOTES
+          const sortedCNs = cns.slice().sort((a,b) => String(b.date).localeCompare(String(a.date)));
+          const cnTotal = sortedCNs.reduce((s,c) => s + Number(c.total||0), 0);
+          document.getElementById('payCNBadge').textContent = sortedCNs.length + ' CNs · ' + fmt(cnTotal) + ' total';
+          document.getElementById('payCNTbody').innerHTML = sortedCNs.slice(0,50).map(c => {
+            const statusColor = c.status === 'closed' ? '#059669' : c.status === 'open' ? '#b45309' : '#64748b';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:10px 12px; font-family:var(--font-mono); font-size:12px;">' + esc(c.creditnote_number) + '</td>' +
+              '<td style="padding:10px 12px;">' + String(c.date||'').slice(0,10) + '</td>' +
+              '<td style="padding:10px 12px;">' + esc(c.customer_name) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-weight:600;">' + fmt(c.total) + '</td>' +
+              '<td style="padding:10px 12px;"><span style="color:' + statusColor + '; font-size:11px; text-transform:capitalize;">' + esc(c.status || '—') + '</span></td>' +
+              '</tr>';
+          }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No credit notes.</td></tr>';
+        } catch(e) {
+          console.warn('Payments page failed:', e);
+        }
+      })();
+      </script>
     </div>
 
     <!-- PAGE: FY26 AUDITED FINANCIAL STATEMENTS -->
@@ -8129,7 +8388,7 @@ window.syncNow = async function(channel, btn) {
     amazon: { pageId:'page-amazon', title:'📦 Amazon · Primary + Secondary', primaryLabel:'Curio → Amazon FBA (Zoho invoices)', secondaryLabel:'Amazon → end consumer (order reports)', primaryFilter: i => /amazon/i.test(String(i.Chain||'')), primarySource:'mi', secondarySource:'am', type:'consignment' },
     mt: { pageId:'page-mt-overview', title:'🏬 Modern Trade · Primary + Secondary', primaryLabel:'Curio → MT chains (Zoho invoices)', secondaryLabel:'MT chains → end consumer (promoter tracker)', primaryFilter: i => !/blinkit|amazon/i.test(String(i.Chain||'')), primarySource:'mi', secondarySource:'mo', type:'consignment' },
     shopify: { pageId:'page-shopify', title:'🛒 Shopify D2C · Direct sales', primaryLabel:'Curio → end consumer (website orders — invoiced and delivered directly)', secondaryLabel:'', primaryFilter:null, primarySource:'sh', secondarySource:'sh', type:'direct' },
-    b2b: { pageId:'page-b2b', title:'💼 B2B · Direct sales', primaryLabel:'Curio → bulk buyers (Kissansay, Lulu, J&K — invoiced and delivered directly)', secondaryLabel:'', primaryFilter:null, primarySource:'b2', secondarySource:'b2', type:'direct' },
+    b2b: { pageId:'page-b2b', title:'💼 B2B · Direct sales', primaryLabel:'Curio → bulk buyers (Zoho invoices, excluding Blinkit + MT chains)', secondaryLabel:'', primaryFilter: i => { const c = String(i.customer_name||'').toLowerCase(); return !/blink|food\s*square|land\s*craft|modern\s*bazaar|new\s*modern|pick\s*n?\s*choose|aap\s*ka\s*bazar|marche/.test(c); }, primarySource:'zi', secondarySource:'b2', type:'direct' },
   };
 
   let RAW = null;
@@ -8938,13 +9197,14 @@ window.syncNow = async function(channel, btn) {
   async function loadMtExtras(force) {
     if (!force && cachedMtExtras) return cachedMtExtras;
     const safe = async (q) => { try { const r = await fetch(EXEC + '?q=' + q); const j = await r.json(); return j && j.data ? j.data : []; } catch (e) { return []; } };
-    const [mtInvoices, promoterRows, storeReports] = await Promise.all([
+    const [mtInvoices, promoterRows, storeReports, officeEntries] = await Promise.all([
       safe('mt_invoices'),
       safe('mt_promoter'),
-      safe('mt_store_reports')
+      safe('mt_store_reports'),
+      safe('mt_office_entries')
     ]);
     const toArr = x => Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.values(x) : []);
-    cachedMtExtras = { mtInvoices: toArr(mtInvoices), promoterRows: toArr(promoterRows), storeReports: toArr(storeReports) };
+    cachedMtExtras = { mtInvoices: toArr(mtInvoices), promoterRows: toArr(promoterRows), storeReports: toArr(storeReports), officeEntries: toArr(officeEntries) };
     return cachedMtExtras;
   }
 
@@ -9197,50 +9457,90 @@ window.syncNow = async function(channel, btn) {
       </div>
 
       <div class="card" id="mtCoverageSlot" style="padding-bottom:20px;">
-        <h2>Store coverage · Per-SKU shipped <span class="badge warn">Sample · 2 of 91 invoices</span></h2>
-        <div style="padding:12px 14px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; font-size:12px; color:#78350f; margin-bottom:16px;">
-          <strong>Sample view — 2 most recent invoices (Jul & Jun 2026).</strong> Full per-SKU-per-store backfill of all 91 MT invoices needs the Zoho detail-fetch fix (~15 min, see Curio_MT_B2B_Handoff.docx). Once Sahil ships that, this table shows every SKU × store × invoice automatically.
+        <h2>Store coverage · Per-SKU shipped <span class="badge ok" id="mtCovBadge">Live · Zoho invoice lines</span></h2>
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+          Every SKU × invoice × chain shipped, live from Zoho. Showing last 90 days by default — scroll or filter below. <span id="mtCovStats">—</span>
         </div>
-        <div style="overflow:auto; margin:0 -24px;">
-          <table>
-            <thead><tr><th>Store</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line value (₹)</th></tr></thead>
-            <tbody>
-              ${(() => {
-                const sample = [
-                  // Modern Bazaar INV-000566 (Dwarka Sec 21, 2026-07-03)
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Himalayan Badri Cow Ghee 500mL',6,7200],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Borage Honey Monofloral 500gm',6,3000],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Walnut 500gm',12,14400],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Qahwa 200gm',6,2600],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Almond 500gm',12,15600],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Ladakh Apricot 500gm',6,6200],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Saffron Mongra 2gm',6,5600],
-                  // Food Square INV-000564 (Ahmedabad, 2026-06-23)
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Almond Oil 100mL',12,7656],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Almond Oil 250mL',12,18560],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Apricot Oil 100mL',12,7954],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Apricot Oil 250mL',12,19886],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Himalayan Chamomile Infusion 60gm',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Himalayan Badri Cow Ghee 500mL',12,11931],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Almond 500gm',12,12926],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Qahwa 200gm',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Saffron Mongra 1gm',12,4640],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Saffron Mongra 2gm',12,9280],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Walnut 500gm',12,11931],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Ladakh Apricot 500gm',12,10274],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Borage Honey Monofloral 500gm',12,4971],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Mustard Oil 500mL',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Sidr Honey Monofloral 500gm',12,9280],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Zafrani Kehwa 250gm',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Walnut Oil 100mL',12,7954],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Walnut Oil 250mL',12,19886],
-                ];
-                return sample.map(r => `<tr><td style="padding-left:24px;"><strong>${r[0]}</strong></td><td>${r[1]}</td><td style="font-family:var(--font-mono);font-size:12px;">${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td class="num">${r[5]}</td><td class="num">${fmt(r[6])}</td></tr>`).join('');
-              })()}
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+          <input type="text" id="mtCovFilter" placeholder="Filter by chain, SKU, invoice…" style="flex:1; min-width:220px; padding:6px 10px; border:1px solid #d4d4d8; border-radius:6px; font-size:13px;">
+          <select id="mtCovPeriod" style="padding:6px 10px; border:1px solid #d4d4d8; border-radius:6px; font-size:13px;">
+            <option value="90">Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="365">Last 365 days</option>
+            <option value="0">All time</option>
+          </select>
+        </div>
+        <div style="overflow:auto; margin:0 -24px; max-height:460px;">
+          <table id="mtCovTable">
+            <thead style="position:sticky; top:0; background:#f8f6f1; z-index:1;"><tr><th>Store/Customer</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line value (₹)</th></tr></thead>
+            <tbody id="mtCovBody"><tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8;">Loading from Zoho invoice lines…</td></tr></tbody>
             </tbody>
           </table>
         </div>
       </div>
+      <script>
+      // IMPORTANT: this script is inside a template literal in renderMtPage(). All ${} must be escaped as \${}
+      // Use string concat instead of template literals to avoid outer-template clash.
+      (async function mtStoreCoverageLive() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; return '₹' + Math.round(n).toLocaleString('en-IN'); };
+        const esc = s => String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+        const inferChain = c => {
+          const s = String(c||'').toLowerCase();
+          if (/blink/.test(s)) return 'Blinkit';
+          if (/food\s*square|land\s*craft/.test(s)) return 'Food Square';
+          if (/modern\s*bazaar/.test(s)) return 'Modern Bazaar';
+          if (/pick\s*n?\s*choose/.test(s)) return 'Pick N Choose';
+          if (/aap\s*ka\s*bazar/.test(s)) return 'AAP KA BAZAR';
+          return c || '—';
+        };
+        try {
+          const r = await fetch(EXEC + '?q=zoho_invoice_lines').then(r => r.json());
+          const lines = (r && r.data || []).filter(l => l.Qty || l.Line_Total);
+          const tbody = document.getElementById('mtCovBody');
+          const stats = document.getElementById('mtCovStats');
+          const filterInput = document.getElementById('mtCovFilter');
+          const periodSelect = document.getElementById('mtCovPeriod');
+          const render = () => {
+            const q = (filterInput.value || '').trim().toLowerCase();
+            const periodDays = parseInt(periodSelect.value, 10);
+            const cutoff = periodDays > 0 ? Date.now() - periodDays * 86400000 : 0;
+            const filtered = lines.filter(l => {
+              const d = new Date(l.Invoice_Date).getTime();
+              if (periodDays > 0 && d < cutoff) return false;
+              if (q) {
+                const hay = [l.Customer_Name, l.Item_Name, l.Invoice_Number, l.SKU].join(' ').toLowerCase();
+                if (hay.indexOf(q) < 0) return false;
+              }
+              return true;
+            }).sort((a,b) => String(b.Invoice_Date).localeCompare(String(a.Invoice_Date)));
+            const totalQty = filtered.reduce((s,x) => s + (+x.Qty || 0), 0);
+            const totalVal = filtered.reduce((s,x) => s + (+x.Line_Total || 0), 0);
+            stats.textContent = filtered.length + ' line items · ' + totalQty.toLocaleString('en-IN') + ' units · ' + fmt(totalVal);
+            tbody.innerHTML = filtered.slice(0, 400).map(l => {
+              const chain = inferChain(l.Customer_Name);
+              const dateFmt = String(l.Invoice_Date||'').slice(0,10);
+              return '<tr>' +
+                '<td style="padding-left:24px;"><strong>' + esc(l.Customer_Name) + '</strong></td>' +
+                '<td><span style="font-size:11px; color:#64748b;">' + esc(chain) + '</span></td>' +
+                '<td style="font-family:var(--font-mono);font-size:12px;">' + esc(l.Invoice_Number) + '</td>' +
+                '<td>' + dateFmt + '</td>' +
+                '<td>' + esc(l.Item_Name) + '</td>' +
+                '<td class="num">' + (l.Qty || 0) + '</td>' +
+                '<td class="num">' + fmt(l.Line_Total) + '</td>' +
+                '</tr>';
+            }).join('') + (filtered.length > 400 ? '<tr><td colspan="7" style="text-align:center; padding:12px; color:#94a3b8; font-size:12px;">… showing first 400 of ' + filtered.length + '. Narrow with the filter above.</td></tr>' : '');
+          };
+          filterInput.addEventListener('input', render);
+          periodSelect.addEventListener('change', render);
+          render();
+        } catch(e) {
+          console.warn('MT coverage failed:', e);
+          const tb = document.getElementById('mtCovBody');
+          if (tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626;">Failed to load: ' + e.message + '</td></tr>';
+        }
+      })();
+      </script>
 
       <div class="card" id="mtUploadSlot" style="padding-bottom:40px;">
         <h2>Upload MT stock snapshot · CSV</h2>
@@ -9434,21 +9734,61 @@ window.syncNow = async function(channel, btn) {
         const d = String(inv.Date || '').slice(0, 10);
         if (d > s.last) s.last = d;
       });
+      // Chain-match helper — invoice side uses Customer_Raw ("FOOD SQUARE-LANDCRAFT RETAIL PRIVATE LIMITED"),
+      // secondary side uses friendly chain names ("Food Square", "Landcraft Retail"). Normalize both.
+      const chainKey = c => String(c||'').toLowerCase().replace(/[^a-z]/g,'');
+      const CHAIN_ALIAS = {
+        'foodsquare':'foodsquare', 'landcraftretail':'foodsquare', 'landcraftretailprivatelimited':'foodsquare', 'foodsquarelandcraftretailprivatelimited':'foodsquare',
+        'modernbazaar':'modernbazaar', 'newmodernbazaar':'modernbazaar', 'newmodernbazaardepartmentalstoresprivatelimited':'modernbazaar',
+        'picknchoose':'picknchoose', 'picknchoosesupermarket':'picknchoose',
+        'aapkabazar':'aapkabazar', 'aapkabazaar':'aapkabazar',
+      };
+      const normChain = c => CHAIN_ALIAS[chainKey(c)] || chainKey(c);
+      // Build chain → first-perStore-row index so secondary can roll into the same chain row
+      const chainToStoreKey = {};
+      Object.keys(perStore).forEach(k => { const n = normChain(perStore[k].chain); if (!chainToStoreKey[n]) chainToStoreKey[n] = k; });
       // Add secondary from promoter sales if available
       (extras.promoterRows || []).forEach(r => {
         const store = String(r.Store || r.store || '').trim();
+        const chain = String(r.Chain || r.chain || '').trim();
         const qty = +(r.Sold || r.sold || r.Units || 0);
-        if (!store || !qty) return;
-        if (!perStore[store]) perStore[store] = { store, chain: String(r.Chain||r.chain||'').trim(), invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
-        perStore[store].sold_qty += qty;
+        if (!qty) return;
+        // Prefer exact store match; else roll into chain's primary invoice bucket
+        let key = store && perStore[store] ? store : (chainToStoreKey[normChain(chain)] || store);
+        if (!key) return;
+        if (!perStore[key]) perStore[key] = { store: store || chain, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[key].sold_qty += qty;
       });
-      // Add secondary from manual store reports
+      // Add secondary from manual store reports (MT_Store_Reports sheet uses `Units` field)
       (extras.storeReports || []).forEach(r => {
         const store = String(r.Store || r.store || '').trim();
-        const qty = +(r.Sold || r.sold || 0);
-        if (!store || !qty) return;
-        if (!perStore[store]) perStore[store] = { store, chain: String(r.Chain||r.chain||'').trim(), invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
-        perStore[store].sold_qty += qty;
+        const chain = String(r.Chain || r.chain || '').trim();
+        const qty = +(r.Units || r.units || r.Sold || r.sold || 0);
+        if (!qty) return;
+        let key = store && perStore[store] ? store : (chainToStoreKey[normChain(chain)] || store);
+        if (!key) return;
+        if (!perStore[key]) perStore[key] = { store: store || chain, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[key].sold_qty += qty;
+      });
+      // Add secondary from office entries (Modern Bazaar store reports etc. — logged via admin manual entry)
+      // These rows have Store_Name field, no explicit Chain — infer chain from store name prefix (MB → Modern Bazaar, FS → Food Square, etc.)
+      const inferChain = store => {
+        const s = String(store||'').toLowerCase();
+        if (/modern\s*bazaar|^mb\b/.test(s)) return 'Modern Bazaar';
+        if (/food\s*square|^fs\b/.test(s)) return 'Food Square';
+        if (/pick\s*n\s*choose|^pnc\b/.test(s)) return 'Pick N Choose';
+        if (/aap\s*ka\s*bazar|^ab\b/.test(s)) return 'AAP KA BAZAR';
+        return '';
+      };
+      (extras.officeEntries || []).forEach(r => {
+        const store = String(r.Store_Name || r.store || '').trim();
+        const chain = String(r.Chain || r.chain || inferChain(store) || '').trim();
+        const qty = +(r.Units_Sold || r.units_sold || r.Units || r.Sold || 0);
+        if (!qty) return;
+        let key = store && perStore[store] ? store : (chainToStoreKey[normChain(chain)] || store);
+        if (!key) return;
+        if (!perStore[key]) perStore[key] = { store: store || chain, chain, invoices: 0, billed_qty: 0, billed_val: 0, sold_qty: 0, last: '' };
+        perStore[key].sold_qty += qty;
       });
 
       const stores = Object.values(perStore).sort((a,b) => b.billed_val - a.billed_val);
@@ -9777,62 +10117,193 @@ window.syncNow = async function(channel, btn) {
 })();
 </script>
 
+<!-- =========================================================
+     MT Per-SKU: Billed vs Sold vs Remaining — alias-aware
+     Added 2026-10-23. Isolated string-concat only.
+     Reads: zoho_invoice_lines + mt_store_reports + sku_aliases + sku_master.
+     ========================================================= -->
 <script>
-(function mtCovLivePatchV2(){
+(function mtPerSkuAliasPatch(){
   var EXEC = "https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec";
-  function fmtR(n){ n = +n || 0; return "₹" + Math.round(n).toLocaleString("en-IN"); }
-  function esc(s){ return String(s||"").replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
-  function inferChain(c){ var s=String(c||"").toLowerCase(); if(/blink/.test(s))return "Blinkit"; if(/food\s*square|land\s*craft/.test(s))return "Food Square"; if(/modern\s*bazaar/.test(s))return "Modern Bazaar"; if(/pick\s*n?\s*choose/.test(s))return "Pick N Choose"; if(/aap\s*ka\s*bazar/.test(s))return "AAP KA BAZAR"; return c||"—"; }
-  function normSku(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
-  function patchCoverage(){
-    var slot = document.getElementById("mtCoverageSlot"); if(!slot) return false;
-    if (slot.getAttribute("data-livepatch")==="1") return true;
-    slot.setAttribute("data-livepatch","1");
-    slot.innerHTML = '<h2>Store coverage · Per-SKU shipped <span class="badge ok">Live · Zoho invoice lines</span></h2>' +
-      '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">Every SKU × invoice × chain shipped, live from Zoho. <span id="mtCovLiveStats">—</span></div>' +
-      '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">' +
-      '<input type="text" id="mtCovLiveFilter" placeholder="Filter by chain, SKU, invoice…" style="flex:1;min-width:220px;padding:6px 10px;border:1px solid #d4d4d8;border-radius:6px;font-size:13px;">' +
-      '<select id="mtCovLivePeriod" style="padding:6px 10px;border:1px solid #d4d4d8;border-radius:6px;font-size:13px;"><option value="90">Last 90 days</option><option value="180">Last 180 days</option><option value="365">Last 365 days</option><option value="0" selected>All time</option></select></div>' +
-      '<div style="overflow:auto;margin:0 -24px;max-height:460px;">' +
-      '<table id="mtCovLiveTable"><thead style="position:sticky;top:0;background:#f8f6f1;z-index:1;"><tr><th>Customer</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line ₹</th></tr></thead><tbody id="mtCovLiveBody"><tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Loading from Zoho invoice lines…</td></tr></tbody></table>' +
-      '</div>';
-    return true;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  function num(n){ n=+n||0; return n.toLocaleString('en-IN'); }
+  function inferChain(c){
+    var s = String(c||'').toLowerCase();
+    if (/blink/.test(s)) return null; // exclude blinkit from MT
+    if (/food\s*square|land\s*craft/.test(s)) return 'Food Square';
+    if (/modern\s*bazaar/.test(s)) return 'Modern Bazaar';
+    if (/pick\s*n?\s*choose/.test(s)) return 'Pick N Choose';
+    if (/aap\s*ka\s*bazar|aapka\s*bazar/.test(s)) return 'Aapka Bazar';
+    return null;
   }
-  function renderPerSku(lines, salesReports){
-    var container = document.getElementById("mtPerStoreSlot") || document.getElementById("mtCoverageSlot"); if (!container) return;
-    var existing = document.getElementById("mtPerSkuCard"); if (existing) existing.remove();
-    var card = document.createElement("div"); card.className = "card"; card.id = "mtPerSkuCard"; card.style.cssText = "padding-bottom:20px;margin-top:20px;";
-    var byChainSku = {};
-    lines.forEach(function(l){ var ch = inferChain(l.Customer_Name); var sku = String(l.Item_Name||"").trim(); if(!sku) return; var k = ch+"||"+sku; if(!byChainSku[k]) byChainSku[k]={chain:ch,sku:sku,billed:0,sold:0}; byChainSku[k].billed += Number(l.Qty||0); });
-    (salesReports||[]).forEach(function(r){ var ch = String(r.Chain||"").trim(); if(!ch) return; var sku = String(r.SKU||"").trim(); if(!sku) return; var units = Number(r.Units||0); if(!units) return; var nsSold = normSku(sku); var matched = null; Object.keys(byChainSku).forEach(function(k){ var v=byChainSku[k]; if(v.chain!==ch) return; if(normSku(v.sku)===nsSold || normSku(v.sku).indexOf(nsSold)>=0 || nsSold.indexOf(normSku(v.sku))>=0) matched=k; }); if (matched) byChainSku[matched].sold += units; else { var k2 = ch+"||"+sku; if(!byChainSku[k2]) byChainSku[k2]={chain:ch,sku:sku,billed:0,sold:0}; byChainSku[k2].sold += units; } });
-    var rows = Object.values(byChainSku).sort(function(a,b){ return (b.billed+b.sold)-(a.billed+a.sold); });
-    var html = '<h2>📊 Per-SKU: Billed vs Sold vs Remaining <span class="badge ok">'+rows.length+' SKUs across chains</span></h2>' +
-      '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">Billed = cumulative shipped qty from Zoho invoices. Sold = secondary offtake from store reports. Remaining = what’s still at the chain.</div>' +
-      '<div style="overflow:auto;max-height:600px;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead style="position:sticky;top:0;background:#f8fafc;"><tr><th style="text-align:left;padding:10px 12px;">Chain</th><th style="text-align:left;padding:10px 12px;">SKU</th><th class="num" style="padding:10px 12px;">Billed</th><th class="num" style="padding:10px 12px;">Sold</th><th class="num" style="padding:10px 12px;">Remaining</th><th class="num" style="padding:10px 12px;">Sell-through</th></tr></thead><tbody>';
-    rows.forEach(function(r){ var rem = r.billed - r.sold; var pct = r.billed>0 ? Math.round(r.sold/r.billed*100) : 0; var remClr = rem<0?"#dc2626":rem<=5?"#b45309":"#059669"; html += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 12px;color:#64748b;">'+esc(r.chain)+'</td><td style="padding:10px 12px;"><strong>'+esc(r.sku)+'</strong></td><td class="num" style="padding:10px 12px;">'+r.billed+'</td><td class="num" style="padding:10px 12px;color:#059669;">'+r.sold+'</td><td class="num" style="padding:10px 12px;font-weight:700;color:'+remClr+';">'+rem+'</td><td class="num" style="padding:10px 12px;color:#64748b;">'+pct+'%</td></tr>'; });
-    html += '</tbody></table></div>';
-    card.innerHTML = html; container.parentNode.insertBefore(card, container.nextSibling);
+  function buildCard(){
+    var mtPage = document.getElementById('page-mt-overview') || document.getElementById('page-mt');
+    if (!mtPage) return null;
+    var existing = document.getElementById('mtPerSkuCard');
+    if (existing) return existing;
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'mtPerSkuCard';
+    card.style.cssText = 'padding-bottom:20px; margin-top:16px;';
+    card.innerHTML =
+      '<h2>Per-SKU · Billed vs Sold vs Remaining <span class="badge ok">Alias-matched</span></h2>' +
+      '<div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">' +
+        'One row per canonical SKU, matched via SKU alias map. ' +
+        '<span id="mtPerSkuStats">Loading…</span>' +
+      '</div>' +
+      '<div style="overflow:auto;">' +
+      '<table style="width:100%; border-collapse:collapse;">' +
+        '<thead style="background:#f8f6f1;"><tr>' +
+          '<th style="text-align:left; padding:9px 20px;">Chain</th>' +
+          '<th style="text-align:left; padding:9px 10px;">SKU</th>' +
+          '<th style="text-align:right; padding:9px 10px;">Billed</th>' +
+          '<th style="text-align:right; padding:9px 10px;">Sold</th>' +
+          '<th style="text-align:right; padding:9px 10px;">Remaining</th>' +
+          '<th style="text-align:right; padding:9px 20px;">Sell-through</th>' +
+        '</tr></thead>' +
+        '<tbody id="mtPerSkuBody"><tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8;">Loading…</td></tr></tbody>' +
+      '</table></div>';
+    // Insert at end of mt page
+    mtPage.appendChild(card);
+    return card;
   }
-  async function patchCoverageTable(lines){
-    var tbody = document.getElementById("mtCovLiveBody"); if(!tbody) return;
-    var fi = document.getElementById("mtCovLiveFilter"), pe = document.getElementById("mtCovLivePeriod"); var stats = document.getElementById("mtCovLiveStats");
-    function render(){ var q = (fi.value||"").trim().toLowerCase(); var pd = parseInt(pe.value,10); var cutoff = pd>0 ? Date.now()-pd*86400000 : 0; var filtered = lines.filter(function(l){ var d = new Date(l.Invoice_Date).getTime(); if(pd>0 && d<cutoff) return false; if(q){ var hay=(l.Customer_Name+" "+l.Item_Name+" "+l.Invoice_Number).toLowerCase(); if(hay.indexOf(q)<0) return false; } return true; }).sort(function(a,b){ return String(b.Invoice_Date).localeCompare(String(a.Invoice_Date)); }); var tq=filtered.reduce(function(s,x){return s+(+x.Qty||0);},0); var tv=filtered.reduce(function(s,x){return s+(+x.Line_Total||0);},0); stats.textContent = filtered.length+" line items · "+tq.toLocaleString("en-IN")+" units · "+fmtR(tv); tbody.innerHTML = filtered.slice(0,400).map(function(l){ var ch=inferChain(l.Customer_Name); return "<tr><td style=\"padding-left:24px;\"><strong>"+esc(l.Customer_Name)+"</strong></td><td><span style=\"font-size:11px;color:#64748b;\">"+esc(ch)+"</span></td><td style=\"font-family:var(--font-mono);font-size:12px;\">"+esc(l.Invoice_Number)+"</td><td>"+String(l.Invoice_Date||"").slice(0,10)+"</td><td>"+esc(l.Item_Name)+"</td><td class=\"num\">"+(l.Qty||0)+"</td><td class=\"num\">"+fmtR(l.Line_Total)+"</td></tr>"; }).join("") + (filtered.length>400 ? "<tr><td colspan=\"7\" style=\"text-align:center;padding:12px;color:#94a3b8;font-size:12px;\">… first 400 of "+filtered.length+". Narrow with the filter.</td></tr>" : ""); }
-    fi.addEventListener("input", render); pe.addEventListener("change", render); render();
-  }
-  async function go(){
-    for (var i=0; i<60; i++){ if (patchCoverage()) break; await new Promise(function(r){ setTimeout(r,500); }); }
-    if (!document.getElementById("mtCovLiveBody")) return;
+  async function run(){
+    var card = buildCard();
+    if (!card) return;
     try {
-      var r1 = await fetch(EXEC+"?q=zoho_invoice_lines").then(function(x){return x.json();});
-      var r2 = await fetch(EXEC+"?q=mt_store_reports").then(function(x){return x.json();}).catch(function(){return {};});
-      var lines = (r1 && r1.data || []).filter(function(l){ return l.Qty || l.Line_Total; });
-      var sales = r2 && r2.data || [];
-      patchCoverageTable(lines);
-      renderPerSku(lines, sales);
-    } catch(e) { console.warn("mtCovLivePatch failed", e); }
+      var urls = [
+        EXEC + '?q=zoho_invoice_lines',
+        EXEC + '?q=mt_store_reports',
+        EXEC + '?q=sku_aliases',
+        EXEC + '?q=sku_master'
+      ];
+      var fetched = await Promise.all(urls.map(function(u){ return fetch(u).then(function(r){return r.json();}); }));
+      var lines     = (fetched[0] && fetched[0].data) || [];
+      var reports   = (fetched[1] && fetched[1].data) || [];
+      var aliases   = (fetched[2] && fetched[2].data) || [];
+      var master    = (fetched[3] && fetched[3].data) || [];
+
+      // Build alias lookup: Channel + External_ID (and Channel_Label) → Canonical_SKU
+      var aliasMap = {}; // key = channel+'::'+label.toLowerCase().trim()
+      aliases.forEach(function(a){
+        var ch = String(a.Channel||'').toLowerCase();
+        if (!ch || !a.Canonical_SKU) return;
+        var labels = [a.External_ID, a.Channel_Label];
+        labels.forEach(function(l){
+          if (!l) return;
+          var k = ch + '::' + String(l).toLowerCase().trim();
+          aliasMap[k] = a.Canonical_SKU;
+        });
+      });
+
+      // Build canonical SKU display name map
+      var canonName = {};
+      master.forEach(function(m){
+        if (m.Canonical_SKU) canonName[m.Canonical_SKU] = (m.Product_Name||m.Name||m.Canonical_SKU) + (m.Pack?' · '+m.Pack:'');
+      });
+
+      // Normalize helpers for fallback fuzzy match
+      function norm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+      var fuzzyFromZoho = {};
+      var fuzzyFromFs = {};
+      aliases.forEach(function(a){
+        if (!a.Canonical_SKU) return;
+        if (String(a.Channel).toLowerCase()==='zoho') fuzzyFromZoho[norm(a.External_ID)] = a.Canonical_SKU;
+        if (String(a.Channel).toLowerCase()==='food_square') fuzzyFromFs[norm(a.External_ID)] = a.Canonical_SKU;
+      });
+
+      // Aggregate billed from Zoho invoice lines (MT chains only)
+      var billed = {}; // key = chain + '|' + canonical
+      lines.forEach(function(l){
+        var chain = inferChain(l.Customer_Name);
+        if (!chain) return;
+        var itemName = String(l.Item_Name||l.SKU||'').trim();
+        if (!itemName) return;
+        var canon = aliasMap['zoho::'+itemName.toLowerCase()] || fuzzyFromZoho[norm(itemName)];
+        if (!canon) return;
+        var qty = +l.Qty||0;
+        if (!qty) return;
+        var k = chain + '|' + canon;
+        billed[k] = (billed[k]||0) + qty;
+      });
+
+      // Aggregate sold from mt_store_reports (match chain to Food Square etc.)
+      var sold = {};
+      reports.forEach(function(r){
+        var chain = String(r.Chain||r.chain||'').trim();
+        if (!chain) chain = inferChain(r.Store||'') || 'Food Square';
+        else {
+          var mapped = inferChain(chain) || inferChain(r.Store||'');
+          if (mapped) chain = mapped;
+        }
+        var skuRaw = String(r.SKU||r.sku||r.Item||r.Item_Name||'').trim();
+        if (!skuRaw) return;
+        var channelKey = chain.toLowerCase().indexOf('food square')>=0 ? 'food_square' : null;
+        var canon = null;
+        if (channelKey) canon = aliasMap[channelKey+'::'+skuRaw.toLowerCase()] || fuzzyFromFs[norm(skuRaw)];
+        if (!canon) {
+          // try zoho alias as last resort
+          canon = aliasMap['zoho::'+skuRaw.toLowerCase()] || fuzzyFromZoho[norm(skuRaw)];
+        }
+        if (!canon) return;
+        var u = +r.Units || +r.Qty || +r.Sold || +r.Units_Sold || 0;
+        if (!u) return;
+        var k = chain + '|' + canon;
+        sold[k] = (sold[k]||0) + u;
+      });
+
+      // Merge
+      var keys = {};
+      Object.keys(billed).forEach(function(k){ keys[k]=1; });
+      Object.keys(sold).forEach(function(k){ keys[k]=1; });
+      var out = Object.keys(keys).map(function(k){
+        var parts = k.split('|');
+        var b = billed[k]||0, s = sold[k]||0;
+        return {
+          chain: parts[0],
+          canonical: parts[1],
+          name: canonName[parts[1]] || parts[1],
+          billed: b, sold: s, remaining: Math.max(0, b - s),
+          pct: b>0 ? (s/b*100) : 0
+        };
+      }).sort(function(a,b){
+        if (a.chain!==b.chain) return a.chain.localeCompare(b.chain);
+        return b.billed - a.billed;
+      });
+
+      var tbody = document.getElementById('mtPerSkuBody');
+      var stats = document.getElementById('mtPerSkuStats');
+      if (!out.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8;">No matched rows yet. Check SKU aliases.</td></tr>';
+        if (stats) stats.textContent = '0 rows · ' + aliases.length + ' aliases';
+        return;
+      }
+      var totalB=0, totalS=0;
+      out.forEach(function(r){ totalB+=r.billed; totalS+=r.sold; });
+      if (stats) stats.textContent = out.length + ' rows · ' + num(totalB) + ' billed · ' + num(totalS) + ' sold · ' + (totalB?((totalS/totalB*100).toFixed(1)):'0') + '% sell-through · ' + aliases.length + ' aliases';
+      tbody.innerHTML = out.map(function(r){
+        var pctColor = r.pct>=80 ? '#059669' : r.pct>=50 ? '#d97706' : '#dc2626';
+        var remColor = r.remaining>0 ? '#0f172a' : '#94a3b8';
+        return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+          '<td style="padding:9px 20px; font-weight:500; color:#64748b;">' + esc(r.chain) + '</td>' +
+          '<td style="padding:9px 10px;">' + esc(r.name) + '</td>' +
+          '<td style="padding:9px 10px; text-align:right;">' + num(r.billed) + '</td>' +
+          '<td style="padding:9px 10px; text-align:right; font-weight:600;">' + num(r.sold) + '</td>' +
+          '<td style="padding:9px 10px; text-align:right; color:' + remColor + ';">' + num(r.remaining) + '</td>' +
+          '<td style="padding:9px 20px; text-align:right; font-weight:600; color:' + pctColor + ';">' + r.pct.toFixed(1) + '%</td>' +
+        '</tr>';
+      }).join('');
+    } catch(e) {
+      console.warn('[mtPerSkuAliasPatch] failed:', e);
+      var tb = document.getElementById('mtPerSkuBody');
+      if (tb) tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Failed: ' + esc(e.message||e) + '</td></tr>';
+    }
   }
-  document.addEventListener("click", function(e){ var el = e.target.closest("[data-page=\"mt-overview\"]"); if (el) setTimeout(go, 800); });
-  if (document.readyState === "complete") setTimeout(go, 5000); else window.addEventListener("load", function(){ setTimeout(go, 5000); });
+  // Run on page nav to #mt
+  function maybeRun(){ if ((location.hash||'').indexOf('mt')>=0) setTimeout(run, 1200); }
+  window.addEventListener('hashchange', maybeRun);
+  if (document.readyState === 'complete') maybeRun();
+  else window.addEventListener('load', maybeRun);
 })();
 </script>
 </body>
