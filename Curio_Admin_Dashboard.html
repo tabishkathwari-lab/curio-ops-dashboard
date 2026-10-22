@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  /* Belt-and-braces: force <script> and <template> to never display, even if a print stylesheet or extension tries to reveal them. Fixes the raw-JS-leak issue at bottom of pages. */
+  script, template, noscript { display: none !important; visibility: hidden !important; }
+  @media print { script, template, noscript, style { display: none !important; visibility: hidden !important; } }
+</style>
 <title>Curio Admin Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
