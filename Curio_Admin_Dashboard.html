@@ -4257,13 +4257,173 @@ window.syncNow = async function(channel, btn) {
           <button class="btn">+ Record payment</button>
         </div>
       </div>
-      <div class="card">
-        <div style="padding: 60px 24px; text-align: center; color: #999;">
-          <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
-          <div style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 6px;">No data yet</div>
-          <div style="font-size: 12px;">This section populates as data flows in via the entry apps.</div>
+      <!-- KPI row -->
+      <div class="kpi-row" id="payKpiRow">
+        <div class="kpi"><div class="label">Total receivable (open invoices)</div><div class="value" id="payRecvTotal">—</div><div class="sub" id="payRecvCount">—</div></div>
+        <div class="kpi" style="background:#fef2f2;"><div class="label">90+ days overdue</div><div class="value" id="payRecv90p" style="color:#dc2626;">—</div><div class="sub">worst exposure</div></div>
+        <div class="kpi" style="background:#eff6ff;"><div class="label">Total payable (open bills)</div><div class="value" id="payPayblTotal" style="color:#1e40af;">—</div><div class="sub" id="payPayblCount">—</div></div>
+        <div class="kpi" style="background:#f0fdf4;"><div class="label">Net position</div><div class="value" id="payNetPos" style="color:#059669;">—</div><div class="sub">receivable − payable</div></div>
+      </div>
+
+      <!-- Receivables aging -->
+      <div class="card" style="margin-top:16px;">
+        <h2>Receivables aging <span class="badge" id="payRecvBadge">—</span></h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                <th style="text-align:left; padding:10px 12px;">Customer</th>
+                <th style="text-align:right; padding:10px 12px;">0-30 d</th>
+                <th style="text-align:right; padding:10px 12px;">31-60 d</th>
+                <th style="text-align:right; padding:10px 12px;">61-90 d</th>
+                <th style="text-align:right; padding:10px 12px; color:#dc2626;">90+ d</th>
+                <th style="text-align:right; padding:10px 12px;">Total due</th>
+                <th style="text-align:right; padding:10px 12px;">Oldest</th>
+              </tr>
+            </thead>
+            <tbody id="payRecvTbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Loading receivables…</td></tr></tbody>
+          </table>
         </div>
       </div>
+
+      <!-- Payables aging -->
+      <div class="card" style="margin-top:16px;">
+        <h2>Payables aging <span class="badge" id="payPayblBadge">—</span></h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                <th style="text-align:left; padding:10px 12px;">Vendor</th>
+                <th style="text-align:right; padding:10px 12px;">0-30 d</th>
+                <th style="text-align:right; padding:10px 12px;">31-60 d</th>
+                <th style="text-align:right; padding:10px 12px;">61-90 d</th>
+                <th style="text-align:right; padding:10px 12px; color:#dc2626;">90+ d</th>
+                <th style="text-align:right; padding:10px 12px;">Total owed</th>
+                <th style="text-align:right; padding:10px 12px;">Oldest</th>
+              </tr>
+            </thead>
+            <tbody id="payPayblTbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Loading payables…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Credit notes -->
+      <div class="card" style="margin-top:16px;">
+        <h2>Credit notes issued <span class="badge" id="payCNBadge">—</span></h2>
+        <div style="font-size:12px; color:#64748b; margin-bottom:12px;">Returns / MRP + constitution resets. These reduce receivables.</div>
+        <div style="overflow-x:auto; max-height:300px;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead style="position:sticky; top:0; background:#f8fafc;">
+              <tr><th style="text-align:left; padding:10px 12px;">CN #</th><th style="text-align:left; padding:10px 12px;">Date</th><th style="text-align:left; padding:10px 12px;">Customer</th><th style="text-align:right; padding:10px 12px;">Amount</th><th style="text-align:left; padding:10px 12px;">Status</th></tr>
+            </thead>
+            <tbody id="payCNTbody"><tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">Loading credit notes…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <script>
+      (async function paymentsPage() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; if (Math.abs(n) >= 1e7) return '₹' + (n/1e7).toFixed(2) + 'Cr'; if (Math.abs(n) >= 1e5) return '₹' + (n/1e5).toFixed(2) + 'L'; if (Math.abs(n) >= 1e3) return '₹' + Math.round(n/1e3) + 'K'; return '₹' + Math.round(n); };
+        const esc = s => String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+        try {
+          const [invR, billR, cnR] = await Promise.all([
+            fetch(EXEC + '?q=zoho_invoices').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=zoho_bills').then(r=>r.json()).catch(()=>({})),
+            fetch(EXEC + '?q=zoho_credit_notes').then(r=>r.json()).catch(()=>({})),
+          ]);
+          const invs = (invR?.data?.invoices || invR?.data || []);
+          const bills = billR?.data || [];
+          const cns = cnR?.data || [];
+          const now = Date.now();
+          const ageOf = d => Math.floor((now - new Date(d).getTime()) / 86400000);
+          const bucket = age => age < 30 ? 'd0' : age < 60 ? 'd30' : age < 90 ? 'd60' : 'd90';
+
+          // RECEIVABLES
+          const openInvs = invs.filter(i => Number(i.balance||0) > 0);
+          const byCustomer = {};
+          openInvs.forEach(i => {
+            const c = i.customer_name || '—';
+            if (!byCustomer[c]) byCustomer[c] = {d0:0,d30:0,d60:0,d90:0,total:0,oldest:9999};
+            const age = ageOf(i.date);
+            byCustomer[c][bucket(age)] += Number(i.balance||0);
+            byCustomer[c].total += Number(i.balance||0);
+            if (age < byCustomer[c].oldest) byCustomer[c].oldest = age;
+          });
+          const sortedCust = Object.entries(byCustomer).sort((a,b) => b[1].total - a[1].total);
+          const totalRecv = sortedCust.reduce((s,[,v])=>s+v.total, 0);
+          const totalRecv90 = sortedCust.reduce((s,[,v])=>s+v.d90, 0);
+          document.getElementById('payRecvTotal').textContent = fmt(totalRecv);
+          document.getElementById('payRecvCount').textContent = openInvs.length + ' open invoices · ' + sortedCust.length + ' customers';
+          document.getElementById('payRecv90p').textContent = fmt(totalRecv90);
+          document.getElementById('payRecvBadge').textContent = sortedCust.length + ' customers';
+          document.getElementById('payRecvTbody').innerHTML = sortedCust.map(([c,v]) => {
+            const red = v.d90 > 0 ? 'color:#dc2626; font-weight:600;' : '';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:10px 12px;"><strong>' + esc(c) + '</strong></td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(v.d0) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(v.d30) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(v.d60) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;' + red + '">' + fmt(v.d90) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-weight:700;">' + fmt(v.total) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-size:11px; color:#64748b;">' + v.oldest + ' d</td>' +
+              '</tr>';
+          }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#059669;">All receivables cleared — nothing open.</td></tr>';
+
+          // PAYABLES
+          const openBills = bills.filter(b => Number(b.balance||0) > 0);
+          const byVendor = {};
+          openBills.forEach(b => {
+            const v = b.vendor_name || '—';
+            if (!byVendor[v]) byVendor[v] = {d0:0,d30:0,d60:0,d90:0,total:0,oldest:9999};
+            const age = ageOf(b.date);
+            byVendor[v][bucket(age)] += Number(b.balance||0);
+            byVendor[v].total += Number(b.balance||0);
+            if (age < byVendor[v].oldest) byVendor[v].oldest = age;
+          });
+          const sortedVend = Object.entries(byVendor).sort((a,b) => b[1].total - a[1].total);
+          const totalPaybl = sortedVend.reduce((s,[,v])=>s+v.total, 0);
+          document.getElementById('payPayblTotal').textContent = fmt(totalPaybl);
+          document.getElementById('payPayblCount').textContent = openBills.length + ' open bills · ' + sortedVend.length + ' vendors';
+          document.getElementById('payPayblBadge').textContent = sortedVend.length + ' vendors';
+          document.getElementById('payPayblTbody').innerHTML = sortedVend.slice(0,30).map(([v,x]) => {
+            const red = x.d90 > 0 ? 'color:#dc2626; font-weight:600;' : '';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:10px 12px;"><strong>' + esc(v) + '</strong></td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(x.d0) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(x.d30) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;">' + fmt(x.d60) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px;' + red + '">' + fmt(x.d90) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-weight:700;">' + fmt(x.total) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-size:11px; color:#64748b;">' + x.oldest + ' d</td>' +
+              '</tr>';
+          }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#059669;">All bills paid.</td></tr>';
+
+          // NET POSITION
+          const net = totalRecv - totalPaybl;
+          const netEl = document.getElementById('payNetPos');
+          netEl.textContent = (net >= 0 ? '+' : '') + fmt(net);
+          netEl.style.color = net >= 0 ? '#059669' : '#dc2626';
+
+          // CREDIT NOTES
+          const sortedCNs = cns.slice().sort((a,b) => String(b.date).localeCompare(String(a.date)));
+          const cnTotal = sortedCNs.reduce((s,c) => s + Number(c.total||0), 0);
+          document.getElementById('payCNBadge').textContent = sortedCNs.length + ' CNs · ' + fmt(cnTotal) + ' total';
+          document.getElementById('payCNTbody').innerHTML = sortedCNs.slice(0,50).map(c => {
+            const statusColor = c.status === 'closed' ? '#059669' : c.status === 'open' ? '#b45309' : '#64748b';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:10px 12px; font-family:var(--font-mono); font-size:12px;">' + esc(c.creditnote_number) + '</td>' +
+              '<td style="padding:10px 12px;">' + String(c.date||'').slice(0,10) + '</td>' +
+              '<td style="padding:10px 12px;">' + esc(c.customer_name) + '</td>' +
+              '<td style="text-align:right; padding:10px 12px; font-weight:600;">' + fmt(c.total) + '</td>' +
+              '<td style="padding:10px 12px;"><span style="color:' + statusColor + '; font-size:11px; text-transform:capitalize;">' + esc(c.status || '—') + '</span></td>' +
+              '</tr>';
+          }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No credit notes.</td></tr>';
+        } catch(e) {
+          console.warn('Payments page failed:', e);
+        }
+      })();
+      </script>
     </div>
 
     <!-- PAGE: FY26 AUDITED FINANCIAL STATEMENTS -->
