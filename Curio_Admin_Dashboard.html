@@ -9312,6 +9312,8 @@ window.syncNow = async function(channel, btn) {
         </div>
       </div>
       <script>
+      // IMPORTANT: this script is inside a template literal in renderMtPage(). All ${} must be escaped as \${}
+      // Use string concat instead of template literals to avoid outer-template clash.
       (async function mtStoreCoverageLive() {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
         const fmt = n => { n = +n || 0; return '₹' + Math.round(n).toLocaleString('en-IN'); };
@@ -9327,7 +9329,7 @@ window.syncNow = async function(channel, btn) {
         };
         try {
           const r = await fetch(EXEC + '?q=zoho_invoice_lines').then(r => r.json());
-          const lines = (r?.data || []).filter(l => l.Qty || l.Line_Total);
+          const lines = (r && r.data || []).filter(l => l.Qty || l.Line_Total);
           const tbody = document.getElementById('mtCovBody');
           const stats = document.getElementById('mtCovStats');
           const filterInput = document.getElementById('mtCovFilter');
@@ -9345,29 +9347,30 @@ window.syncNow = async function(channel, btn) {
               }
               return true;
             }).sort((a,b) => String(b.Invoice_Date).localeCompare(String(a.Invoice_Date)));
-            const totalQty = filtered.reduce((s,r) => s + (+r.Qty || 0), 0);
-            const totalVal = filtered.reduce((s,r) => s + (+r.Line_Total || 0), 0);
-            stats.textContent = `${filtered.length} line items · ${totalQty.toLocaleString('en-IN')} units · ${fmt(totalVal)}`;
+            const totalQty = filtered.reduce((s,x) => s + (+x.Qty || 0), 0);
+            const totalVal = filtered.reduce((s,x) => s + (+x.Line_Total || 0), 0);
+            stats.textContent = filtered.length + ' line items · ' + totalQty.toLocaleString('en-IN') + ' units · ' + fmt(totalVal);
             tbody.innerHTML = filtered.slice(0, 400).map(l => {
               const chain = inferChain(l.Customer_Name);
               const dateFmt = String(l.Invoice_Date||'').slice(0,10);
-              return `<tr>
-                <td style="padding-left:24px;"><strong>${esc(l.Customer_Name)}</strong></td>
-                <td><span style="font-size:11px; color:#64748b;">${esc(chain)}</span></td>
-                <td style="font-family:var(--font-mono);font-size:12px;">${esc(l.Invoice_Number)}</td>
-                <td>${dateFmt}</td>
-                <td>${esc(l.Item_Name)}</td>
-                <td class="num">${l.Qty || 0}</td>
-                <td class="num">${fmt(l.Line_Total)}</td>
-              </tr>`;
-            }).join('') + (filtered.length > 400 ? `<tr><td colspan="7" style="text-align:center; padding:12px; color:#94a3b8; font-size:12px;">… showing first 400 of ${filtered.length}. Narrow with the filter above.</td></tr>` : '');
+              return '<tr>' +
+                '<td style="padding-left:24px;"><strong>' + esc(l.Customer_Name) + '</strong></td>' +
+                '<td><span style="font-size:11px; color:#64748b;">' + esc(chain) + '</span></td>' +
+                '<td style="font-family:var(--font-mono);font-size:12px;">' + esc(l.Invoice_Number) + '</td>' +
+                '<td>' + dateFmt + '</td>' +
+                '<td>' + esc(l.Item_Name) + '</td>' +
+                '<td class="num">' + (l.Qty || 0) + '</td>' +
+                '<td class="num">' + fmt(l.Line_Total) + '</td>' +
+                '</tr>';
+            }).join('') + (filtered.length > 400 ? '<tr><td colspan="7" style="text-align:center; padding:12px; color:#94a3b8; font-size:12px;">… showing first 400 of ' + filtered.length + '. Narrow with the filter above.</td></tr>' : '');
           };
           filterInput.addEventListener('input', render);
           periodSelect.addEventListener('change', render);
           render();
         } catch(e) {
           console.warn('MT coverage failed:', e);
-          document.getElementById('mtCovBody').innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626;">Failed to load: ${e.message}</td></tr>`;
+          const tb = document.getElementById('mtCovBody');
+          if (tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626;">Failed to load: ' + e.message + '</td></tr>';
         }
       })();
       </script>
