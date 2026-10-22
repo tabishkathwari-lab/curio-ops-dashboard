@@ -8381,7 +8381,7 @@ window.syncNow = async function(channel, btn) {
     amazon: { pageId:'page-amazon', title:'📦 Amazon · Primary + Secondary', primaryLabel:'Curio → Amazon FBA (Zoho invoices)', secondaryLabel:'Amazon → end consumer (order reports)', primaryFilter: i => /amazon/i.test(String(i.Chain||'')), primarySource:'mi', secondarySource:'am', type:'consignment' },
     mt: { pageId:'page-mt-overview', title:'🏬 Modern Trade · Primary + Secondary', primaryLabel:'Curio → MT chains (Zoho invoices)', secondaryLabel:'MT chains → end consumer (promoter tracker)', primaryFilter: i => !/blinkit|amazon/i.test(String(i.Chain||'')), primarySource:'mi', secondarySource:'mo', type:'consignment' },
     shopify: { pageId:'page-shopify', title:'🛒 Shopify D2C · Direct sales', primaryLabel:'Curio → end consumer (website orders — invoiced and delivered directly)', secondaryLabel:'', primaryFilter:null, primarySource:'sh', secondarySource:'sh', type:'direct' },
-    b2b: { pageId:'page-b2b', title:'💼 B2B · Direct sales', primaryLabel:'Curio → bulk buyers (Kissansay, Lulu, J&K — invoiced and delivered directly)', secondaryLabel:'', primaryFilter:null, primarySource:'b2', secondarySource:'b2', type:'direct' },
+    b2b: { pageId:'page-b2b', title:'💼 B2B · Direct sales', primaryLabel:'Curio → bulk buyers (Zoho invoices, excluding Blinkit + MT chains)', secondaryLabel:'', primaryFilter: i => { const c = String(i.customer_name||'').toLowerCase(); return !/blink|food\s*square|land\s*craft|modern\s*bazaar|new\s*modern|pick\s*n?\s*choose|aap\s*ka\s*bazar|marche/.test(c); }, primarySource:'zi', secondarySource:'b2', type:'direct' },
   };
 
   let RAW = null;
