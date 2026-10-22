@@ -9290,50 +9290,87 @@ window.syncNow = async function(channel, btn) {
       </div>
 
       <div class="card" id="mtCoverageSlot" style="padding-bottom:20px;">
-        <h2>Store coverage · Per-SKU shipped <span class="badge warn">Sample · 2 of 91 invoices</span></h2>
-        <div style="padding:12px 14px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; font-size:12px; color:#78350f; margin-bottom:16px;">
-          <strong>Sample view — 2 most recent invoices (Jul & Jun 2026).</strong> Full per-SKU-per-store backfill of all 91 MT invoices needs the Zoho detail-fetch fix (~15 min, see Curio_MT_B2B_Handoff.docx). Once Sahil ships that, this table shows every SKU × store × invoice automatically.
+        <h2>Store coverage · Per-SKU shipped <span class="badge ok" id="mtCovBadge">Live · Zoho invoice lines</span></h2>
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+          Every SKU × invoice × chain shipped, live from Zoho. Showing last 90 days by default — scroll or filter below. <span id="mtCovStats">—</span>
         </div>
-        <div style="overflow:auto; margin:0 -24px;">
-          <table>
-            <thead><tr><th>Store</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line value (₹)</th></tr></thead>
-            <tbody>
-              ${(() => {
-                const sample = [
-                  // Modern Bazaar INV-000566 (Dwarka Sec 21, 2026-07-03)
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Himalayan Badri Cow Ghee 500mL',6,7200],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Borage Honey Monofloral 500gm',6,3000],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Walnut 500gm',12,14400],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Qahwa 200gm',6,2600],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Almond 500gm',12,15600],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Ladakh Apricot 500gm',6,6200],
-                  ['Dwarka Sec 21','Modern Bazaar','INV-000566','2026-07-03','Kashmir Saffron Mongra 2gm',6,5600],
-                  // Food Square INV-000564 (Ahmedabad, 2026-06-23)
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Almond Oil 100mL',12,7656],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Almond Oil 250mL',12,18560],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Apricot Oil 100mL',12,7954],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Apricot Oil 250mL',12,19886],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Himalayan Chamomile Infusion 60gm',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Himalayan Badri Cow Ghee 500mL',12,11931],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Almond 500gm',12,12926],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Qahwa 200gm',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Saffron Mongra 1gm',12,4640],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Saffron Mongra 2gm',12,9280],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Kashmir Walnut 500gm',12,11931],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Ladakh Apricot 500gm',12,10274],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Borage Honey Monofloral 500gm',12,4971],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Mustard Oil 500mL',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Sidr Honey Monofloral 500gm',12,9280],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Zafrani Kehwa 250gm',12,4309],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Walnut Oil 100mL',12,7954],
-                  ['Ahmedabad DC','Food Square','INV-000564','2026-06-23','Cold Pressed Walnut Oil 250mL',12,19886],
-                ];
-                return sample.map(r => `<tr><td style="padding-left:24px;"><strong>${r[0]}</strong></td><td>${r[1]}</td><td style="font-family:var(--font-mono);font-size:12px;">${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td class="num">${r[5]}</td><td class="num">${fmt(r[6])}</td></tr>`).join('');
-              })()}
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+          <input type="text" id="mtCovFilter" placeholder="Filter by chain, SKU, invoice…" style="flex:1; min-width:220px; padding:6px 10px; border:1px solid #d4d4d8; border-radius:6px; font-size:13px;">
+          <select id="mtCovPeriod" style="padding:6px 10px; border:1px solid #d4d4d8; border-radius:6px; font-size:13px;">
+            <option value="90">Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="365">Last 365 days</option>
+            <option value="0">All time</option>
+          </select>
+        </div>
+        <div style="overflow:auto; margin:0 -24px; max-height:460px;">
+          <table id="mtCovTable">
+            <thead style="position:sticky; top:0; background:#f8f6f1; z-index:1;"><tr><th>Store/Customer</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line value (₹)</th></tr></thead>
+            <tbody id="mtCovBody"><tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8;">Loading from Zoho invoice lines…</td></tr></tbody>
             </tbody>
           </table>
         </div>
       </div>
+      <script>
+      (async function mtStoreCoverageLive() {
+        const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
+        const fmt = n => { n = +n || 0; return '₹' + Math.round(n).toLocaleString('en-IN'); };
+        const esc = s => String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+        const inferChain = c => {
+          const s = String(c||'').toLowerCase();
+          if (/blink/.test(s)) return 'Blinkit';
+          if (/food\s*square|land\s*craft/.test(s)) return 'Food Square';
+          if (/modern\s*bazaar/.test(s)) return 'Modern Bazaar';
+          if (/pick\s*n?\s*choose/.test(s)) return 'Pick N Choose';
+          if (/aap\s*ka\s*bazar/.test(s)) return 'AAP KA BAZAR';
+          return c || '—';
+        };
+        try {
+          const r = await fetch(EXEC + '?q=zoho_invoice_lines').then(r => r.json());
+          const lines = (r?.data || []).filter(l => l.Qty || l.Line_Total);
+          const tbody = document.getElementById('mtCovBody');
+          const stats = document.getElementById('mtCovStats');
+          const filterInput = document.getElementById('mtCovFilter');
+          const periodSelect = document.getElementById('mtCovPeriod');
+          const render = () => {
+            const q = (filterInput.value || '').trim().toLowerCase();
+            const periodDays = parseInt(periodSelect.value, 10);
+            const cutoff = periodDays > 0 ? Date.now() - periodDays * 86400000 : 0;
+            const filtered = lines.filter(l => {
+              const d = new Date(l.Invoice_Date).getTime();
+              if (periodDays > 0 && d < cutoff) return false;
+              if (q) {
+                const hay = [l.Customer_Name, l.Item_Name, l.Invoice_Number, l.SKU].join(' ').toLowerCase();
+                if (hay.indexOf(q) < 0) return false;
+              }
+              return true;
+            }).sort((a,b) => String(b.Invoice_Date).localeCompare(String(a.Invoice_Date)));
+            const totalQty = filtered.reduce((s,r) => s + (+r.Qty || 0), 0);
+            const totalVal = filtered.reduce((s,r) => s + (+r.Line_Total || 0), 0);
+            stats.textContent = `${filtered.length} line items · ${totalQty.toLocaleString('en-IN')} units · ${fmt(totalVal)}`;
+            tbody.innerHTML = filtered.slice(0, 400).map(l => {
+              const chain = inferChain(l.Customer_Name);
+              const dateFmt = String(l.Invoice_Date||'').slice(0,10);
+              return `<tr>
+                <td style="padding-left:24px;"><strong>${esc(l.Customer_Name)}</strong></td>
+                <td><span style="font-size:11px; color:#64748b;">${esc(chain)}</span></td>
+                <td style="font-family:var(--font-mono);font-size:12px;">${esc(l.Invoice_Number)}</td>
+                <td>${dateFmt}</td>
+                <td>${esc(l.Item_Name)}</td>
+                <td class="num">${l.Qty || 0}</td>
+                <td class="num">${fmt(l.Line_Total)}</td>
+              </tr>`;
+            }).join('') + (filtered.length > 400 ? `<tr><td colspan="7" style="text-align:center; padding:12px; color:#94a3b8; font-size:12px;">… showing first 400 of ${filtered.length}. Narrow with the filter above.</td></tr>` : '');
+          };
+          filterInput.addEventListener('input', render);
+          periodSelect.addEventListener('change', render);
+          render();
+        } catch(e) {
+          console.warn('MT coverage failed:', e);
+          document.getElementById('mtCovBody').innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626;">Failed to load: ${e.message}</td></tr>`;
+        }
+      })();
+      </script>
 
       <div class="card" id="mtUploadSlot" style="padding-bottom:40px;">
         <h2>Upload MT stock snapshot · CSV</h2>
