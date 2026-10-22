@@ -749,14 +749,16 @@ window.syncNow = async function(channel, btn) {
             const net = r.offtake - r.spend;
             const ratio = r.spend > 0 ? (r.offtake / r.spend).toFixed(2) + 'x' : '—';
             const st = statusFor(r);
-            return `<tr style="border-bottom:1px solid #f1f5f9;">
-              <td style="padding:11px 12px;"><strong>${r.name}</strong><div style="font-size:11px;color:#94a3b8;">${r.note}</div></td>
-              <td style="text-align:right;padding:11px 12px;font-weight:600;">${fmt(r.offtake)}</td>
-              <td style="text-align:right;padding:11px 12px;color:#64748b;">${fmt(r.spend)}</td>
-              <td style="text-align:right;padding:11px 12px;font-weight:700;color:${net >= 0 ? '#059669' : '#dc2626'};">${net >= 0 ? '+' : ''}${fmt(net)}</td>
-              <td style="text-align:center;padding:11px 12px;font-weight:600;color:${st.color};">${ratio}</td>
-              <td style="padding:11px 12px;"><span style="color:${st.color};font-size:12px;">${st.emoji} ${st.label}</span></td>
-            </tr>`;
+            const netColor = net >= 0 ? '#059669' : '#dc2626';
+            const netSign = net >= 0 ? '+' : '';
+            return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+              '<td style="padding:11px 12px;"><strong>' + r.name + '</strong><div style="font-size:11px;color:#94a3b8;">' + r.note + '</div></td>' +
+              '<td style="text-align:right;padding:11px 12px;font-weight:600;">' + fmt(r.offtake) + '</td>' +
+              '<td style="text-align:right;padding:11px 12px;color:#64748b;">' + fmt(r.spend) + '</td>' +
+              '<td style="text-align:right;padding:11px 12px;font-weight:700;color:' + netColor + ';">' + netSign + fmt(net) + '</td>' +
+              '<td style="text-align:center;padding:11px 12px;font-weight:600;color:' + st.color + ';">' + ratio + '</td>' +
+              '<td style="padding:11px 12px;"><span style="color:' + st.color + ';font-size:12px;">' + st.emoji + ' ' + st.label + '</span></td>' +
+              '</tr>';
           }).join('');
         } catch (e) {
           console.warn('Channel ROI failed:', e);
