@@ -9776,5 +9776,64 @@ window.syncNow = async function(channel, btn) {
   else window.addEventListener('load', () => setTimeout(initMtB2b, 3000));
 })();
 </script>
+
+<script>
+(function mtCovLivePatchV2(){
+  var EXEC = "https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec";
+  function fmtR(n){ n = +n || 0; return "₹" + Math.round(n).toLocaleString("en-IN"); }
+  function esc(s){ return String(s||"").replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
+  function inferChain(c){ var s=String(c||"").toLowerCase(); if(/blink/.test(s))return "Blinkit"; if(/food\s*square|land\s*craft/.test(s))return "Food Square"; if(/modern\s*bazaar/.test(s))return "Modern Bazaar"; if(/pick\s*n?\s*choose/.test(s))return "Pick N Choose"; if(/aap\s*ka\s*bazar/.test(s))return "AAP KA BAZAR"; return c||"—"; }
+  function normSku(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+  function patchCoverage(){
+    var slot = document.getElementById("mtCoverageSlot"); if(!slot) return false;
+    if (slot.getAttribute("data-livepatch")==="1") return true;
+    slot.setAttribute("data-livepatch","1");
+    slot.innerHTML = '<h2>Store coverage · Per-SKU shipped <span class="badge ok">Live · Zoho invoice lines</span></h2>' +
+      '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">Every SKU × invoice × chain shipped, live from Zoho. <span id="mtCovLiveStats">—</span></div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">' +
+      '<input type="text" id="mtCovLiveFilter" placeholder="Filter by chain, SKU, invoice…" style="flex:1;min-width:220px;padding:6px 10px;border:1px solid #d4d4d8;border-radius:6px;font-size:13px;">' +
+      '<select id="mtCovLivePeriod" style="padding:6px 10px;border:1px solid #d4d4d8;border-radius:6px;font-size:13px;"><option value="90">Last 90 days</option><option value="180">Last 180 days</option><option value="365">Last 365 days</option><option value="0" selected>All time</option></select></div>' +
+      '<div style="overflow:auto;margin:0 -24px;max-height:460px;">' +
+      '<table id="mtCovLiveTable"><thead style="position:sticky;top:0;background:#f8f6f1;z-index:1;"><tr><th>Customer</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line ₹</th></tr></thead><tbody id="mtCovLiveBody"><tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Loading from Zoho invoice lines…</td></tr></tbody></table>' +
+      '</div>';
+    return true;
+  }
+  function renderPerSku(lines, salesReports){
+    var container = document.getElementById("mtPerStoreSlot") || document.getElementById("mtCoverageSlot"); if (!container) return;
+    var existing = document.getElementById("mtPerSkuCard"); if (existing) existing.remove();
+    var card = document.createElement("div"); card.className = "card"; card.id = "mtPerSkuCard"; card.style.cssText = "padding-bottom:20px;margin-top:20px;";
+    var byChainSku = {};
+    lines.forEach(function(l){ var ch = inferChain(l.Customer_Name); var sku = String(l.Item_Name||"").trim(); if(!sku) return; var k = ch+"||"+sku; if(!byChainSku[k]) byChainSku[k]={chain:ch,sku:sku,billed:0,sold:0}; byChainSku[k].billed += Number(l.Qty||0); });
+    (salesReports||[]).forEach(function(r){ var ch = String(r.Chain||"").trim(); if(!ch) return; var sku = String(r.SKU||"").trim(); if(!sku) return; var units = Number(r.Units||0); if(!units) return; var nsSold = normSku(sku); var matched = null; Object.keys(byChainSku).forEach(function(k){ var v=byChainSku[k]; if(v.chain!==ch) return; if(normSku(v.sku)===nsSold || normSku(v.sku).indexOf(nsSold)>=0 || nsSold.indexOf(normSku(v.sku))>=0) matched=k; }); if (matched) byChainSku[matched].sold += units; else { var k2 = ch+"||"+sku; if(!byChainSku[k2]) byChainSku[k2]={chain:ch,sku:sku,billed:0,sold:0}; byChainSku[k2].sold += units; } });
+    var rows = Object.values(byChainSku).sort(function(a,b){ return (b.billed+b.sold)-(a.billed+a.sold); });
+    var html = '<h2>📊 Per-SKU: Billed vs Sold vs Remaining <span class="badge ok">'+rows.length+' SKUs across chains</span></h2>' +
+      '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">Billed = cumulative shipped qty from Zoho invoices. Sold = secondary offtake from store reports. Remaining = what’s still at the chain.</div>' +
+      '<div style="overflow:auto;max-height:600px;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead style="position:sticky;top:0;background:#f8fafc;"><tr><th style="text-align:left;padding:10px 12px;">Chain</th><th style="text-align:left;padding:10px 12px;">SKU</th><th class="num" style="padding:10px 12px;">Billed</th><th class="num" style="padding:10px 12px;">Sold</th><th class="num" style="padding:10px 12px;">Remaining</th><th class="num" style="padding:10px 12px;">Sell-through</th></tr></thead><tbody>';
+    rows.forEach(function(r){ var rem = r.billed - r.sold; var pct = r.billed>0 ? Math.round(r.sold/r.billed*100) : 0; var remClr = rem<0?"#dc2626":rem<=5?"#b45309":"#059669"; html += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 12px;color:#64748b;">'+esc(r.chain)+'</td><td style="padding:10px 12px;"><strong>'+esc(r.sku)+'</strong></td><td class="num" style="padding:10px 12px;">'+r.billed+'</td><td class="num" style="padding:10px 12px;color:#059669;">'+r.sold+'</td><td class="num" style="padding:10px 12px;font-weight:700;color:'+remClr+';">'+rem+'</td><td class="num" style="padding:10px 12px;color:#64748b;">'+pct+'%</td></tr>'; });
+    html += '</tbody></table></div>';
+    card.innerHTML = html; container.parentNode.insertBefore(card, container.nextSibling);
+  }
+  async function patchCoverageTable(lines){
+    var tbody = document.getElementById("mtCovLiveBody"); if(!tbody) return;
+    var fi = document.getElementById("mtCovLiveFilter"), pe = document.getElementById("mtCovLivePeriod"); var stats = document.getElementById("mtCovLiveStats");
+    function render(){ var q = (fi.value||"").trim().toLowerCase(); var pd = parseInt(pe.value,10); var cutoff = pd>0 ? Date.now()-pd*86400000 : 0; var filtered = lines.filter(function(l){ var d = new Date(l.Invoice_Date).getTime(); if(pd>0 && d<cutoff) return false; if(q){ var hay=(l.Customer_Name+" "+l.Item_Name+" "+l.Invoice_Number).toLowerCase(); if(hay.indexOf(q)<0) return false; } return true; }).sort(function(a,b){ return String(b.Invoice_Date).localeCompare(String(a.Invoice_Date)); }); var tq=filtered.reduce(function(s,x){return s+(+x.Qty||0);},0); var tv=filtered.reduce(function(s,x){return s+(+x.Line_Total||0);},0); stats.textContent = filtered.length+" line items · "+tq.toLocaleString("en-IN")+" units · "+fmtR(tv); tbody.innerHTML = filtered.slice(0,400).map(function(l){ var ch=inferChain(l.Customer_Name); return "<tr><td style=\"padding-left:24px;\"><strong>"+esc(l.Customer_Name)+"</strong></td><td><span style=\"font-size:11px;color:#64748b;\">"+esc(ch)+"</span></td><td style=\"font-family:var(--font-mono);font-size:12px;\">"+esc(l.Invoice_Number)+"</td><td>"+String(l.Invoice_Date||"").slice(0,10)+"</td><td>"+esc(l.Item_Name)+"</td><td class=\"num\">"+(l.Qty||0)+"</td><td class=\"num\">"+fmtR(l.Line_Total)+"</td></tr>"; }).join("") + (filtered.length>400 ? "<tr><td colspan=\"7\" style=\"text-align:center;padding:12px;color:#94a3b8;font-size:12px;\">… first 400 of "+filtered.length+". Narrow with the filter.</td></tr>" : ""); }
+    fi.addEventListener("input", render); pe.addEventListener("change", render); render();
+  }
+  async function go(){
+    for (var i=0; i<60; i++){ if (patchCoverage()) break; await new Promise(function(r){ setTimeout(r,500); }); }
+    if (!document.getElementById("mtCovLiveBody")) return;
+    try {
+      var r1 = await fetch(EXEC+"?q=zoho_invoice_lines").then(function(x){return x.json();});
+      var r2 = await fetch(EXEC+"?q=mt_store_reports").then(function(x){return x.json();}).catch(function(){return {};});
+      var lines = (r1 && r1.data || []).filter(function(l){ return l.Qty || l.Line_Total; });
+      var sales = r2 && r2.data || [];
+      patchCoverageTable(lines);
+      renderPerSku(lines, sales);
+    } catch(e) { console.warn("mtCovLivePatch failed", e); }
+  }
+  document.addEventListener("click", function(e){ var el = e.target.closest("[data-page=\"mt-overview\"]"); if (el) setTimeout(go, 800); });
+  if (document.readyState === "complete") setTimeout(go, 5000); else window.addEventListener("load", function(){ setTimeout(go, 5000); });
+})();
+</script>
 </body>
 </html>
