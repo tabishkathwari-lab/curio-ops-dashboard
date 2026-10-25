@@ -6474,6 +6474,53 @@ window.syncNow = async function(channel, btn) {
         skuPrimaryMonth[canon][m].units += Number(l.Qty)||0;
         skuPrimaryMonth[canon][m].revenue += Number(l.Amount)||0;
       });
+      // Pull SKU aliases for food_square → canonical mapping, used for mt_store_reports
+      let _skuAliasesList = [];
+      try {
+        const _aRes = await CurioAPI.get('sku_aliases');
+        _skuAliasesList = (_aRes && _aRes.ok ? _aRes.data : []) || [];
+      } catch(e) { /* ignore */ }
+      const _fsAlias = {};
+      const _normName = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+      _skuAliasesList.forEach(a => {
+        if (String(a.Channel||'').toLowerCase() === 'food_square' && a.Canonical_SKU) {
+          _fsAlias[_normName(a.External_ID || a.Channel_Label)] = a.Canonical_SKU;
+        }
+      });
+      // mt_store_reports → bucket into skuPrimaryMonth (Food Square etc.)
+      (mtStoreReports||[]).forEach(e => {
+        let m = String(e.Month||'').slice(0,7);
+        if (!m || m === 'ALL' || !/^\d{4}-\d{2}$/.test(m)) m = new Date().toISOString().slice(0,7);
+        const u = Number(e.Units)||0;
+        const rev = Number(e.Value)||0;
+        if (!u && !rev) return;
+        const canon = _fsAlias[_normName(e.SKU||'')] || ('_u:'+(e.SKU||'?'));
+        if (!skuPrimaryMonth[canon]) skuPrimaryMonth[canon] = {};
+        if (!skuPrimaryMonth[canon][m]) skuPrimaryMonth[canon][m] = { units: 0, revenue: 0 };
+        skuPrimaryMonth[canon][m].units += u;
+        skuPrimaryMonth[canon][m].revenue += rev;
+      });
+      // Promoter daily entries (sell_through_computed) → bucket into skuPrimaryMonth
+      (sellThrough||[]).forEach(r => {
+        const m = String(r.To_Time||'').slice(0,7); if (!m) return;
+        const u = Number(r.Units_Sold)||0; if (u <= 0) return;
+        const canon = promoterAlias[r.SKU] || ('_u:'+r.SKU);
+        const rev = u * (priceMap[canon]||0);
+        if (!skuPrimaryMonth[canon]) skuPrimaryMonth[canon] = {};
+        if (!skuPrimaryMonth[canon][m]) skuPrimaryMonth[canon][m] = { units: 0, revenue: 0 };
+        skuPrimaryMonth[canon][m].units += u;
+        skuPrimaryMonth[canon][m].revenue += rev;
+      });
+      // Office manual sales entries (mt_office_entries) → bucket into skuPrimaryMonth
+      (mtOfficeEntries||[]).forEach(e => {
+        const m = String(e.Date||'').slice(0,7); if (!m) return;
+        const u = Number(e.Units_Sold)||0; if (u <= 0) return;
+        const canon = e.SKU_Code || e.Canonical_SKU || promoterAlias[e.SKU] || ('_u:'+(e.SKU||e.SKU_Code));
+        if (!skuPrimaryMonth[canon]) skuPrimaryMonth[canon] = {};
+        if (!skuPrimaryMonth[canon][m]) skuPrimaryMonth[canon][m] = { units: 0, revenue: 0 };
+        skuPrimaryMonth[canon][m].units += u;
+        skuPrimaryMonth[canon][m].revenue += Number(e.Revenue)||0;
+      });
       const gInR = Object.values(monthlyPrimary).reduce((s,v)=>s+v.revenue,0);
       const gIn = Object.values(monthlyPrimary).reduce((s,v)=>s+v.units,0);
       const monthlySecondary = {}, storeSecondaryMonth = {}, chainSecondary = {};
