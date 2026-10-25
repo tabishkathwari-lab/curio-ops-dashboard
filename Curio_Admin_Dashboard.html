@@ -6235,14 +6235,50 @@ window.syncNow = async function(channel, btn) {
     const ops = opsRes.data || {};
     const checkins = checkinsRes.data || [];
     const stock = ops.stock || [];
-    const mtInvoices = (mtInvRes && mtInvRes.ok ? mtInvRes.data : []) || [];
+    let mtInvoices = (mtInvRes && mtInvRes.ok ? mtInvRes.data : []) || [];
+    // Merge in any newer MT invoices from raw Zoho_Invoices that haven't been baked into MT_Invoices yet.
+    try {
+      const _ziRes = await CurioAPI.get('zoho_invoices');
+      // zoho_invoices endpoint returns { ok, data: { count, invoices: [...] } }
+      let _ziList = [];
+      if (_ziRes && _ziRes.ok) {
+        if (Array.isArray(_ziRes.data)) _ziList = _ziRes.data;
+        else if (_ziRes.data && Array.isArray(_ziRes.data.invoices)) _ziList = _ziRes.data.invoices;
+      }
+      const MT_ALLOW = /modern\s*bazaar|landcraft|food\s*square|pick\s*n|aap\s*ka\s*bazar|marche\s*retail/i;
+      const BLOCK = /blink|zepto|instamart/i;
+      const seen = new Set(mtInvoices.map(i => String(i.Invoice_Number||'').trim()));
+      _ziList.forEach(inv => {
+        const cust = String(inv.customer_name||'');
+        if (!MT_ALLOW.test(cust) || BLOCK.test(cust)) return;
+        const n = String(inv.invoice_number||'').trim();
+        if (!n || seen.has(n)) return;
+        const dateIso = inv.date || '';
+        const chainM = cust.match(/modern\s*bazaar/i) ? 'Modern Bazaar'
+                      : /landcraft|food\s*square/i.test(cust) ? 'Food Square'
+                      : /pick\s*n/i.test(cust) ? 'Pick N Choose'
+                      : /aap\s*ka\s*bazar/i.test(cust) ? 'Aap Ka Bazar'
+                      : /marche/i.test(cust) ? 'Marche' : '—';
+        mtInvoices.push({
+          Invoice_Number: n,
+          Customer_Raw: cust,
+          Chain: chainM,
+          Date: dateIso,
+          Month: dateIso,
+          Total: Number(inv.total)||0,
+          Total_Qty: 0,
+          Line_Count: 0,
+          Synced_At: new Date().toISOString(),
+        });
+      });
+    } catch(e) { console.warn('zoho_invoices MT backfill failed', e); }
     let mtLines = (mtLinesRes && mtLinesRes.ok ? mtLinesRes.data : []) || [];
     // Fallback: if mt_invoice_lines sheet is empty, derive lines from zoho_invoice_lines using invoice numbers of MT invoices
     if (!mtLines.length) {
       try {
         const _zlRes = await CurioAPI.get('zoho_invoice_lines');
         const _zl = (_zlRes && _zlRes.ok ? _zlRes.data : []) || [];
-        const _mtInvNos = new Set((mtInvRes && mtInvRes.ok ? mtInvRes.data : []).map(i => String(i.Invoice_Number||'').trim()).filter(Boolean));
+        const _mtInvNos = new Set(mtInvoices.map(i => String(i.Invoice_Number||'').trim()).filter(Boolean));
         mtLines = _zl.filter(l => _mtInvNos.has(String(l.Invoice_Number||'').trim()) && (l.Qty || l.Line_Total)).map(l => ({
           Invoice_Number: l.Invoice_Number,
           SKU_Desc: l.Item_Name || l.SKU,
