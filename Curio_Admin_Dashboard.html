@@ -6436,7 +6436,18 @@ window.syncNow = async function(channel, btn) {
       const fmtDate = t => t ? new Date(t).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
       const fmtDateTime = t => t ? new Date(t).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
       const fmtRelative = t => { if (!t) return '—'; const d = (Date.now() - new Date(t).getTime())/1000; if (d<60) return 'just now'; if (d<3600) return Math.round(d/60)+'m ago'; if (d<86400) return Math.round(d/3600)+'h ago'; return Math.round(d/86400)+'d ago'; };
-      const monthLabel = ym => { if (!ym) return '—'; const [y, m] = String(ym).slice(0,7).split('-'); const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m)-1] || m; return `${mo} '${String(y).slice(2)}`; };
+      const monthLabel = ym => {
+        if (!ym) return '—';
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        let s = String(ym);
+        // Try ISO or YYYY-MM first
+        let match = s.match(/^(\d{4})-(\d{2})/);
+        if (match) return `${MONTHS[Number(match[2])-1] || match[2]} '${match[1].slice(2)}`;
+        // Try full Date string "Wed Apr 23 2026 …"
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return `${MONTHS[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+        return '—';
+      };
 
       const chainMap = {'NEW MODERN BAZAAR DEPARTMENTAL STORES PRIVATE LIMITED':'Modern Bazaar','FOOD SQUARE-LANDCRAFT RETAIL PRIVATE LIMITED':'Food Square','LANDCRAFT RETAIL PRIVATE LIMITED':'Food Square','AAP KA BAZAR':'Aap Ka Bazar','Pick N Choose Super Market Residency Road':'Pick N Choose','PICK-N-CHOOSE SUPERMARKET BAGAAT':'Pick N Choose'};
       const invoiceAlias = {'Almond Oil':'CURIO-ALMOND-OIL-100','Black Forest Honey':'CURIO-BLACKFOREST-HONEY-500','Borage Honey':'CURIO-MONOFLORAL-HONEY-500','Borage Honey Monofloral-':'CURIO-MONOFLORAL-HONEY-500','Chamomile Tea':'CURIO-CHAMOMILE-INF','Cold Pressed Almond Oil-':'CURIO-ALMOND-OIL-100','Cold Pressed Apricot Oil-':'CURIO-APRICOT-OIL-100','Cold Pressed Mustard Oil-':'CURIO-MUSTARD-OIL-500','Cold Pressed Walnut Oil-':'CURIO-WALNUT-OIL-100','Himalayan Badri Cow':'CURIO-GHEE-500','Himalayan Badri Cow Ghee-':'CURIO-GHEE-500','Himalayan Cammomile':'CURIO-CHAMOMILE-INF','Himalayan Cammomile Tea-':'CURIO-CHAMOMILE-INF','Himalayan Chamomile':'CURIO-CHAMOMILE-INF','Kashmir Almond- 500gm':'CURIO-ALMONDS-500','Kashmir Qahwa':'CURIO-QAHWA-TEA-200','Kashmir Qahwa - 100gm':'CURIO-QAHWA-TEA-200','Kashmir Qahwa- 200gm':'CURIO-QAHWA-TEA-200','Kashmir Saffron':'CURIO-SAFFRON-2G','Kashmir Saffron Mongra-':'CURIO-SAFFRON-2G','Kashmir Saffron Mongra- 1gm':'CURIO-SAFFRON-1G','Kashmir Saffron Mongra- 2gm':'CURIO-SAFFRON-2G','Kashmir Walnut- 500gm':'CURIO-WALNUTS-500','Ladakh Apricot- 500gm':'CURIO-APRICOTS-500','Mustard Oil 1 L':'CURIO-MUSTARD-OIL-500','Sidr Honey Monofloral-':'CURIO-SIDR-HONEY-500','Sidr Honey Monofloral- 500gm':'CURIO-SIDR-HONEY-500','Walnut Oil':'CURIO-WALNUT-OIL-100','Wild Floral Honey':'CURIO-WILD-HONEY-500','Wild Floral Honey Multifloral-':'CURIO-WILD-HONEY-500','Zafrani Kehwa- 250gm':'CURIO-ZAFRANI-KEHWA-250'};
