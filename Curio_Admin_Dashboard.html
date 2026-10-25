@@ -6183,8 +6183,13 @@ window.syncNow = async function(channel, btn) {
         'OIL-ALO-100':'CURIO-ALMOND-OIL-100','OIL-MU-500':'CURIO-MUSTARD-OIL-500',
       };
       const today = _ymdLocal();
+      // Fetch sell-through and office entries directly to avoid TDZ on the outer scope's `sellThrough` / `mtOfficeEntries`
+      const _stRes = await CurioAPI.get('sell_through_computed').catch(() => ({}));
+      const _stRows = (_stRes && _stRes.ok ? _stRes.data : []) || [];
+      const _mtOffRes = await CurioAPI.get('mt_office_entries').catch(() => ({}));
+      const _mtOffRows = (_mtOffRes && _mtOffRes.ok ? _mtOffRes.data : []) || [];
       let mtSellRev = 0, mtSellUnits = 0;
-      (sellThrough||[]).forEach(r => {
+      _stRows.forEach(r => {
         if (String(r.To_Time||'').slice(0,10) !== today) return;
         const u = Number(r.Units_Sold)||0; if (u === 0) return;
         const canon = promoterAlias[r.SKU];
@@ -6192,7 +6197,7 @@ window.syncNow = async function(channel, btn) {
         mtSellUnits += u;
       });
       let mtReportRev = 0, mtReportUnits = 0;
-      (mtOfficeEntries||[]).forEach(e => {
+      _mtOffRows.forEach(e => {
         if (String(e.Date||'').slice(0,10) !== today) return;
         mtReportRev += Number(e.Revenue)||0; mtReportUnits += Number(e.Units_Sold)||0;
       });
@@ -6443,7 +6448,17 @@ window.syncNow = async function(channel, btn) {
       const priceMap = window._skuPriceMap || {};
       const storeInfo = window._storeNameMap || {};
       const storeName = c => storeInfo[c] || c;
-      const storeChain = c => (window._storeToChain||{})[c] || '—';
+      const storeChain = c => {
+        const m = window._storeToChain || {};
+        if (m[c]) return m[c];
+        // Synthetic store names used by consolidated uploads (Food Square etc.)
+        const s = String(c||'');
+        if (/^FS\b|food\s*square|land\s*craft/i.test(s)) return 'Food Square';
+        if (/^MB\b|modern\s*bazaar/i.test(s)) return 'Modern Bazaar';
+        if (/^PNC\b|pick\s*n\s*choose/i.test(s)) return 'Pick N Choose';
+        if (/^AB\b|aap\s*ka\s*bazar|aapka\s*bazar/i.test(s)) return 'Aap Ka Bazar';
+        return '—';
+      };
       const thisMonth = _ymLocal();
 
       // ==== AGGREGATIONS ====
@@ -9618,13 +9633,11 @@ window.syncNow = async function(channel, btn) {
           <table id="mtCovTable">
             <thead style="position:sticky; top:0; background:#f8f6f1; z-index:1;"><tr><th>Store/Customer</th><th>Chain</th><th>Invoice</th><th>Date</th><th>SKU</th><th class="num">Qty</th><th class="num">Line value (₹)</th></tr></thead>
             <tbody id="mtCovBody"><tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8;">Loading from Zoho invoice lines…</td></tr></tbody>
-            </tbody>
           </table>
         </div>
       </div>
       <script>
-      // IMPORTANT: this script is inside a template literal in renderMtPage(). All ${} must be escaped as \${}
-      // Use string concat instead of template literals to avoid outer-template clash.
+      // IMPORTANT: this script is inside a template literal; use string concat only, no backticks or interpolation.
       (async function mtStoreCoverageLive() {
         const EXEC = 'https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec';
         const fmt = n => { n = +n || 0; return '₹' + Math.round(n).toLocaleString('en-IN'); };
