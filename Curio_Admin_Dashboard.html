@@ -10246,23 +10246,21 @@ window.syncNow = async function(channel, btn) {
   async function initMtB2b() {
     try {
       const inv = await loadInvoices();
-      renderMtPage(inv);
+      // MT page is owned by refreshPromoterData / Coverage snapshot renderer — don't re-render it here
       renderB2bPage(inv);
 
-      // Re-render if any upstream script overwrites page content later
-      ['page-mt-overview', 'page-b2b'].forEach(id => {
-        const el = document.getElementById(id); if (!el) return;
-        const observer = new MutationObserver((muts) => {
-          // Only re-render if OUR markers are gone (something nuked our content)
-          const ours = el.querySelector(id === 'page-mt-overview' ? '#mtSyncBtn' : '#b2bSyncBtn');
-          if (!ours && cachedInvoices) {
+      // Re-render B2B only if its sync button disappears
+      const el = document.getElementById('page-b2b');
+      if (el) {
+        const observer = new MutationObserver(() => {
+          if (!el.querySelector('#b2bSyncBtn') && cachedInvoices) {
             observer.disconnect();
-            if (id === 'page-mt-overview') renderMtPage(cachedInvoices); else renderB2bPage(cachedInvoices);
+            renderB2bPage(cachedInvoices);
             observer.observe(el, { childList: true, subtree: false });
           }
         });
         observer.observe(el, { childList: true, subtree: false });
-      });
+      }
     } catch (e) {
       console.error('MT/B2B rebuild failed:', e);
     }
