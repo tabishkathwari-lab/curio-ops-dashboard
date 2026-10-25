@@ -5187,7 +5187,7 @@ window.syncNow = async function(channel, btn) {
   // ============ LIVE PROMOTER DATA (check-ins, stock, attendance, alerts) ============
   async function refreshPromoterData() {
     if (typeof CurioAPI === 'undefined') return;
-    const [opsRes, checkinsRes, mtInvRes, mtLinesRes, sellthroughRes, allCheckinsRes, skusRes, mtOfficeRes, storesRes] = await Promise.all([
+    const [opsRes, checkinsRes, mtInvRes, mtLinesRes, sellthroughRes, allCheckinsRes, skusRes, mtOfficeRes, storesRes, mtStoreRptsRes] = await Promise.all([
       CurioAPI.get('todays_ops'),
       CurioAPI.get('todays_checkins'),
       CurioAPI.get('mt_invoices'),
@@ -5197,6 +5197,7 @@ window.syncNow = async function(channel, btn) {
       CurioAPI.get('skus'),
       CurioAPI.get('mt_office_entries'),
       CurioAPI.get('stores'),
+      CurioAPI.get('mt_store_reports'),
     ]);
     // Populate store→chain and store→name maps
     // Post-migration: Stores sheet has just "Store" column (name IS the key). Pre-migration: Store_Code + Store_Name.
@@ -6239,6 +6240,7 @@ window.syncNow = async function(channel, btn) {
     const sellThrough = (sellthroughRes && sellthroughRes.ok ? sellthroughRes.data : []) || [];
     const allCheckins = (allCheckinsRes && allCheckinsRes.ok ? allCheckinsRes.data : []) || [];
     const mtOfficeEntries = (mtOfficeRes && mtOfficeRes.ok ? mtOfficeRes.data : []) || [];
+    const mtStoreReports = (mtStoreRptsRes && mtStoreRptsRes.ok ? mtStoreRptsRes.data : []) || [];
 
     // Helper: update KPI card by label
     const setKpi = (label, value, sub) => {
@@ -6441,6 +6443,25 @@ window.syncNow = async function(channel, btn) {
         if (!storeSecondaryMonth[sn]) storeSecondaryMonth[sn] = {};
         if (!storeSecondaryMonth[sn][m]) storeSecondaryMonth[sn][m] = { units: 0, revenue: 0 };
         storeSecondaryMonth[sn][m].units += u; storeSecondaryMonth[sn][m].revenue += rev;
+      });
+      // Food Square / direct chain uploads via mt_store_reports (Chain/Store/Month/SKU/Units/Value)
+      // Month="ALL" means consolidated; bucket into current month so it shows in the latest column.
+      const _curMonth = new Date().toISOString().slice(0,7);
+      (mtStoreReports||[]).forEach(e => {
+        let m = String(e.Month||'').slice(0,7);
+        if (!m || m === 'ALL' || !/^\d{4}-\d{2}$/.test(m)) m = _curMonth;
+        const u = Number(e.Units)||0;
+        const rev = Number(e.Value)||0;
+        if (!u && !rev) return;
+        if (!monthlySecondary[m]) monthlySecondary[m] = { units: 0, revenue: 0 };
+        monthlySecondary[m].units += u; monthlySecondary[m].revenue += rev;
+        const sn = String(e.Store||'').trim() || String(e.Chain||'').trim() || '—';
+        if (!storeSecondaryMonth[sn]) storeSecondaryMonth[sn] = {};
+        if (!storeSecondaryMonth[sn][m]) storeSecondaryMonth[sn][m] = { units: 0, revenue: 0 };
+        storeSecondaryMonth[sn][m].units += u; storeSecondaryMonth[sn][m].revenue += rev;
+        const chain = String(e.Chain||'').trim() || '—';
+        if (!chainSecondary[chain]) chainSecondary[chain] = { units: 0, revenue: 0 };
+        chainSecondary[chain].units += u; chainSecondary[chain].revenue += rev;
       });
       const gOutR = Object.values(monthlySecondary).reduce((s,v)=>s+v.revenue,0);
       const gOut = Object.values(monthlySecondary).reduce((s,v)=>s+v.units,0);
@@ -10299,11 +10320,20 @@ window.syncNow = async function(channel, btn) {
       if (tb) tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Failed: ' + esc(e.message||e) + '</td></tr>';
     }
   }
-  // Run on page nav to #mt
-  function maybeRun(){ if ((location.hash||'').indexOf('mt')>=0) setTimeout(run, 1200); }
-  window.addEventListener('hashchange', maybeRun);
-  if (document.readyState === 'complete') maybeRun();
-  else window.addEventListener('load', maybeRun);
+  // Run on page nav to #mt, and re-inject if other renderers overwrite the MT page
+  let _running = false;
+  async function maybeRun(){
+    if ((location.hash||'').indexOf('mt')<0) return;
+    if (_running) return;
+    if (document.getElementById('mtPerSkuCard')) return;
+    _running = true;
+    try { await run(); } finally { _running = false; }
+  }
+  window.addEventListener('hashchange', ()=>setTimeout(maybeRun, 500));
+  // Keep retrying every 2s while on MT page until card lands and stays
+  setInterval(maybeRun, 2000);
+  if (document.readyState === 'complete') setTimeout(maybeRun, 1500);
+  else window.addEventListener('load', ()=>setTimeout(maybeRun, 1500));
 })();
 </script>
 </body>
