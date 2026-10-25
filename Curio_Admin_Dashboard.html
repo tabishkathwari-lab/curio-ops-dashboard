@@ -6395,15 +6395,20 @@ window.syncNow = async function(channel, btn) {
       const thisMonth = _ymLocal();
 
       // ==== AGGREGATIONS ====
-      const invById = {}; mtInvoices.forEach(i => { invById[i.Invoice_Number] = i; });
+      // Blinkit is quick-commerce, not MT — exclude from every MT roll-up.
+      const _MT_DENY = /blink|zepto|instamart|quick\s*commerce|swiggy/i;
+      const invById = {}; mtInvoices.forEach(i => { if (!_MT_DENY.test(String(i.Customer_Raw||i.Customer_Name||''))) invById[i.Invoice_Number] = i; });
       const monthlyPrimary = {}, chainPrimary = {}, skuPrimaryMonth = {};
       mtInvoices.forEach(inv => {
+        const cust = String(inv.Customer_Raw||inv.Customer_Name||'');
+        if (_MT_DENY.test(cust)) return;
         let m = String(inv.Month||''); if (m.includes('T')) m = m.slice(0,7); m = m.slice(0,7);
         if (!monthlyPrimary[m]) monthlyPrimary[m] = { units: 0, revenue: 0, invoices: 0 };
         monthlyPrimary[m].units += Number(inv.Total_Qty)||0;
         monthlyPrimary[m].revenue += Number(inv.Total)||0;
         monthlyPrimary[m].invoices++;
         const chain = normalizeChain(inv.Customer_Raw);
+        if (_MT_DENY.test(chain)) return;
         if (!chainPrimary[chain]) chainPrimary[chain] = { units: 0, revenue: 0 };
         chainPrimary[chain].units += Number(inv.Total_Qty)||0;
         chainPrimary[chain].revenue += Number(inv.Total)||0;
