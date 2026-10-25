@@ -6236,7 +6236,23 @@ window.syncNow = async function(channel, btn) {
     const checkins = checkinsRes.data || [];
     const stock = ops.stock || [];
     const mtInvoices = (mtInvRes && mtInvRes.ok ? mtInvRes.data : []) || [];
-    const mtLines = (mtLinesRes && mtLinesRes.ok ? mtLinesRes.data : []) || [];
+    let mtLines = (mtLinesRes && mtLinesRes.ok ? mtLinesRes.data : []) || [];
+    // Fallback: if mt_invoice_lines sheet is empty, derive lines from zoho_invoice_lines using invoice numbers of MT invoices
+    if (!mtLines.length) {
+      try {
+        const _zlRes = await CurioAPI.get('zoho_invoice_lines');
+        const _zl = (_zlRes && _zlRes.ok ? _zlRes.data : []) || [];
+        const _mtInvNos = new Set((mtInvRes && mtInvRes.ok ? mtInvRes.data : []).map(i => String(i.Invoice_Number||'').trim()).filter(Boolean));
+        mtLines = _zl.filter(l => _mtInvNos.has(String(l.Invoice_Number||'').trim()) && (l.Qty || l.Line_Total)).map(l => ({
+          Invoice_Number: l.Invoice_Number,
+          SKU_Desc: l.Item_Name || l.SKU,
+          SKU: l.SKU,
+          Qty: l.Qty,
+          Amount: l.Line_Total,
+          Rate: l.Rate,
+        }));
+      } catch (e) { console.warn('zoho_invoice_lines fallback failed', e); }
+    }
     const sellThrough = (sellthroughRes && sellthroughRes.ok ? sellthroughRes.data : []) || [];
     const allCheckins = (allCheckinsRes && allCheckinsRes.ok ? allCheckinsRes.data : []) || [];
     const mtOfficeEntries = (mtOfficeRes && mtOfficeRes.ok ? mtOfficeRes.data : []) || [];
@@ -6595,6 +6611,7 @@ window.syncNow = async function(channel, btn) {
       let html = `<div class="page-head">
         <div><h1>Modern Trade</h1><div class="meta">${mtInvoices.length} invoices · ${activeChains} chains · ${stores.length} stores · updated ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false})}</div></div>
         <div style="display:flex; gap:8px;">
+          <button class="btn ghost" id="mtZohoSyncBtn" onclick="(async(e)=>{const b=e.target;b.disabled=true;const o=b.textContent;b.textContent='⟳ Syncing…';try{const r=await fetch('https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec',{method:'POST',body:JSON.stringify({action:'sync_now',user:'tabish',payload:{channel:'zoho'}})});const j=await r.json();b.textContent=j.ok?'✓ Synced — reload':'✗ Failed';setTimeout(()=>{b.textContent=o;b.disabled=false;},3000);}catch(err){b.textContent='✗ '+err.message;setTimeout(()=>{b.textContent=o;b.disabled=false;},3000);}})(event)">↻ Sync from Zoho</button>
           <button class="btn ghost" onclick="openMtModal && openMtModal('salesEntry')">📝 Enter store report</button>
           <button class="btn ghost" onclick="document.getElementById('mtPdfInput') && document.getElementById('mtPdfInput').click()">📎 Upload invoice PDF</button>
           <button class="btn">Export CSV</button>
