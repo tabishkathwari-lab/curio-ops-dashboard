@@ -6465,10 +6465,28 @@ window.syncNow = async function(channel, btn) {
         chainPrimary[chain].units += Number(inv.Total_Qty)||0;
         chainPrimary[chain].revenue += Number(inv.Total)||0;
       });
+      // Merge the shared sku_aliases sheet (channel='zoho') into invoiceAlias so dashboard uses the single source of truth
+      try {
+        const _zRes = await CurioAPI.get('sku_aliases');
+        const _rows = (_zRes && _zRes.ok ? _zRes.data : []) || [];
+        _rows.forEach(a => {
+          if (String(a.Channel||'').toLowerCase() !== 'zoho' || !a.Canonical_SKU) return;
+          const label = String(a.External_ID||a.Channel_Label||'').trim();
+          if (label) invoiceAlias[label] = a.Canonical_SKU;
+        });
+      } catch (e) { /* non-blocking */ }
+      // Prefix-based fallback resolver: given an item name, find the longest invoiceAlias key that is a prefix of it
+      const _aliasKeysSorted = Object.keys(invoiceAlias).sort((a,b)=>b.length-a.length);
+      const _resolveAlias = s => {
+        const k = String(s||'').trim();
+        if (invoiceAlias[k]) return invoiceAlias[k];
+        for (const key of _aliasKeysSorted) { if (k.indexOf(key) === 0) return invoiceAlias[key]; }
+        return null;
+      };
       mtLines.forEach(l => {
         const inv = invById[l.Invoice_Number]; if (!inv) return;
         let m = String(inv.Month||''); if (m.includes('T')) m = m.slice(0,7); m = m.slice(0,7);
-        const canon = invoiceAlias[String(l.SKU_Desc||'').trim()] || ('_u:'+l.SKU_Desc);
+        const canon = _resolveAlias(l.SKU_Desc) || ('_u:'+l.SKU_Desc);
         if (!skuPrimaryMonth[canon]) skuPrimaryMonth[canon] = {};
         if (!skuPrimaryMonth[canon][m]) skuPrimaryMonth[canon][m] = { units: 0, revenue: 0 };
         skuPrimaryMonth[canon][m].units += Number(l.Qty)||0;
