@@ -2830,6 +2830,7 @@ window.syncNow = async function(channel, btn) {
           <div class="meta">Your own website · Real data from full Shopify export (Nov 2023 – Jul 2026)</div>
         </div>
         <div style="display: flex; gap: 8px;">
+          <button class="btn ghost" id="shopifySyncBtn" onclick="(async(e)=>{const b=e.target;const o=b.textContent;b.disabled=true;b.textContent='⟳ Syncing…';try{const r=await fetch('https://script.google.com/macros/s/AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo/exec',{method:'POST',body:JSON.stringify({action:'sync_now',user:'tabish',payload:{channel:'shopify'}})});const j=await r.json();b.textContent=j.ok?'✓ Synced — reload':'✗ '+(j.error||'Failed');setTimeout(()=>{b.textContent=o;b.disabled=false;},4000);}catch(err){b.textContent='✗ '+err.message;setTimeout(()=>{b.textContent=o;b.disabled=false;},4000);}})(event)">↻ Sync from Shopify</button>
           <button class="btn ghost">Upload CSV</button>
           <button class="btn" style="background: #5E8E3E;">Export</button>
         </div>
