@@ -5651,7 +5651,7 @@ window.syncNow = async function(channel, btn) {
       const monLbl = ym => { if (!ym) return '—'; const [y,m] = ym.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m)-1] + " '" + y.slice(2); };
       const configs = {
         amazon:  { endpoint: 'amazon_raw',  rev: 'Total_Sales',  units: 'Units',  date: 'Date' },
-        shopify: { endpoint: 'shopify_raw', rev: 'Revenue',      units: 'Units',  date: 'Date' },
+        shopify: { endpoint: 'shopify_raw', rev: 'Total',        units: 'Units',  date: 'Order_Date' },
         b2b:     { endpoint: 'b2b_raw',     rev: 'Total_Amount', units: 'Quantity', date: 'Order_Date' },
         mt:      { endpoint: 'mt_raw',      rev: 'Revenue',      units: 'Units_Sold', date: 'Date' },
       };
@@ -5679,7 +5679,7 @@ window.syncNow = async function(channel, btn) {
       const fmtL = n => n >= 100000 ? '₹' + (n/100000).toFixed(2) + 'L' : '₹' + Math.round(n).toLocaleString('en-IN');
       const configs = {
         amazon:  { endpoint: 'amazon_raw',  rev: 'Total_Sales',  units: 'Units',    date: 'Date' },
-        shopify: { endpoint: 'shopify_raw', rev: 'Revenue',      units: 'Units',    date: 'Date' },
+        shopify: { endpoint: 'shopify_raw', rev: 'Total',        units: 'Units',    date: 'Order_Date' },
         b2b:     { endpoint: 'b2b_raw',     rev: 'Total_Amount', units: 'Quantity', date: 'Order_Date' },
       };
       for (const [ch, cfg] of Object.entries(configs)) {
