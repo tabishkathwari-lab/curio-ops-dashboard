@@ -633,6 +633,37 @@ window.syncNow = async function(channel, btn) {
         <button class="btn">Export report</button>
       </div>
 
+      <!-- SALES SUMMARY STRIP -->
+      <style>
+        .ss-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0 18px;}
+        .ss-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;}
+        .ss-card .ss-h{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#6b7280;font-weight:600;}
+        .ss-card .ss-today{font-size:22px;font-weight:700;color:#111827;margin-top:4px;}
+        .ss-card .ss-sub{font-size:11px;color:#6b7280;margin-top:6px;line-height:1.4;}
+        .ss-card.ss-total{background:#111827;color:#fff;}
+        .ss-card.ss-total .ss-h{color:#9ca3af;}
+        .ss-card.ss-total .ss-today{color:#fff;}
+        .ss-card.ss-total .ss-sub{color:#d1d5db;}
+      </style>
+      <div class="ss-strip">
+        <div class="ss-card ss-total"><div class="ss-h">All Today</div><div class="ss-today" id="ss-all-today">—</div><div class="ss-sub">MTD <span id="ss-all-mtd">—</span> &middot; YTD <span id="ss-all-ytd">—</span></div></div>
+        <div class="ss-card"><div class="ss-h">Shopify</div><div class="ss-today" id="ss-shopify-today">—</div><div class="ss-sub">MTD <span id="ss-shopify-mtd">—</span> &middot; YTD <span id="ss-shopify-ytd">—</span></div></div>
+        <div class="ss-card"><div class="ss-h">Blinkit</div><div class="ss-today" id="ss-blinkit-today">—</div><div class="ss-sub">MTD <span id="ss-blinkit-mtd">—</span> &middot; YTD <span id="ss-blinkit-ytd">—</span></div></div>
+        <div class="ss-card"><div class="ss-h">Amazon</div><div class="ss-today" id="ss-amazon-today">—</div><div class="ss-sub">MTD <span id="ss-amazon-mtd">—</span> &middot; YTD <span id="ss-amazon-ytd">—</span></div></div>
+        <div class="ss-card"><div class="ss-h">B2B</div><div class="ss-today" id="ss-b2b-today">—</div><div class="ss-sub">MTD <span id="ss-b2b-mtd">—</span> &middot; YTD <span id="ss-b2b-ytd">—</span></div></div>
+      </div>
+      <script>
+      (function(){
+        var P=["https://script.google.com","macros","s","AKfycbwCqZtIIM7ZKVf9b-3Fwa_4K9tgrkr6MRG34hw4IXcuicPYpJ48zbfm5pSUImnIzXCo","exec"];
+        var U=P.join("/")+"?secret=curio2026&q=sales_summary";
+        function f(n){if(n==null||isNaN(n))return "—";n=Math.round(Number(n));if(n>=1e7)return "₹"+(n/1e7).toFixed(2)+"Cr";if(n>=1e5)return "₹"+(n/1e5).toFixed(2)+"L";if(n>=1e3)return "₹"+(n/1e3).toFixed(1)+"K";return "₹"+n;}
+        function s(i,v){var e=document.getElementById(i);if(e)e.textContent=f(v);}
+        function L(){fetch(U+"&cb="+Date.now()).then(function(r){return r.json();}).then(function(j){if(!j||!j.ok||!j.data)return;var d=j.data;s("ss-all-today",d.totals.today);s("ss-all-mtd",d.totals.mtd);s("ss-all-ytd",d.totals.ytd);["shopify","blinkit","amazon","b2b"].forEach(function(c){var x=d.channels[c]||{};s("ss-"+c+"-today",x.today);s("ss-"+c+"-mtd",x.mtd);s("ss-"+c+"-ytd",x.ytd);});}).catch(function(){});}
+        L();setInterval(L,300000);
+      })();
+      </script>
+
+
       <!-- ========== OVERVIEW STRIP ========== -->
       <style>
         .ov-strip { background:#2c3e50; color:#fff; padding:8px 16px; border-radius:10px 10px 0 0; font-size:11px; letter-spacing:1.5px; font-weight:600; margin-top:4px; }
