@@ -1,8 +1,10 @@
-// SCOREPATCH_PROMOTER_CHECKINS_V1: populate Days active / AM-PM / Last active from Supabase
+// SCOREPATCH_PROMOTER_CHECKINS_V2
+// Populates Days active / AM-PM / Last active / On leave (= missed days this month) on the Promoters scorecard
 (function(){
   var SB='https://cikyevecsuamzndxfpir.supabase.co';
   var KEY='sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   var CACHE=null, CACHE_T=0;
+  function istDateStr(d){ return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
   async function loadData(){
     if (CACHE && (Date.now()-CACHE_T)<300000) return CACHE;
     var out={}, off=0;
@@ -12,8 +14,12 @@
       if (!Array.isArray(page)||!page.length) break;
       page.forEach(function(rec){
         var k=rec.promoter; if(!k) return;
-        if (!out[k]) out[k]={days:new Set(), last:null, am:0, pm:0};
-        if (rec.date) out[k].days.add(rec.date);
+        if (!out[k]) out[k]={days:new Set(), last:null, am:0, pm:0, thisMonthDays:new Set()};
+        if (rec.date) {
+          out[k].days.add(rec.date);
+          var now=new Date(), ym=istDateStr(now).slice(0,7);
+          if (rec.date.slice(0,7)===ym) out[k].thisMonthDays.add(rec.date);
+        }
         if (!out[k].last || rec.timestamp>out[k].last) out[k].last=rec.timestamp;
         var h=null;
         if (rec.time_str && /^\d{1,2}/.test(rec.time_str)) h=parseInt(rec.time_str.split(':')[0]);
@@ -26,6 +32,12 @@
     CACHE=out; CACHE_T=Date.now();
     return out;
   }
+  function elapsedMonthDays(){
+    // Days from 1st of IST month up to today inclusive
+    var now=new Date();
+    var ist=istDateStr(now);
+    return parseInt(ist.slice(8,10), 10);
+  }
   async function patch(){
     try {
       var tables=document.querySelectorAll('table');
@@ -36,23 +48,37 @@
         if (names.indexOf('Days active')>=0 && names.indexOf('AM / PM')>=0 && names.indexOf('Last active')>=0){ table=tables[i]; break; }
       }
       if (!table) return;
-      if (table.dataset.spPatched==='1' && (Date.now()-parseInt(table.dataset.spTs||'0',10))<30000) return;
+      if (table.dataset.spPatched==='2' && (Date.now()-parseInt(table.dataset.spTs||'0',10))<30000) return;
       var data=await loadData();
       var hdrs=Array.from(table.querySelectorAll('thead th')).map(function(x){return x.textContent.trim();});
-      var iName=hdrs.indexOf('Promoter'), iDays=hdrs.indexOf('Days active'), iAmPm=hdrs.indexOf('AM / PM'), iLast=hdrs.indexOf('Last active');
+      var iN=hdrs.indexOf('Promoter'), iD=hdrs.indexOf('Days active'), iA=hdrs.indexOf('AM / PM'), iL=hdrs.indexOf('Last active'), iOL=hdrs.indexOf('On leave');
+      // Rename 'On leave' header to 'Missed (mo)' once for clarity
+      if (iOL>=0 && table.querySelectorAll('thead th')[iOL].dataset.renamed!=='1'){
+        var th=table.querySelectorAll('thead th')[iOL];
+        th.textContent='Missed (mo)';
+        th.title='Working days this month without a check-in · computed from promoter_checkins';
+        th.dataset.renamed='1';
+      }
+      var elapsed = elapsedMonthDays();
       Array.from(table.querySelectorAll('tbody tr')).forEach(function(tr){
         var tds=tr.querySelectorAll('td'); if (!tds.length) return;
-        var name=(tds[iName]&&tds[iName].textContent||'').replace(/^[^A-Za-z]+/,'').trim();
+        var name=(tds[iN]&&tds[iN].textContent||'').replace(/^[^A-Za-z]+/,'').trim();
         var d=data[name]; if (!d) return;
-        if (tds[iDays]) tds[iDays].textContent=d.days.size;
-        if (tds[iAmPm]) tds[iAmPm].textContent=d.am+' / '+d.pm;
-        if (tds[iLast] && d.last) tds[iLast].textContent=new Date(d.last).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+        if (tds[iD]) tds[iD].textContent=d.days.size;
+        if (tds[iA]) tds[iA].textContent=d.am+' / '+d.pm;
+        if (tds[iL] && d.last) tds[iL].textContent=new Date(d.last).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+        if (iOL>=0 && tds[iOL]) {
+          var missed = Math.max(0, elapsed - d.thisMonthDays.size);
+          tds[iOL].textContent = missed;
+          tds[iOL].title = 'Days in Nov '+elapsed+' · active '+d.thisMonthDays.size+' · missed '+missed;
+        }
       });
-      table.dataset.spPatched='1'; table.dataset.spTs=String(Date.now());
+      table.dataset.spPatched='2'; table.dataset.spTs=String(Date.now());
     } catch(e){ console.warn('[scorepatch]', e); }
   }
   var t;
   var run=function(){ clearTimeout(t); t=setTimeout(patch, 500); };
-  new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
+  if (document.body) new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded', function(){ new MutationObserver(run).observe(document.body,{childList:true,subtree:true}); run(); });
   run();
 })();
