@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Promoter Performance · Curio</title>
+<style>
+  :root { --ink:#0c1a2b; --bg:#f3efe6; --card:#fff; --accent:#b08d57; --mute:#6b7280; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+  h1 { margin:0 0 4px; font-weight: 600; font-size: 32px; }
+  .sub { color: var(--mute); margin-bottom: 24px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .kpi { background: var(--card); border-radius: 12px; padding: 16px 20px; }
+  .kpi .lbl { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  .kpi .val { font-size: 28px; font-weight: 600; margin-top: 4px; }
+  .panel { background: var(--card); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+  .panel h2 { margin: 0 0 16px; font-weight: 600; font-size: 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+  th { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 500; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background:#eef2ff; color:#4338ca; }
+  .controls { display:flex; gap:10px; align-items:center; margin-bottom: 16px; flex-wrap: wrap; }
+  select, input[type="month"] { padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; background: #fff; font-size: 14px; }
+  .loading { padding: 40px; text-align:center; color: var(--mute); }
+  a.back { color: var(--mute); text-decoration: none; font-size: 14px; }
+  a.back:hover { color: var(--ink); }
+  tr.highlight { background: #fef9e7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="margin-bottom: 20px;"><a class="back" href="/">&larr; Back to Dashboard</a></div>
+  <h1>Promoter Performance</h1>
+  <div class="sub">Field activity · GPS check-ins · all history</div>
+  <div class="kpis" id="kpis"></div>
+  <div class="panel">
+    <h2>Per-promoter monthly breakdown</h2>
+    <div class="controls">
+      <label>Filter month: <select id="monthFilter"><option value="">All months</option></select></label>
+      <label>Sort: <select id="sortBy"><option value="total">Total check-ins</option><option value="recent">Most recent</option><option value="name">Name</option></select></label>
+    </div>
+    <div id="table"><div class="loading">Loading…</div></div>
+  </div>
+  <div class="panel">
+    <h2>Recent activity (last 30 days)</h2>
+    <div id="recent"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+<script>
+const SB_URL='https://cikyevecsuamzndxfpir.supabase.co';
+const SB_KEY='sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
+async function sb(path){
+  const r = await fetch(SB_URL+'/rest/v1/'+path, {headers:{apikey:SB_KEY, Authorization:'Bearer '+SB_KEY}});
+  return r.json();
+}
+async function sbAll(table, query){
+  let all=[], off=0;
+  while(off<50000){
+    const page = await sb(table+'?'+query+'&limit=1000&offset='+off);
+    if (!Array.isArray(page) || !page.length) break;
+    all = all.concat(page);
+    if (page.length < 1000) break;
+    off += 1000;
+  }
+  return all;
+}
+function fmt(n){ return (n||0).toLocaleString('en-IN'); }
+function monthLabel(m){ try{ const [y,mm]=m.split('-'); return new Date(+y, +mm-1, 1).toLocaleDateString('en-IN',{month:'short', year:'numeric'}); }catch(e){return m;} }
+let ALL_ROWS = [];
+async function load(){
+  const rows = await sbAll('promoter_checkins', 'select=*&order=timestamp.desc');
+  ALL_ROWS = rows;
+  render();
+}
+function render(){
+  const monthFilter = document.getElementById('monthFilter').value;
+  const sortBy = document.getElementById('sortBy').value;
+  const rows = ALL_ROWS.filter(r => !monthFilter || (r.date||'').startsWith(monthFilter));
+  // KPIs
+  const totalCheckins = rows.length;
+  const uniqPromoters = new Set(rows.map(r=>r.promoter)).size;
+  const uniqStores = new Set(rows.map(r=>r.store_code).filter(Boolean)).size;
+  const activeDays = new Set(rows.map(r=>r.date).filter(Boolean)).size;
+  const avgPerDay = activeDays ? Math.round(totalCheckins/activeDays) : 0;
+  document.getElementById('kpis').innerHTML = [
+    ['Total check-ins', fmt(totalCheckins)],
+    ['Active promoters', fmt(uniqPromoters)],
+    ['Stores covered', fmt(uniqStores)],
+    ['Active days', fmt(activeDays)],
+    ['Avg check-ins/day', fmt(avgPerDay)]
+  ].map(([l,v])=>`<div class="kpi"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join('');
+  // Month filter options
+  const monthSet = new Set(ALL_ROWS.map(r=>(r.date||'').slice(0,7)).filter(Boolean));
+  const monthSel = document.getElementById('monthFilter');
+  if (monthSel.options.length <= 1) {
+    [...monthSet].sort().reverse().forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=monthLabel(m); monthSel.appendChild(o); });
+  }
+  // Per-promoter × month table
+  const months = [...new Set(rows.map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort();
+  const byPromoter = {};
+  rows.forEach(r=>{
+    const p = r.promoter || '(unknown)';
+    if (!byPromoter[p]) byPromoter[p] = { total: 0, recent: null, perMonth: {}, stores: new Set() };
+    byPromoter[p].total++;
+    byPromoter[p].stores.add(r.store_code);
+    const m = (r.date||'').slice(0,7);
+    byPromoter[p].perMonth[m] = (byPromoter[p].perMonth[m]||0) + 1;
+    if (!byPromoter[p].recent || r.timestamp > byPromoter[p].recent) byPromoter[p].recent = r.timestamp;
+  });
+  let promList = Object.entries(byPromoter);
+  if (sortBy === 'name') promList.sort((a,b)=>a[0].localeCompare(b[0]));
+  else if (sortBy === 'recent') promList.sort((a,b)=>String(b[1].recent||'').localeCompare(String(a[1].recent||'')));
+  else promList.sort((a,b)=>b[1].total - a[1].total);
+  const recentCutoff = new Date(Date.now() - 7*24*3600*1000).toISOString();
+  let html = '<table><thead><tr><th>Promoter</th><th class="num">Total</th><th class="num">Stores</th><th>Last check-in</th>';
+  months.forEach(m=>{ html += '<th class="num">'+monthLabel(m)+'</th>'; });
+  html += '</tr></thead><tbody>';
+  promList.forEach(([p, s])=>{
+    const recentStr = s.recent ? new Date(s.recent).toLocaleDateString('en-IN',{day:'2-digit', month:'short'}) : '—';
+    const isActive = s.recent && s.recent > recentCutoff;
+    html += `<tr${isActive?' class="highlight"':''}><td><strong>${p}</strong>${isActive?' <span class="pill">active 7d</span>':''}</td><td class="num">${fmt(s.total)}</td><td class="num">${fmt(s.stores.size)}</td><td>${recentStr}</td>`;
+    months.forEach(m=>{ html += '<td class="num">'+(s.perMonth[m]?fmt(s.perMonth[m]):'—')+'</td>'; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('table').innerHTML = html;
+  // Recent 30 days list
+  const cutoff = new Date(Date.now() - 30*24*3600*1000).toISOString().slice(0,10);
+  const recent = ALL_ROWS.filter(r => (r.date||'') >= cutoff).slice(0, 100);
+  let rhtml = '<table><thead><tr><th>Date</th><th>Promoter</th><th>Store</th><th>Distance (m)</th><th>Photo</th></tr></thead><tbody>';
+  recent.forEach(r=>{
+    const d = r.date ? new Date(r.date).toLocaleDateString('en-IN',{day:'2-digit', month:'short'}) : '—';
+    const photo = r.photo_url ? `<a href="${r.photo_url}" target="_blank">view</a>` : '—';
+    rhtml += `<tr><td>${d}</td><td>${r.promoter||'—'}</td><td>${r.store_name||r.store_code||'—'}</td><td class="num">${r.distance_from_store_m?Math.round(r.distance_from_store_m):'—'}</td><td>${photo}</td></tr>`;
+  });
+  rhtml += '</tbody></table>';
+  if (recent.length === 0) rhtml = '<div class="loading">No check-ins in the last 30 days.</div>';
+  document.getElementById('recent').innerHTML = rhtml;
+}
+document.getElementById('monthFilter').addEventListener('change', render);
+document.getElementById('sortBy').addEventListener('change', render);
+load().catch(e=>{ document.getElementById('table').innerHTML = '<div class="loading">Error loading: '+e+'</div>'; });
+</script>
+</body>
+</html>
