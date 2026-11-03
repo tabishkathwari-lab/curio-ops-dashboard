@@ -1,7 +1,8 @@
-// SCOREPATCH_PROMOTER_CHECKINS_V4
+// SCOREPATCH_PROMOTER_CHECKINS_V5
 (function(){
   var SB='https://cikyevecsuamzndxfpir.supabase.co';
   var KEY='sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
+  var BLACKLIST={'probe':1,'AUDIT_v11':1,'TEST_DIAGNOSTIC':1,'test':1,'TEST':1};
   var CACHE=null, CACHE_T=0;
   function istDateStr(d){ return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
   async function loadData(){
@@ -13,6 +14,7 @@
       if (!Array.isArray(page)||!page.length) break;
       page.forEach(function(rec){
         var k=rec.promoter; if(!k) return;
+        if (BLACKLIST[k]) return;
         if (!out[k]) out[k]={allDays:new Set(), last:null, am:0, pm:0, perDay:{}, thisMonthDays:new Set()};
         if (rec.date) {
           out[k].allDays.add(rec.date);
@@ -54,7 +56,7 @@
     var t = findTable(function(n){ return hasCol(n,/Days active/)>=0 && hasCol(n,/AM \/ PM/)>=0 && hasCol(n,/Last active/)>=0; });
     if (!t) return;
     var table = t.table, hdrs = t.hdrs;
-    if (table.dataset.spPatched==='4' && (Date.now()-parseInt(table.dataset.spTs||'0',10))<30000) return;
+    if (table.dataset.spPatched==='5' && (Date.now()-parseInt(table.dataset.spTs||'0',10))<30000) return;
     var iN=hasCol(hdrs,/^Promoter$/), iD=hasCol(hdrs,/Days active/), iA=hasCol(hdrs,/AM \/ PM/), iL=hasCol(hdrs,/Last active/);
     var iOL=hasCol(hdrs,/On leave|Missed/);
     if (iOL>=0 && /On leave/.test(hdrs[iOL]) && table.querySelectorAll('thead th')[iOL].dataset.renamed!=='1'){
@@ -73,13 +75,13 @@
         tds[iOL].textContent = missed;
       }
     });
-    table.dataset.spPatched='4'; table.dataset.spTs=String(Date.now());
+    table.dataset.spPatched='5'; table.dataset.spTs=String(Date.now());
   }
   async function patchMonthlySummary(data){
     var t = findTable(function(n){ return hasCol(n,/^Promoter$/)>=0 && hasCol(n,/Attendance %/)>=0 && hasCol(n,/Full days/)>=0; });
     if (!t) return;
     var table = t.table, hdrs = t.hdrs;
-    if (table.dataset.spSumPatched==='4' && (Date.now()-parseInt(table.dataset.spSumTs||'0',10))<30000) return;
+    if (table.dataset.spSumPatched==='5' && (Date.now()-parseInt(table.dataset.spSumTs||'0',10))<30000) return;
     var iN=hasCol(hdrs,/^Promoter$/), iFull=hasCol(hdrs,/Full days/), iHalf=hasCol(hdrs,/Half days/), iLeave=hasCol(hdrs,/On leave/), iAbs=hasCol(hdrs,/Absent/), iPct=hasCol(hdrs,/Attendance %/);
     var elapsed = elapsedMonthDays();
     var now = new Date(); var ym = istDateStr(now).slice(0,7);
@@ -109,14 +111,14 @@
       tr.innerHTML = cells.join('');
       tbody.appendChild(tr);
     });
-    table.dataset.spSumPatched='4'; table.dataset.spSumTs=String(Date.now());
+    table.dataset.spSumPatched='5'; table.dataset.spSumTs=String(Date.now());
   }
   async function patch(){
     try {
       var data = await loadData();
       await patchScorecard(data);
       await patchMonthlySummary(data);
-    } catch(e){ console.warn('[scorepatch v4]', e); }
+    } catch(e){ console.warn('[scorepatch v5]', e); }
   }
   var t;
   var run=function(){ clearTimeout(t); t=setTimeout(patch, 500); };
