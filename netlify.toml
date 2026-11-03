@@ -1,0 +1,6 @@
+# Inject scorepatch.js into HTML responses so the Promoters scorecard
+# pulls Days active / AM-PM / Last active from Supabase promoter_checkins.
+
+[[edge_functions]]
+  path = "/*"
+  function = "inject-scorepatch"
