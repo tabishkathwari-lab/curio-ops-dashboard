@@ -1,6 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+(function(){
+  var SB_URL='https://cikyevecsuamzndxfpir.supabase.co';
+  var SB_KEY='sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
+  var _fetch=window.fetch.bind(window);
+  async function sb(p){var r=await _fetch(SB_URL+'/rest/v1/'+p,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.json();}
+  function j(d){return new Response(JSON.stringify({ok:true,data:d}),{status:200,headers:{'Content-Type':'application/json'}});}
+  window.fetch=async function(u,o){
+    var s=String(u);
+    try{
+      if(s.indexOf('/exec')>-1&&s.indexOf('q=shopify_raw')>-1){
+        var rs=await sb('sales_shopify?select=order_id,order_date,timestamp,customer_email,city,sku,units,unit_price,total,payment_method,financial_status,source&order=order_date.desc&limit=5000');
+        return j((rs||[]).map(function(r){return {Timestamp:r.timestamp,Order_Date:r.order_date,Order_ID:r.order_id,Customer_Email:r.customer_email,City:r.city,SKU:r.sku,Units:r.units,Unit_Price:r.unit_price,Total:r.total,Payment_Method:r.payment_method,Financial_Status:r.financial_status,Source:r.source,Entry_By:r.source};}));
+      }
+      if(s.indexOf('/exec')>-1&&s.indexOf('q=shopify_monthly')>-1){
+        var raw=await sb('sales_shopify?select=order_date,total,units&limit=10000');
+        var b={};for(var i=0;i<(raw||[]).length;i++){var r2=raw[i];var m=(r2.order_date||'').slice(0,7);if(!m)continue;if(!b[m])b[m]={Month:m,Total_Sales:0,Total_Units:0};b[m].Total_Sales+=Number(r2.total||0);b[m].Total_Units+=Number(r2.units||0);}
+        return j(Object.keys(b).sort().map(function(k){return b[k];}));
+      }
+      if(s.indexOf('/exec')>-1&&s.indexOf('q=shopify_live')>-1){
+        var rs2=await sb('sales_shopify?select=order_id,order_date,timestamp,total,sku,units&order=timestamp.desc&limit=500');
+        return j(rs2||[]);
+      }
+    }catch(e){console.warn('sb intercept err',e);}
+    return _fetch(u,o);
+  };
+})();
+</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
