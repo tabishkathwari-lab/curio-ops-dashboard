@@ -1,6 +1,4 @@
-// SCOREPATCH_PROMOTER_CHECKINS_V3
-// Populates: Promoters scorecard (Days active / AM-PM / Last active / Missed-mo)
-// AND the Attendance view's Promoter monthly summary table (Full / Half / On leave / Absent / %)
+// SCOREPATCH_PROMOTER_CHECKINS_V4
 (function(){
   var SB='https://cikyevecsuamzndxfpir.supabase.co';
   var KEY='sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -42,6 +40,7 @@
     return out;
   }
   function elapsedMonthDays(){ var now=new Date(); return parseInt(istDateStr(now).slice(8,10),10); }
+  function hasCol(hdrs, re){ for (var i=0;i<hdrs.length;i++) if (re.test(hdrs[i])) return i; return -1; }
   function findTable(filter){
     var tables=document.querySelectorAll('table');
     for (var i=0;i<tables.length;i++){
@@ -52,13 +51,13 @@
     return null;
   }
   async function patchScorecard(data){
-    var t = findTable(function(n){ return n.indexOf('Days active')>=0 && n.indexOf('AM / PM')>=0 && n.indexOf('Last active')>=0; });
+    var t = findTable(function(n){ return hasCol(n,/Days active/)>=0 && hasCol(n,/AM \/ PM/)>=0 && hasCol(n,/Last active/)>=0; });
     if (!t) return;
     var table = t.table, hdrs = t.hdrs;
-    if (table.dataset.spPatched==='3' && (Date.now()-parseInt(table.dataset.spTs||'0',10))<30000) return;
-    var iN=hdrs.indexOf('Promoter'), iD=hdrs.indexOf('Days active'), iA=hdrs.indexOf('AM / PM'), iL=hdrs.indexOf('Last active');
-    var iOL=hdrs.indexOf('On leave'); if (iOL<0) iOL=hdrs.indexOf('Missed (mo)');
-    if (hdrs.indexOf('On leave')>=0 && table.querySelectorAll('thead th')[iOL].dataset.renamed!=='1'){
+    if (table.dataset.spPatched==='4' && (Date.now()-parseInt(table.dataset.spTs||'0',10))<30000) return;
+    var iN=hasCol(hdrs,/^Promoter$/), iD=hasCol(hdrs,/Days active/), iA=hasCol(hdrs,/AM \/ PM/), iL=hasCol(hdrs,/Last active/);
+    var iOL=hasCol(hdrs,/On leave|Missed/);
+    if (iOL>=0 && /On leave/.test(hdrs[iOL]) && table.querySelectorAll('thead th')[iOL].dataset.renamed!=='1'){
       var th=table.querySelectorAll('thead th')[iOL]; th.textContent='Missed (mo)'; th.title='Working days this month without a check-in'; th.dataset.renamed='1';
     }
     var elapsed = elapsedMonthDays();
@@ -74,25 +73,17 @@
         tds[iOL].textContent = missed;
       }
     });
-    table.dataset.spPatched='3'; table.dataset.spTs=String(Date.now());
+    table.dataset.spPatched='4'; table.dataset.spTs=String(Date.now());
   }
   async function patchMonthlySummary(data){
-    var t = findTable(function(n){ return n.indexOf('Promoter')>=0 && n.indexOf('Attendance %')>=0 && n.indexOf('Full days')<0 ? false : (n.indexOf('Promoter')>=0 && n.indexOf('Attendance %')>=0); });
+    var t = findTable(function(n){ return hasCol(n,/^Promoter$/)>=0 && hasCol(n,/Attendance %/)>=0 && hasCol(n,/Full days/)>=0; });
     if (!t) return;
     var table = t.table, hdrs = t.hdrs;
-    if (table.dataset.spSumPatched==='3' && (Date.now()-parseInt(table.dataset.spSumTs||'0',10))<30000) return;
-    // Find column indexes
-    var iN=hdrs.findIndex(function(x){return x==='Promoter';});
-    var iFull=hdrs.findIndex(function(x){return /Full days/i.test(x);});
-    var iHalf=hdrs.findIndex(function(x){return /Half days/i.test(x);});
-    var iLeave=hdrs.findIndex(function(x){return /On leave/i.test(x);});
-    var iAbs=hdrs.findIndex(function(x){return /Absent/i.test(x);});
-    var iPct=hdrs.findIndex(function(x){return /Attendance %/i.test(x);});
+    if (table.dataset.spSumPatched==='4' && (Date.now()-parseInt(table.dataset.spSumTs||'0',10))<30000) return;
+    var iN=hasCol(hdrs,/^Promoter$/), iFull=hasCol(hdrs,/Full days/), iHalf=hasCol(hdrs,/Half days/), iLeave=hasCol(hdrs,/On leave/), iAbs=hasCol(hdrs,/Absent/), iPct=hasCol(hdrs,/Attendance %/);
     var elapsed = elapsedMonthDays();
     var now = new Date(); var ym = istDateStr(now).slice(0,7);
-    // Build or clear tbody
-    var tbody = table.querySelector('tbody');
-    if (!tbody) return;
+    var tbody = table.querySelector('tbody'); if (!tbody) return;
     tbody.innerHTML = '';
     Object.keys(data).forEach(function(name){
       var d = data[name];
@@ -118,14 +109,14 @@
       tr.innerHTML = cells.join('');
       tbody.appendChild(tr);
     });
-    table.dataset.spSumPatched='3'; table.dataset.spSumTs=String(Date.now());
+    table.dataset.spSumPatched='4'; table.dataset.spSumTs=String(Date.now());
   }
   async function patch(){
     try {
       var data = await loadData();
       await patchScorecard(data);
       await patchMonthlySummary(data);
-    } catch(e){ console.warn('[scorepatch v3]', e); }
+    } catch(e){ console.warn('[scorepatch v4]', e); }
   }
   var t;
   var run=function(){ clearTimeout(t); t=setTimeout(patch, 500); };
