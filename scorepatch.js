@@ -1,9 +1,9 @@
-/* scorepatch V20 - adds top-row tile fix for B2B + MT (reads sales_b2b view + mt_customers filter) */
+/* scorepatch V21 - B2B top-tile uses sales_b2b view by stable ID (#ss-b2b-*) + ALL TODAY includes B2B */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V20';
+  const VERSION = 'V21';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -386,80 +386,24 @@
     } catch(e){ console.error('[sp'+VERSION+'] home sales pss err', e); }
   }
 
-  // --- V20: patch home top-row tiles (BLINKIT / AMAZON / B2B / MT misreads) ---
+  // --- V21: patch B2B top tile on home page using stable DOM IDs ---
   async function patchHomeTopTiles(){
     try {
-      const page = document.getElementById('page-home');
-      if (!page) return;
+      const b2bToday = document.getElementById('ss-b2b-today');
+      const b2bMtd = document.getElementById('ss-b2b-mtd');
+      const b2bYtd = document.getElementById('ss-b2b-ytd');
+      if (!b2bToday) return; // page not rendered yet
       const mb = monthBounds();
       const fy = fyBounds('FY27');
       const today = istDate();
-      const [b2bToday, b2bMtd, b2bYtd, mtToday, mtMtd, mtYtd] = await Promise.all([
+      const [bT, bM, bY] = await Promise.all([
         sumPage('sales_b2b','total','&date=eq.'+today),
         sumPage('sales_b2b','total','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst),
-        sumPage('sales_b2b','total','&date=gte.'+fy.first+'&date=lt.'+fy.nextFirst),
-        // MT = sales_mt_office (promoter entries) + zoho_invoices filtered by mt_customers
-        (async()=>{
-          const [promoter, zoho, mtCust] = await Promise.all([
-            sumPage('sales_mt_office','total','&date=eq.'+today),
-            sbGet('zoho_invoices?select=customer_name,total&date=eq.'+today),
-            sbGet('mt_customers?select=customer_name')
-          ]);
-          const names = new Set((mtCust||[]).map(x=>String(x.customer_name).toUpperCase()));
-          const zohoMt = (zoho||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
-          return promoter + zohoMt;
-        })(),
-        (async()=>{
-          const [promoter, zoho, mtCust] = await Promise.all([
-            sumPage('sales_mt_office','total','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst),
-            sbGet('zoho_invoices?select=customer_name,total&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst),
-            sbGet('mt_customers?select=customer_name')
-          ]);
-          const names = new Set((mtCust||[]).map(x=>String(x.customer_name).toUpperCase()));
-          const zohoMt = (zoho||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
-          return promoter + zohoMt;
-        })(),
-        (async()=>{
-          const [promoter, zoho, mtCust] = await Promise.all([
-            sumPage('sales_mt_office','total','&date=gte.'+fy.first+'&date=lt.'+fy.nextFirst),
-            pagedAll('zoho_invoices','customer_name,total','&date=gte.'+fy.first+'&date=lt.'+fy.nextFirst),
-            sbGet('mt_customers?select=customer_name')
-          ]);
-          const names = new Set((mtCust||[]).map(x=>String(x.customer_name).toUpperCase()));
-          const zohoMt = (zoho||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
-          return promoter + zohoMt;
-        })()
+        sumPage('sales_b2b','total','&date=gte.'+fy.first+'&date=lt.'+fy.nextFirst)
       ]);
-
-      // Find the top-row tiles. Each tile card has a small label (text node) and a large value.
-      // Match by label text; the "sub" line has "MTD X . YTD Y" pattern.
-      function findTile(labelRe){
-        const all = Array.from(page.querySelectorAll('*'));
-        for (const el of all) {
-          if (el.children.length) continue;
-          const t = (el.textContent||'').trim();
-          if (!labelRe.test(t)) continue;
-          // Tile root is 2-3 levels up
-          let node = el;
-          for (let i=0;i<5;i++) { node = node.parentElement; if (!node) break; 
-            if (node.textContent && /MTD/i.test(node.textContent) && /YTD/i.test(node.textContent)) return node; }
-        }
-        return null;
-      }
-      function setTile(tile, todayVal, mtdVal, ytdVal){
-        if (!tile) return;
-        // find big numeric element — biggest font text under tile
-        const texts = Array.from(tile.querySelectorAll('*')).filter(e=>e.children.length===0 && e.textContent.trim());
-        let big=null, maxSize=0;
-        texts.forEach(e=>{ const s = parseFloat(getComputedStyle(e).fontSize)||0; if (s>maxSize && /[₹0-9—-]/.test(e.textContent)) { maxSize=s; big=e; } });
-        if (big) big.textContent = todayVal>0 ? rupee(todayVal) : '₹0';
-        // find sub-line with MTD/YTD
-        const sub = texts.find(e => /MTD/i.test(e.textContent) && /YTD/i.test(e.textContent));
-        if (sub) sub.textContent = 'MTD '+rupee(mtdVal)+' · YTD '+rupee(ytdVal);
-      }
-
-      setTile(findTile(/^B2B$/i), b2bToday, b2bMtd, b2bYtd);
-      setTile(findTile(/^MT$/i), mtToday, mtMtd, mtYtd);
+      b2bToday.textContent = bT>0 ? rupee(bT) : '₹0';
+      if (b2bMtd) b2bMtd.textContent = rupee(bM);
+      if (b2bYtd) b2bYtd.textContent = rupee(bY);
     } catch(e){ console.error('[sp'+VERSION+'] home tiles err', e); }
   }
 
