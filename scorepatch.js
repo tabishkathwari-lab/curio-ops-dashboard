@@ -1,9 +1,9 @@
-/* scorepatch V22 - also fixes Sales by channel row for MT (zoho + sales_mt_office) and B2B (sales_b2b view) */
+/* scorepatch V23 - preserves .ov-delta span IDs so dashboard home/shopify overview no longer throws null errors */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V22';
+  const VERSION = 'V23';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -115,9 +115,24 @@
     if (!card) return;
     const v = card.querySelector('.ov-value');
     if (v && value !== undefined) v.textContent = value;
+    // IMPORTANT: Do NOT setTextContent on the parent .ov-delta div because that destroys
+    // the inner <span id="ovSalesPrev">...</span> element that dashboard's own code looks up by ID.
+    // Instead find the inner span (e.g. ovSalesPrev) and replace only its text.
     const deltas = card.querySelectorAll('.ov-delta');
-    if (deltas[0] && delta1 !== undefined) deltas[0].textContent = delta1;
-    if (deltas[1] && delta2 !== undefined) deltas[1].textContent = delta2;
+    function setDelta(deltaDiv, newText){
+      if (!deltaDiv || newText === undefined) return;
+      const span = deltaDiv.querySelector('span[id]');
+      if (span) {
+        // Replace just the span text — extract delta text (e.g. "+12.3%" after "Previous period ")
+        const m = String(newText).match(/(?:previous\s+period|previous\s+year)\s+(.*)/i);
+        span.textContent = m ? m[1] : String(newText);
+      } else {
+        // Fallback: use textContent only if no span exists
+        deltaDiv.textContent = newText;
+      }
+    }
+    setDelta(deltas[0], delta1);
+    setDelta(deltas[1], delta2);
   }
 
   async function patchHomeOverview(){
