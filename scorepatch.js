@@ -1,4 +1,4 @@
-// SCOREPATCH_PROMOTER_CHECKINS_V8_dateFix
+// SCOREPATCH_PROMOTER_CHECKINS_V9
 (function(){
   var SB='https://cikyevecsuamzndxfpir.supabase.co';
   var KEY='sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -39,8 +39,8 @@
   async function loadOverview(){
     if (C_O && (Date.now()-C_O_T)<120000) return C_O;
     var mb=monthBounds(), t=todayIST();
-    var monthF='date=gte.'+mb.first+'&date=lte.'+mb.last;
-    var shopMo='order_date=gte.'+mb.first+'&order_date=lte.'+mb.last;
+    var monthF='date=gte.'+mb.first+'&date=lt.'+mb.nextFirst;
+    var shopMo='order_date=gte.'+mb.first+'&order_date=lt.'+mb.nextFirst;
     var shopMtd=await sumPage('sales_shopify','total',shopMo);
     var shopOrdersMtd=await countOrders(shopMo);
     var blMtd=await sumPage('sales_blinkit','net_sales',monthF);
