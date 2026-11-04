@@ -1,4 +1,4 @@
-// SCOREPATCH_PROMOTER_CHECKINS_V7
+// SCOREPATCH_PROMOTER_CHECKINS_V8_dateFix
 (function(){
   var SB='https://cikyevecsuamzndxfpir.supabase.co';
   var KEY='sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -7,7 +7,7 @@
   var C_P=null,C_P_T=0,C_A=null,C_A_T=0,C_O=null,C_O_T=0;
   function istDateStr(d){ return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
   function todayIST(){ return istDateStr(new Date()); }
-  function monthBounds(){ var t=todayIST(), ym=t.slice(0,7); return {first:ym+'-01',last:ym+'-31',ym:ym}; }
+  function monthBounds(){ var t=todayIST(); var y=parseInt(t.slice(0,4),10),m=parseInt(t.slice(5,7),10); var first=t.slice(0,7)+'-01'; var ny=y,nm=m+1; if(nm>12){nm=1;ny++;} var nextFirst=ny+'-'+(nm<10?'0'+nm:nm)+'-01'; return {first:first,nextFirst:nextFirst,ym:t.slice(0,7)}; }
   function fmtINR(n){
     if (n==null||isNaN(n)) return '₹0';
     if (n>=10000000) return '₹'+(n/10000000).toFixed(2)+'Cr';
