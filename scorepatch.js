@@ -1,9 +1,9 @@
-/* scorepatch V21 - B2B top-tile uses sales_b2b view by stable ID (#ss-b2b-*) + ALL TODAY includes B2B */
+/* scorepatch V22 - also fixes Sales by channel row for MT (zoho + sales_mt_office) and B2B (sales_b2b view) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V21';
+  const VERSION = 'V22';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -407,8 +407,107 @@
     } catch(e){ console.error('[sp'+VERSION+'] home tiles err', e); }
   }
 
+  // --- V22: patch 'Sales by channel' table rows (MT + B2B) ---
+  async function patchSalesByChannel(){
+    try {
+      // Find the Sales by channel table by header pattern
+      const tables = Array.from(document.querySelectorAll('table'));
+      let tbl = null;
+      for (const t of tables) {
+        const txt = (t.textContent||'');
+        if (/MT/.test(txt) && /B2B/.test(txt) && /Shopify/.test(txt) && /Blinkit/.test(txt) && /This month/i.test(txt) && !/Profit/i.test(txt)) { tbl = t; break; }
+      }
+      if (!tbl) return;
+      const rows = Array.from(tbl.querySelectorAll('tbody tr, tr'));
+      const mb = monthBounds();
+      const pmb = prevMonthBounds(mb);
+      const today = istDate();
+      const daysIn = Math.min((new Date(today).getUTCDate()), 31);
+
+      function findRow(labelRe){
+        for (const r of rows) {
+          const first = (r.children[0] && r.children[0].textContent||'').trim();
+          if (labelRe.test(first)) return r;
+        }
+        return null;
+      }
+      function setCell(row, colIdx, val){ if (!row || !row.children[colIdx]) return; row.children[colIdx].textContent = val; }
+      function fmt(n){ return n>0 ? rupee(n) : '—'; }
+
+      // --- MT row: sales_mt_office + zoho_invoices JOIN mt_customers ---
+      async function mtRange(range){
+        const [promoter, zoho, mtCust] = await Promise.all([
+          sumPage('sales_mt_office','total','&date=gte.'+range.first+'&date=lt.'+range.nextFirst),
+          pagedAll('zoho_invoices','customer_name,total','&date=gte.'+range.first+'&date=lt.'+range.nextFirst),
+          sbGet('mt_customers?select=customer_name')
+        ]);
+        const names = new Set((mtCust||[]).map(x=>String(x.customer_name).toUpperCase()));
+        const zMt = (zoho||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        return promoter + zMt;
+      }
+      async function mtEq(date){
+        const [promoter, zoho, mtCust] = await Promise.all([
+          sbGet('sales_mt_office?select=total&date=eq.'+date),
+          sbGet('zoho_invoices?select=customer_name,total&date=eq.'+date),
+          sbGet('mt_customers?select=customer_name')
+        ]);
+        const names = new Set((mtCust||[]).map(x=>String(x.customer_name).toUpperCase()));
+        const pT = (promoter||[]).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const zT = (zoho||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        return pT + zT;
+      }
+
+      // --- B2B row: sales_b2b view ---
+      async function b2bRange(range){
+        return await sumPage('sales_b2b','total','&date=gte.'+range.first+'&date=lt.'+range.nextFirst);
+      }
+      async function b2bEq(date){
+        return await sumPage('sales_b2b','total','&date=eq.'+date);
+      }
+
+      const [mtToday, mtMtd, mtLast, b2bToday2, b2bMtd2, b2bLast] = await Promise.all([
+        mtEq(today), mtRange(mb), mtRange(pmb),
+        b2bEq(today), b2bRange(mb), b2bRange(pmb)
+      ]);
+
+      // Columns: 0=Channel, 1=Today, 2=MTD, 3=Daily avg, 4=Last month, 5=sparkline
+      const mtRow = findRow(/MT$/);
+      if (mtRow) {
+        setCell(mtRow, 1, fmt(mtToday));
+        setCell(mtRow, 2, fmt(mtMtd));
+        setCell(mtRow, 3, fmt(mtMtd / daysIn));
+        setCell(mtRow, 4, fmt(mtLast));
+      }
+      const b2bRow = findRow(/B2B$/);
+      if (b2bRow) {
+        setCell(b2bRow, 1, fmt(b2bToday2));
+        setCell(b2bRow, 2, fmt(b2bMtd2));
+        setCell(b2bRow, 3, fmt(b2bMtd2 / daysIn));
+        setCell(b2bRow, 4, fmt(b2bLast));
+      }
+
+      // Update the Total row to account for our changes
+      // Grab all channel MTDs by text parse
+      function parseR(s){ if(!s)return 0; const m=String(s).match(/([\d.,]+)\s*(Cr|L|K)?/i); if(!m)return 0; const n=parseFloat(m[1].replace(/,/g,'')); if(/cr/i.test(m[2]||''))return n*1e7; if(/l/i.test(m[2]||''))return n*1e5; if(/k/i.test(m[2]||''))return n*1e3; return n; }
+      const shopRow = findRow(/Shopify$/);
+      const blnkRow = findRow(/Blinkit$/);
+      const amzRow = findRow(/Amazon$/);
+      function rowVal(row, idx){ return row ? parseR(row.children[idx]?.textContent) : 0; }
+      const totToday = rowVal(shopRow,1)+rowVal(blnkRow,1)+rowVal(amzRow,1)+mtToday+b2bToday2;
+      const totMtd = rowVal(shopRow,2)+rowVal(blnkRow,2)+rowVal(amzRow,2)+mtMtd+b2bMtd2;
+      const totAvg = rowVal(shopRow,3)+rowVal(blnkRow,3)+rowVal(amzRow,3)+(mtMtd/daysIn)+(b2bMtd2/daysIn);
+      const totLast = rowVal(shopRow,4)+rowVal(blnkRow,4)+rowVal(amzRow,4)+mtLast+b2bLast;
+      const totToEl = document.getElementById('cbTotToday'); if (totToEl) totToEl.textContent = totToday>0 ? rupee(totToday) : '—';
+      const totMtdEl = document.getElementById('cbTotMonth'); if (totMtdEl) totMtdEl.textContent = totMtd>0 ? rupee(totMtd) : '—';
+      const totAvgEl = document.getElementById('cbTotAvg'); if (totAvgEl) totAvgEl.textContent = totAvg>0 ? rupee(totAvg) : '—';
+      const totLastEl = document.getElementById('cbTotLast'); if (totLastEl) totLastEl.textContent = totLast>0 ? rupee(totLast) : '—';
+    } catch(e){ console.error('[sp'+VERSION+'] sales by channel err', e); }
+  }
+
+
   async function runAll(){
     await patchHomeTopTiles();
+    await patchSalesByChannel();
     await patchHomeOverview();
     await patchHomeSalesPSS();
     await patchShopifyOverview();
