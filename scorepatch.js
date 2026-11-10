@@ -1,9 +1,9 @@
-/* scorepatch V26 - adds Kashmir Almonds + Wild Multi Floral Honey Zoho mappings (SKU-DF-00003, SKU-HN-001) */
+/* scorepatch V27 - also render Raw Materials and Packaging sections on Inventory page from live Zoho (RM-* and PK-* items) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V26';
+  const VERSION = 'V27';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -601,6 +601,111 @@
     } catch(e){ console.error('[spV25] inventory zoho err', e); }
   }
 
+  // --- V27: render Raw Materials + Packaging on Inventory page from LIVE Zoho ---
+  async function patchInventoryRawAndPackaging(){
+    try {
+      const page = document.getElementById('page-inventory');
+      if (!page) return;
+      if (page.dataset.sp27Done === '1') return;
+      // Fetch RM-* (raw materials) and PK-* (packaging) items from Supabase zoho_items
+      const [rms, pks] = await Promise.all([
+        sbGet('zoho_items?select=sku,name,stock_on_hand,unit&sku=like.RM-*&item_type=eq.inventory&status=eq.active&limit=100'),
+        sbGet('zoho_items?select=sku,name,stock_on_hand,unit&sku=like.PK-*&item_type=eq.inventory&status=eq.active&limit=200')
+      ]);
+      const liveBlock = page.querySelector('.live-factory-block');
+      if (!liveBlock) return;
+      // Build the Raw Materials card
+      function sortByStock(a,b){ return (Number(b.stock_on_hand)||0) - (Number(a.stock_on_hand)||0); }
+      const rmSorted = (rms||[]).slice().sort(sortByStock);
+      const rmTotal = rmSorted.length;
+      const rmNonZero = rmSorted.filter(x => Number(x.stock_on_hand) > 0).length;
+      const rmZero = rmTotal - rmNonZero;
+      let rmHtml = '';
+      rmHtml += '<div class="card" id="sp27-raw-card" style="margin-top:20px; padding:16px;">';
+      rmHtml += '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">';
+      rmHtml += '<div><div style="font-size:16px; font-weight:700; color:#0f172a;">🌾 Raw Materials (live from Zoho)</div>';
+      rmHtml += '<div style="font-size:12px; color:#64748b; margin-top:2px;">' + rmTotal + ' items · ' + rmNonZero + ' in stock · ' + rmZero + ' at zero</div></div>';
+      rmHtml += '<div style="font-size:11px; color:#15803d; background:#ecfdf5; padding:4px 10px; border-radius:12px;">Live</div></div>';
+      rmHtml += '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+      rmHtml += '<thead><tr style="background:#f8fafc;"><th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Item</th>';
+      rmHtml += '<th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">SKU</th>';
+      rmHtml += '<th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">Stock</th>';
+      rmHtml += '<th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Unit</th></tr></thead><tbody>';
+      rmSorted.forEach(x => {
+        const stock = Number(x.stock_on_hand) || 0;
+        const zero = stock === 0;
+        rmHtml += '<tr' + (zero ? ' style="color:#dc2626; background:#fef2f2;"' : '') + '>';
+        rmHtml += '<td style="padding:6px 8px; border-bottom:1px solid #f1f5f9;">' + (x.name||'') + '</td>';
+        rmHtml += '<td style="padding:6px 8px; border-bottom:1px solid #f1f5f9; color:#64748b; font-family:monospace; font-size:11px;">' + (x.sku||'') + '</td>';
+        rmHtml += '<td style="padding:6px 8px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600;">' + (zero ? '0' : stock.toLocaleString('en-IN')) + '</td>';
+        rmHtml += '<td style="padding:6px 8px; border-bottom:1px solid #f1f5f9; color:#64748b;">' + (x.unit||'') + '</td></tr>';
+      });
+      rmHtml += '</tbody></table></div>';
+      // Build Packaging card, grouped by type
+      const pkGroups = {
+        'Bottles & Jars': [],
+        'Labels': [],
+        'Boxes': [],
+        'Caps': [],
+        'Vials': [],
+        'Seals': [],
+        'Other': []
+      };
+      (pks||[]).forEach(p => {
+        const n = (p.name||'').toLowerCase(), s = (p.sku||'').toUpperCase();
+        if (/bottle|jar/i.test(n) || /BOTTLE|JAR/.test(s)) pkGroups['Bottles & Jars'].push(p);
+        else if (/label/i.test(n) || /LBL/.test(s)) pkGroups['Labels'].push(p);
+        else if (/^box|,\s*box|box,/i.test(n) || /PK-BOX/.test(s)) pkGroups['Boxes'].push(p);
+        else if (/cap/i.test(n) || /-CAP/.test(s)) pkGroups['Caps'].push(p);
+        else if (/vial/i.test(n) || /-VIAL/.test(s)) pkGroups['Vials'].push(p);
+        else if (/seal/i.test(n) || /-SEAL/.test(s)) pkGroups['Seals'].push(p);
+        else pkGroups['Other'].push(p);
+      });
+      const pkTotal = (pks||[]).length;
+      const pkNonZero = (pks||[]).filter(x => Number(x.stock_on_hand) > 0).length;
+      let pkHtml = '';
+      pkHtml += '<div class="card" id="sp27-pk-card" style="margin-top:20px; padding:16px;">';
+      pkHtml += '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">';
+      pkHtml += '<div><div style="font-size:16px; font-weight:700; color:#0f172a;">📦 Packaging (live from Zoho)</div>';
+      pkHtml += '<div style="font-size:12px; color:#64748b; margin-top:2px;">' + pkTotal + ' items · ' + pkNonZero + ' in stock · ' + (pkTotal-pkNonZero) + ' at zero</div></div>';
+      pkHtml += '<div style="font-size:11px; color:#15803d; background:#ecfdf5; padding:4px 10px; border-radius:12px;">Live</div></div>';
+      Object.keys(pkGroups).forEach(groupName => {
+        const items = pkGroups[groupName].slice().sort(sortByStock);
+        if (!items.length) return;
+        const grpNonZero = items.filter(x => Number(x.stock_on_hand) > 0).length;
+        pkHtml += '<details style="margin-bottom:8px;"><summary style="cursor:pointer; padding:6px 0; font-weight:600; color:#334155;">' + groupName + ' <span style="color:#64748b; font-weight:400; font-size:12px;">(' + items.length + ' items · ' + grpNonZero + ' in stock)</span></summary>';
+        pkHtml += '<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; margin-left:12px;">';
+        pkHtml += '<thead><tr style="background:#f8fafc;"><th style="text-align:left; padding:6px;">Item</th><th style="text-align:left; padding:6px;">SKU</th><th style="text-align:right; padding:6px;">Stock</th></tr></thead><tbody>';
+        items.forEach(x => {
+          const stock = Number(x.stock_on_hand) || 0;
+          const zero = stock === 0;
+          pkHtml += '<tr' + (zero ? ' style="color:#dc2626;"' : '') + '>';
+          pkHtml += '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9;">' + (x.name||'') + '</td>';
+          pkHtml += '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; color:#64748b; font-family:monospace; font-size:10px;">' + (x.sku||'') + '</td>';
+          pkHtml += '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600;">' + (zero ? '0' : stock.toLocaleString('en-IN')) + '</td></tr>';
+        });
+        pkHtml += '</tbody></table></details>';
+      });
+      pkHtml += '</div>';
+      // Remove any existing v27 cards (idempotent)
+      const old = document.getElementById('sp27-raw-card');
+      if (old) old.remove();
+      const oldPk = document.getElementById('sp27-pk-card');
+      if (oldPk) oldPk.remove();
+      // Insert after the live-factory-block
+      const container = document.createElement('div');
+      container.id = 'sp27-container';
+      container.innerHTML = rmHtml + pkHtml;
+      // Remove any existing container
+      const oldContainer = document.getElementById('sp27-container');
+      if (oldContainer) oldContainer.remove();
+      liveBlock.parentElement.insertBefore(container, liveBlock.nextSibling);
+      page.dataset.sp27Done = '1';
+      console.log('[spV27] Raw Materials + Packaging cards rendered from Zoho: RM=' + rmTotal + ' PK=' + pkTotal);
+    } catch(e){ console.error('[spV27] raw/packaging err', e); }
+  }
+
+
 
 
   // --- V22: patch 'Sales by channel' table rows (MT + B2B) ---
@@ -705,6 +810,7 @@
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
     await patchInventoryFromZoho();
+    await patchInventoryRawAndPackaging();
     await patchSalesByChannel();
     await patchHomeOverview();
     await patchHomeSalesPSS();
