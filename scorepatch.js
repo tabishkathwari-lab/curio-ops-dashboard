@@ -1,9 +1,9 @@
-/* scorepatch V23 - preserves .ov-delta span IDs so dashboard home/shopify overview no longer throws null errors */
+/* scorepatch V24 - hide Legacy static inventory view on Inventory page (prevent team confusion vs Zoho) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V23';
+  const VERSION = 'V24';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -422,6 +422,41 @@
     } catch(e){ console.error('[sp'+VERSION+'] home tiles err', e); }
   }
 
+  // --- V24: hide the Legacy static inventory view on the Inventory page ---
+  function patchInventoryHideLegacy(){
+    try {
+      const page = document.getElementById('page-inventory');
+      if (!page) return;
+      if (page.dataset.sp24Hidden === '1') return; // already done
+      // Walk direct children of page-inventory; find the HR.gold-rule separator; hide it + everything after
+      const kids = Array.from(page.children);
+      let found = false;
+      for (const el of kids) {
+        if (found) { el.style.display = 'none'; continue; }
+        if (el.tagName === 'HR' && (el.classList.contains('gold-rule') || /gold-rule/.test(el.className||''))) {
+          el.style.display = 'none';
+          found = true;
+        }
+      }
+      // Fallback: if no gold-rule found, use the eyebrow "Legacy stock view" as anchor
+      if (!found) {
+        for (const el of kids) {
+          const t = (el.textContent||'').trim();
+          if (/Legacy stock view/.test(t)) {
+            let cur = el;
+            while (cur) { cur.style.display = 'none'; cur = cur.nextElementSibling; }
+            found = true; break;
+          }
+        }
+      }
+      if (found) {
+        page.dataset.sp24Hidden = '1';
+        console.log('[spV24] Legacy inventory view hidden');
+      }
+    } catch(e){ console.error('[spV24] hide legacy inventory err', e); }
+  }
+
+
   // --- V22: patch 'Sales by channel' table rows (MT + B2B) ---
   async function patchSalesByChannel(){
     try {
@@ -522,6 +557,7 @@
 
   async function runAll(){
     await patchHomeTopTiles();
+    patchInventoryHideLegacy();
     await patchSalesByChannel();
     await patchHomeOverview();
     await patchHomeSalesPSS();
