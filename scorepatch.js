@@ -1,9 +1,9 @@
-/* scorepatch V25 - rewrite Inventory page Finished Goods tables from live Zoho (stock_on_hand), not the stale Oct-28 sheet snapshot */
+/* scorepatch V26 - adds Kashmir Almonds + Wild Multi Floral Honey Zoho mappings (SKU-DF-00003, SKU-HN-001) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V25';
+  const VERSION = 'V26';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -476,8 +476,9 @@
     'Himalayan Chamomile Tea 60 g': 'SKU-TE-003',
     'Mono Floral Borage Honey 500 g': 'SKU-HN-002',
     'Black Forest Honey 500 g': 'SKU-HN-003',
-    'Sidr Honey 500 g': 'SKU-HN-004'
-    // 'Kashmir Almonds 500 g' and 'Wild Multi Floral Honey 500 g' have no Zoho SKU
+    'Sidr Honey 500 g': 'SKU-HN-004',
+    'Kashmir Almonds 500 g': 'SKU-DF-00003',          // Kashmir Sweet Almond Kernels 500 g
+    'Wild Multi Floral Honey 500 g': 'SKU-HN-001'     // Raw Wild Multifloral Honey 500 g
   };
   async function patchInventoryFromZoho(){
     try {
