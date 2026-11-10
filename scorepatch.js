@@ -1,9 +1,9 @@
-/* scorepatch V27 - also render Raw Materials and Packaging sections on Inventory page from live Zoho (RM-* and PK-* items) */
+/* scorepatch V28 - V27 + strip warning icons from SKU name before Zoho lookup, so all 20 rows match Materials and Packaging sections on Inventory page from live Zoho (RM-* and PK-* items) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V27';
+  const VERSION = 'V28';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -513,7 +513,8 @@
         const category = (cells[1].textContent||'').trim();
         const mrpText = (cells[5].textContent||'').trim();
         const mrp = Number(mrpText.replace(/[^0-9.]/g,'')) || 0;
-        const zohoSku = FG_SKU_MAP[skuName];
+        const skuKey = skuName.replace(/[^a-z0-9 .]/gi,'').replace(/\s+/g,' ').trim();
+        const zohoSku = FG_SKU_MAP[skuKey] || FG_SKU_MAP[skuName];
         let ready, total, semi;
         if (zohoSku && bySku[zohoSku] !== undefined) {
           ready = bySku[zohoSku];
