@@ -1,9 +1,9 @@
-/* scorepatch V24 - hide Legacy static inventory view on Inventory page (prevent team confusion vs Zoho) */
+/* scorepatch V25 - rewrite Inventory page Finished Goods tables from live Zoho (stock_on_hand), not the stale Oct-28 sheet snapshot */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V24';
+  const VERSION = 'V25';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -456,6 +456,151 @@
     } catch(e){ console.error('[spV24] hide legacy inventory err', e); }
   }
 
+  // --- V25: rewrite Finished Goods Inventory numbers from LIVE Zoho (zoho_items) ---
+  // Maps sheet product-name → Zoho SKU
+  const FG_SKU_MAP = {
+    'Almond Oil 100 ml': 'ALOIL-100',
+    'Almond Oil 250 ml': 'SKH-OIL-002',
+    'Walnut Oil 100 ml': 'SKH-OIL-005',
+    'Walnut Oil 250 ml': 'SKH-OIL-006',
+    'Apricot Oil 100 ml': 'SKH-OIL-003',
+    'Apricot Oil 250 ml': 'SKH-OIL-004',
+    'Mustard Oil 500 ml': 'SKH-OIL-007',
+    'Kashmir Walnuts 500 g': 'SKU-DF-00001',
+    'Ladakh Apricot 500 g': 'SKU-DF-00005',
+    'Himalayan Badri Cow Ghee 500 ml': 'SKU-GHEE-001',
+    'Kashmir Saffron 1 g': 'SKU-SF-001',
+    'Kashmir Saffron 2 g': 'SKU-SF-002',
+    'Kashmir Qahwa 200 g': 'SKU-TE-001',
+    'Zafrani Kehwa 250 g': 'SKU-TE-002',
+    'Himalayan Chamomile Tea 60 g': 'SKU-TE-003',
+    'Mono Floral Borage Honey 500 g': 'SKU-HN-002',
+    'Black Forest Honey 500 g': 'SKU-HN-003',
+    'Sidr Honey 500 g': 'SKU-HN-004'
+    // 'Kashmir Almonds 500 g' and 'Wild Multi Floral Honey 500 g' have no Zoho SKU
+  };
+  async function patchInventoryFromZoho(){
+    try {
+      const page = document.getElementById('page-inventory');
+      if (!page) return;
+      if (page.dataset.sp25Done === '1') return;
+      // Fetch zoho_items for the mapped SKUs
+      const wantSkus = Object.values(FG_SKU_MAP);
+      const quoted = wantSkus.map(s => '"' + s + '"').join(',');
+      const items = await sbGet('zoho_items?select=sku,name,stock_on_hand&sku=in.(' + encodeURIComponent(quoted) + ')');
+      const bySku = {};
+      items.forEach(i => { bySku[i.sku] = Number(i.stock_on_hand) || 0; });
+      // Find the "Finished SKU · full list" table (header starts with SKU/Category/Semi/Ready/Total/MRP)
+      const tables = Array.from(page.querySelectorAll('table'));
+      let fullListTbl = null, catTbl = null;
+      tables.forEach(t => {
+        const hdrRow = t.querySelector('thead tr, tr:first-child');
+        if (!hdrRow) return;
+        const hdrs = Array.from(hdrRow.children).map(c => (c.textContent||'').trim().toLowerCase());
+        if (hdrs.join('|').startsWith('sku|category|semi|ready|total|mrp')) fullListTbl = t;
+        if (hdrs.join('|').startsWith('category|skus|semi-finished|ready|total units|value')) catTbl = t;
+      });
+      if (!fullListTbl) { console.log('[spV25] full list table not found'); return; }
+      // Iterate rows, replace Semi/Ready/Total based on zoho stock
+      const rows = fullListTbl.querySelectorAll('tbody tr');
+      let totalUnits = 0, totalValue = 0;
+      const catAgg = {}; // category → {skus:count, semi, ready, total, value}
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length < 6) return;
+        const skuName = (cells[0].textContent||'').trim();
+        const category = (cells[1].textContent||'').trim();
+        const mrpText = (cells[5].textContent||'').trim();
+        const mrp = Number(mrpText.replace(/[^0-9.]/g,'')) || 0;
+        const zohoSku = FG_SKU_MAP[skuName];
+        let ready, total, semi;
+        if (zohoSku && bySku[zohoSku] !== undefined) {
+          ready = bySku[zohoSku];
+          total = ready;
+          semi = 0;
+          cells[2].textContent = '—';   // em-dash — Zoho doesn't track semi
+          cells[3].textContent = String(ready);
+          cells[4].textContent = String(total);
+          cells[4].style.fontWeight = 'bold';
+          row.dataset.sp25 = 'zoho';
+        } else {
+          // Unmapped SKU (Kashmir Almonds / Wild Multi Floral Honey) — mark as "no Zoho match"
+          cells[2].textContent = '—';
+          cells[3].textContent = 'n/a';
+          cells[4].textContent = 'n/a';
+          cells[3].style.color = '#888';
+          cells[4].style.color = '#888';
+          row.dataset.sp25 = 'noZoho';
+          return;
+        }
+        totalUnits += total;
+        totalValue += total * mrp;
+        if (!catAgg[category]) catAgg[category] = {skus:0, semi:0, ready:0, total:0, value:0};
+        catAgg[category].skus++;
+        catAgg[category].ready += ready;
+        catAgg[category].total += total;
+        catAgg[category].value += total * mrp;
+      });
+      // Rewrite category table rows
+      if (catTbl) {
+        const cRows = catTbl.querySelectorAll('tbody tr');
+        cRows.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length < 6) return;
+          const cat = (cells[0].textContent||'').trim();
+          if (cat === 'All categories' || cat.toLowerCase().includes('all')) {
+            // Totals row
+            cells[1].textContent = String(Object.values(catAgg).reduce((s,x)=>s+x.skus,0));
+            cells[2].textContent = '—';
+            cells[3].textContent = String(totalUnits);
+            cells[4].textContent = String(totalUnits);
+            cells[5].textContent = rupee(totalValue);
+            return;
+          }
+          const agg = catAgg[cat];
+          if (!agg) return;
+          cells[1].textContent = String(agg.skus);
+          cells[2].textContent = '—';
+          cells[3].textContent = String(agg.ready);
+          cells[4].textContent = String(agg.total);
+          cells[5].textContent = rupee(agg.value);
+        });
+      }
+      // Update the top-right ₹XX.XXL value if present
+      const liveBlock = page.querySelector('.live-factory-block');
+      if (liveBlock) {
+        const tvEl = Array.from(liveBlock.querySelectorAll('*')).find(e => /Total inventory value/i.test(e.textContent||'') && e.children.length < 4);
+        if (tvEl) {
+          const valEl = tvEl.previousElementSibling || tvEl.parentElement?.querySelector('[class*="value"], h2, h3');
+          if (valEl) valEl.textContent = rupee(totalValue);
+        }
+        // Also update "Finished SKUs: 20, ... units total"
+        const kpis = liveBlock.querySelectorAll('.kpi, [class*="kpi"]');
+        kpis.forEach(k => {
+          const t = (k.textContent||'').trim();
+          if (/Finished SKUs/i.test(t)) {
+            const vEl = k.querySelector('.value, .kpi-value, strong, h3, h2') || k.children[1];
+            if (vEl) vEl.textContent = String(Object.values(catAgg).reduce((s,x)=>s+x.skus,0));
+            const sub = Array.from(k.querySelectorAll('*')).find(e => /units total/i.test(e.textContent||''));
+            if (sub) sub.textContent = totalUnits.toLocaleString('en-IN') + ' units total (Zoho)';
+          }
+        });
+        // Update "As of" timestamp
+        const asOfEl = Array.from(liveBlock.querySelectorAll('*')).find(e => /As of|pulled live/i.test(e.textContent||'') && e.children.length < 3);
+        if (asOfEl) {
+          const now = new Date();
+          const ist = new Date(now.getTime()+5.5*3600*1000);
+          const d = ist.toUTCString().slice(5,16);
+          asOfEl.textContent = 'As of ' + d + ' · live from Zoho (via Supabase)';
+          asOfEl.style.color = '#15803d';
+        }
+      }
+      page.dataset.sp25Done = '1';
+      console.log('[spV25] Inventory rewritten from Zoho: ' + totalUnits + ' units / ' + rupee(totalValue));
+    } catch(e){ console.error('[spV25] inventory zoho err', e); }
+  }
+
+
 
   // --- V22: patch 'Sales by channel' table rows (MT + B2B) ---
   async function patchSalesByChannel(){
@@ -558,6 +703,7 @@
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
+    await patchInventoryFromZoho();
     await patchSalesByChannel();
     await patchHomeOverview();
     await patchHomeSalesPSS();
