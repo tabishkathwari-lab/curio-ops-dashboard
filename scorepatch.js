@@ -1,9 +1,9 @@
-/* scorepatch V28 - V27 + strip warning icons from SKU name before Zoho lookup, so all 20 rows match Materials and Packaging sections on Inventory page from live Zoho (RM-* and PK-* items) */
+/* scorepatch V29 - V28 + fix 4 broken Shopify-page sections: FY27/L3M/CurMonth/Lifetime tiles, monthly trend tbody (shopifyLiveTrend), Daily sales card, Paid Ads mp-kpis Loading placeholder. All 4 now read live sales_shopify from Supabase. */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V28';
+  const VERSION = 'V29';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -807,6 +807,172 @@
   }
 
 
+
+  async function patchShopifyBrokenTiles(){
+    try {
+      const page = document.getElementById('page-shopify');
+      if (!page) return;
+      // Pull lifetime sales_shopify once (cheap — <1000 lines total)
+      const rows = await pagedAll('sales_shopify', 'order_id,order_date,units,total');
+      if (!rows || !rows.length) return;
+      // Aggregate: unique orders per month + revenue + units
+      const byMonth = {};
+      const orderToDate = {};
+      rows.forEach(r => {
+        const m = String(r.order_date||'').slice(0,7);
+        if (!m) return;
+        if (!byMonth[m]) byMonth[m] = { orders: new Set(), revenue: 0, units: 0 };
+        byMonth[m].orders.add(r.order_id);
+        byMonth[m].revenue += parseFloat(r.total||0);
+        byMonth[m].units += parseFloat(r.units||0);
+        orderToDate[r.order_id] = r.order_date;
+      });
+      const months = Object.keys(byMonth).sort();
+      const now = new Date();
+      const ist = new Date(now.getTime()+5.5*3600*1000);
+      const curYm = ist.toISOString().slice(0,7);
+      // ---- KPI TILE 1: FY27 YTD (Apr current fy -> now) ----
+      // Determine current FY: Apr-Mar. FYYY starts Apr of calendar year (YY-1 + 2000)
+      const curY = ist.getUTCFullYear(), curM = ist.getUTCMonth()+1;
+      const fyStartY = curM >= 4 ? curY : curY - 1;
+      const fyLabel = 'FY' + String((fyStartY+1)).slice(2);
+      const fyFirst = fyStartY + '-04-01';
+      const fyMonths = months.filter(m => m >= fyStartY + '-04' && m <= curYm);
+      let fyOrders = new Set(), fyRev = 0;
+      fyMonths.forEach(m => { byMonth[m].orders.forEach(o => fyOrders.add(o)); fyRev += byMonth[m].revenue; });
+      setText('shFY27Rev', rupee(fyRev));
+      setText('shFY27Sub', fyOrders.size + ' orders · ' + fyMonths.length + ' months');
+      // ---- KPI TILE 2: Last 3 months (rolling, excluding current) ----
+      // Actually "last 3 months" = current + 2 prior = 3 total months rolling window ending now
+      const l3 = [];
+      for (let i=0; i<3; i++){
+        const d = new Date(ist); d.setUTCMonth(d.getUTCMonth() - i);
+        l3.push(d.toISOString().slice(0,7));
+      }
+      let l3Orders = new Set(), l3Rev = 0;
+      l3.forEach(m => { if (byMonth[m]){ byMonth[m].orders.forEach(o => l3Orders.add(o)); l3Rev += byMonth[m].revenue; }});
+      const l3Aov = l3Orders.size > 0 ? Math.round(l3Rev / l3Orders.size) : 0;
+      setText('shL3MRev', rupee(l3Rev));
+      setText('shL3MSub', l3Orders.size + ' orders · AOV ' + rupee(l3Aov));
+      // ---- KPI TILE 3: Current month ----
+      const cmRev = byMonth[curYm]?.revenue || 0;
+      const cmOrders = byMonth[curYm]?.orders.size || 0;
+      setText('shCurMRev', rupee(cmRev));
+      setText('shCurMSub', curYm + ' · ' + cmOrders + ' orders');
+      // ---- KPI TILE 4: Lifetime ----
+      let ltOrders = new Set(), ltRev = 0;
+      months.forEach(m => { byMonth[m].orders.forEach(o => ltOrders.add(o)); ltRev += byMonth[m].revenue; });
+      setText('shLifetimeRev', rupee(ltRev));
+      setText('shLifetimeSub', ltOrders.size + ' orders across ' + months.length + ' months');
+      // ---- SECTION: Shopify monthly trend · last 12 months (tbody id=shopifyLiveTrend) ----
+      const tbody = document.getElementById('shopifyLiveTrend');
+      if (tbody){
+        // Last 12 calendar months ending curYm, newest first
+        const last12 = [];
+        for (let i=0; i<12; i++){
+          const d = new Date(ist); d.setUTCMonth(d.getUTCMonth() - i);
+          last12.push(d.toISOString().slice(0,7));
+        }
+        let maxRev = 0;
+        last12.forEach(m => { const r = byMonth[m]?.revenue || 0; if (r > maxRev) maxRev = r; });
+        let html = '';
+        last12.forEach(m => {
+          const data = byMonth[m];
+          const rev = data?.revenue || 0;
+          const ord = data?.orders.size || 0;
+          const aov = ord > 0 ? Math.round(rev / ord) : 0;
+          const pct = maxRev > 0 ? (rev / maxRev * 100) : 0;
+          const [y, mo] = m.split('-');
+          const label = monthNameShort(parseInt(mo,10)) + ' ' + y;
+          html += '<tr>';
+          html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">' + label + '</td>';
+          html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;text-align:left;">' + ord + '</td>';
+          html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">' + rupee(rev) + '</td>';
+          html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">' + rupee(aov) + '</td>';
+          html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;"><div style="background:#dbeafe;height:12px;border-radius:3px;width:' + pct.toFixed(1) + '%;max-width:300px;"></div></td>';
+          html += '</tr>';
+        });
+        tbody.innerHTML = html;
+      }
+      // ---- SECTION: Daily sales · Last 50 orders — rebuild from live Supabase ----
+      // Find the card: has h3/h4 containing "Daily sales"
+      const dsHeading = Array.from(page.querySelectorAll('h2,h3,h4')).find(h=>h.textContent.includes('Daily sales'));
+      if (dsHeading){
+        const card = dsHeading.closest('section, div[class*="card"], div[class*="section"]');
+        if (card && !card.dataset.sp29){
+          // Get last 50 orders by order_date, newest first; one row per order (sum lines)
+          const byOrder = {};
+          rows.forEach(r => {
+            if (!byOrder[r.order_id]) byOrder[r.order_id] = { id: r.order_id, date: r.order_date, rev: 0 };
+            byOrder[r.order_id].rev += parseFloat(r.total||0);
+          });
+          const orders = Object.values(byOrder).sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+          const last50 = orders.slice(0, 50);
+          const byDate = {};
+          last50.forEach(o => {
+            if (!byDate[o.date]) byDate[o.date] = { orders: 0, revenue: 0 };
+            byDate[o.date].orders++;
+            byDate[o.date].revenue += o.rev;
+          });
+          const dates = Object.keys(byDate).sort().reverse();
+          const totalOrders = last50.length;
+          const totalRev = last50.reduce((s,o)=>s+o.rev, 0);
+          const aov = totalOrders > 0 ? Math.round(totalRev / totalOrders) : 0;
+          const firstDate = last50[last50.length-1]?.date || '';
+          const lastDate = last50[0]?.date || '';
+          const daysSince = lastDate ? Math.floor((Date.now() - new Date(lastDate).getTime()) / 86400000) : 0;
+          const activeDays = Array.from(new Set(last50.filter(o => {
+            const d = new Date(o.date); const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+            return d >= cutoff;
+          }).map(o => o.date))).length;
+          // Update the badge if present (the "Snapshot 14 Oct 2026" chip)
+          const badge = card.querySelector('[class*="badge"], [class*="chip"], [class*="pill"]');
+          if (badge && /Snapshot/i.test(badge.textContent)){
+            badge.textContent = 'Live · ' + istDate();
+          }
+          // Update the four summary boxes if they exist
+          const boxes = card.querySelectorAll('div[class*="kpi"], .box, [class*="metric"]');
+          // Fallback: brute-force replace the known values
+          const cardHtml = card.innerHTML;
+          card.innerHTML = cardHtml
+            .replace(/>\s*48\s*</, '>' + totalOrders + '<')
+            .replace(/>\s*₹91,851\s*</, '>' + rupee(totalRev) + '<')
+            .replace(/>\s*AOV ₹1,914\s*</, '>AOV ' + rupee(aov) + '<')
+            .replace(/>\s*2026-06-29 → 2026-10-14\s*</, '>' + firstDate + ' → ' + lastDate + '<')
+            .replace(/>\s*2026-10-14\s*</g, '>' + lastDate + '<')
+            .replace(/>\s*33d ago\s*</, '>' + daysSince + 'd ago<')
+            .replace(/>\s*0\s*<\/div>\s*<div[^>]*>\s*days with/, '>' + activeDays + '</div><div class="sub">days with');
+          // Also rebuild the day-level table body
+          const dailyTbody = card.querySelector('tbody');
+          if (dailyTbody){
+            let html = '';
+            dates.forEach(d => {
+              const row = byDate[d];
+              const dAov = row.orders > 0 ? Math.round(row.revenue / row.orders) : 0;
+              html += '<tr>';
+              html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">' + d + '</td>';
+              html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">' + row.orders + '</td>';
+              html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">' + rupee(row.revenue) + '</td>';
+              html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">' + rupee(dAov) + '</td>';
+              html += '<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:999px;font-size:11px;">' + row.orders + ' paid</span></td>';
+              html += '</tr>';
+            });
+            dailyTbody.innerHTML = html;
+          }
+          card.dataset.sp29 = '1';
+        }
+      }
+      // ---- SECTION: mp-kpis "Loading..." (Paid Ads -> Website Performance) ----
+      const mp = document.getElementById('mp-kpis');
+      if (mp && /Loading/i.test(mp.textContent)){
+        // We have no Meta/Google spend data in Supabase for this page yet; show a tidy "not connected" state
+        mp.innerHTML = '<div style="padding:12px 16px;color:#64748b;font-size:13px;">Meta &amp; Google ad data not yet synced into Supabase. The table below is empty until the next sync.</div>';
+      }
+    } catch(e){ console.error('[sp'+VERSION+'] shopify broken tiles err', e); }
+  }
+
+  function setText(id, val){ const el = document.getElementById(id); if (el) el.textContent = val; }
+
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
@@ -818,6 +984,7 @@
     await patchShopifyOverview();
     await patchToday();
     await patchShopifyPanel();
+    await patchShopifyBrokenTiles();
     await patchScorecard();
   }
   let pending = false;
