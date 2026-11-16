@@ -1,9 +1,9 @@
-/* scorepatch V29 - V28 + fix 4 broken Shopify-page sections: FY27/L3M/CurMonth/Lifetime tiles, monthly trend tbody (shopifyLiveTrend), Daily sales card, Paid Ads mp-kpis Loading placeholder. All 4 now read live sales_shopify from Supabase. */
+/* scorepatch V30 - V29 + wrap Shopify D2C Direct sales panel in a proper card (white bg, padding, border, radius) so content stops bleeding outside any visible container. */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V29';
+  const VERSION = 'V30';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -280,6 +280,12 @@
         });
         html += '<tr style="font-weight:700;"><td style="padding:6px;">Total</td><td style="text-align:right;padding:6px;">'+orderSet.size+'</td><td style="text-align:right;padding:6px;">'+rupee(total)+'</td></tr></tbody></table>';
       }
+      panel.style.background = '#ffffff';
+      panel.style.padding = '20px 24px';
+      panel.style.borderRadius = '12px';
+      panel.style.border = '1px solid #e2e8f0';
+      panel.style.marginBottom = '16px';
+      panel.style.boxSizing = 'border-box';
       panel.innerHTML = html;
       panel.dataset.sp17Fy = currentFy;
       panel.dataset.sp17Rendered = currentFy;
