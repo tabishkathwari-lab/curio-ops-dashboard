@@ -1,9 +1,9 @@
-/* scorepatch V30 - V29 + wrap Shopify D2C Direct sales panel in a proper card (white bg, padding, border, radius) so content stops bleeding outside any visible container. */
+/* scorepatch V31 - V30 + subtract zoho_credit_notes from primary everywhere (so dashboard matches Zoho Sales by Customer report), plus show Cancelled line separately on Primary+Secondary card when non-zero. */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V30';
+  const VERSION = 'V31';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -61,6 +61,28 @@
     }
     return rows;
   }
+  // --- V31: credit notes helpers ---
+  // A credit note in Zoho represents a cancelled/returned invoice. To mirror what
+  // Zoho's "Sales by Customer" report shows, primary = sum(invoices) - sum(credit_notes).
+  async function sumCreditNotes(filter){
+    return await sumPage('zoho_credit_notes','total',filter||'');
+  }
+  async function creditNotesByCustomer(filter){
+    return await pagedAll('zoho_credit_notes','customer_name,total,status',filter||'');
+  }
+  // Net primary from Zoho for a date range (optional customer_name regex applied in JS)
+  async function zohoNetPrimary(range, customerFilterFn){
+    const dateFilter = '&date=gte.'+range.first+'&date=lt.'+range.nextFirst;
+    const [inv, cn] = await Promise.all([
+      pagedAll('zoho_invoices','customer_name,total',dateFilter),
+      pagedAll('zoho_credit_notes','customer_name,total',dateFilter)
+    ]);
+    const f = customerFilterFn || (()=>true);
+    const invT = inv.filter(r=>f(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
+    const cnT = cn.filter(r=>f(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
+    return {invoiced: invT, cancelled: cnT, net: invT - cnT};
+  }
+
   async function countDistinctOrders(table, col, filter){
     const set = new Set(); let off=0;
     while(true){
@@ -83,13 +105,16 @@
 
   // All-channel aggregate for current month
   async function loadAllChannel(mb){
-    const [shop, blink, mt, b2b, meta] = await Promise.all([
+    const dateF = '&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst;
+    const [shop, blink, mt, b2bInv, b2bCn, meta] = await Promise.all([
       sumPage('sales_shopify','total','&order_date=gte.'+mb.first+'&order_date=lt.'+mb.nextFirst),
-      sumPage('sales_blinkit','total_sales','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst),
-      sumPage('sales_mt_office','total','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst),
-      sumPage('zoho_invoices','total','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst),
-      sumPage('meta_ads_live','spend','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst).catch(()=>0)
+      sumPage('sales_blinkit','total_sales',dateF),
+      sumPage('sales_mt_office','total',dateF),
+      sumPage('zoho_invoices','total',dateF),
+      sumPage('zoho_credit_notes','total',dateF),
+      sumPage('meta_ads_live','spend',dateF).catch(()=>0)
     ]);
+    const b2b = b2bInv - b2bCn;
     const orders = await countDistinctOrders('sales_shopify','order_id','&order_date=gte.'+mb.first+'&order_date=lt.'+mb.nextFirst);
     return {store: shop+blink+mt+b2b, ads: meta, orders, shop, blink, mt, b2b};
   }
@@ -362,16 +387,30 @@
       const fy = fyBounds(fyLabel);
 
       const zoho = await pagedAll('zoho_invoices', 'customer_name,total', '&date=gte.'+fy.first+'&date=lt.'+fy.nextFirst);
+      const cnotes = await pagedAll('zoho_credit_notes', 'customer_name,total', '&date=gte.'+fy.first+'&date=lt.'+fy.nextFirst);
       const shop = await pagedAll('sales_shopify', 'total', '&order_date=gte.'+fy.first+'&order_date=lt.'+fy.nextFirst);
-      const zohoTotal = zoho.reduce((s,r)=>s+parseFloat(r.total||0),0);
+      const zohoInvoiced = zoho.reduce((s,r)=>s+parseFloat(r.total||0),0);
+      const zohoCancelled = cnotes.reduce((s,r)=>s+parseFloat(r.total||0),0);
+      const zohoTotal = zohoInvoiced - zohoCancelled; // net
       const shopTotal = shop.reduce((s,r)=>s+parseFloat(r.total||0),0);
       const primaryTotal = zohoTotal + shopTotal;
 
       const divs = Array.from(card.querySelectorAll('div'));
       const pLabel = divs.find(d => /primary total/i.test(d.textContent.trim()) && d.children.length === 0);
-      const wantedPrimary = rupee(primaryTotal);
+      const wantedPrimary = (primaryTotal < 0 ? '-' : '') + rupee(Math.abs(primaryTotal));
       if (pLabel && pLabel.nextElementSibling && pLabel.nextElementSibling.textContent.trim() !== wantedPrimary) {
         pLabel.nextElementSibling.textContent = wantedPrimary;
+      }
+      // V31: show Cancelled line beneath Primary when non-zero
+      if (pLabel && zohoCancelled > 0){
+        let cRow = pLabel.parentElement.querySelector('[data-sp31-cancel]');
+        if (!cRow){
+          cRow = document.createElement('div');
+          cRow.setAttribute('data-sp31-cancel','1');
+          cRow.style.cssText = 'display:flex;justify-content:space-between;padding:4px 0;font-size:11px;color:#dc2626;margin-top:2px;';
+          pLabel.parentElement.insertBefore(cRow, pLabel.nextElementSibling ? pLabel.nextElementSibling.nextSibling : null);
+        }
+        cRow.innerHTML = '<span style="opacity:0.7;">↳ Incl. invoice cancellations</span><span><strong>-'+rupee(zohoCancelled)+'</strong> <small style="color:#888;margin-left:6px;">gross '+rupee(zohoInvoiced + shopTotal)+'</small></span>';
       }
 
       const sLabel = divs.find(d => /secondary total/i.test(d.textContent.trim()) && d.children.length === 0);
@@ -385,10 +424,14 @@
 
       const empty = card.querySelector('.sf-empty');
       if (empty) {
-        const marche = zoho.filter(r => /MARCHE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
-        const blinkit = zoho.filter(r => /BLINK COMMERCE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const marcheInv = zoho.filter(r => /MARCHE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const marcheCn = cnotes.filter(r => /MARCHE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const marche = marcheInv - marcheCn;
+        const blinkitInv = zoho.filter(r => /BLINK COMMERCE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const blinkitCn = cnotes.filter(r => /BLINK COMMERCE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const blinkit = blinkitInv - blinkitCn;
         const other = zohoTotal - marche - blinkit;
-        const buckets = [['B2B — Blinkit', blinkit], ['B2B — Direct (Suyash, DRL, etc)', other], ['MT Chains (Marche)', marche], ['Shopify D2C', shopTotal]].filter(b => b[1] > 0).sort((a,b)=>b[1]-a[1]);
+        const buckets = [['B2B — Blinkit', blinkit], ['B2B — Direct (Suyash, DRL, etc)', other], ['MT Chains (Marche)', marche], ['Shopify D2C', shopTotal]].filter(b => b[1] !== 0).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
         const tot = buckets.reduce((s,b)=>s+b[1],0);
         empty.innerHTML = buckets.map(b => {
           const pct = tot > 0 ? Math.round(b[1]/tot*100) : 0;
@@ -744,25 +787,30 @@
 
       // --- MT row: sales_mt_office + zoho_invoices JOIN mt_customers ---
       async function mtRange(range){
-        const [promoter, zoho, mtCust] = await Promise.all([
-          sumPage('sales_mt_office','total','&date=gte.'+range.first+'&date=lt.'+range.nextFirst),
-          pagedAll('zoho_invoices','customer_name,total','&date=gte.'+range.first+'&date=lt.'+range.nextFirst),
+        const dF = '&date=gte.'+range.first+'&date=lt.'+range.nextFirst;
+        const [promoter, zoho, cnotes, mtCust] = await Promise.all([
+          sumPage('sales_mt_office','total',dF),
+          pagedAll('zoho_invoices','customer_name,total',dF),
+          pagedAll('zoho_credit_notes','customer_name,total',dF),
           sbGet('mt_customers?select=customer_name')
         ]);
         const names = new Set((mtCust||[]).map(x=>String(x.customer_name).toUpperCase()));
         const zMt = (zoho||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
-        return promoter + zMt;
+        const zMtCn = (cnotes||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        return promoter + (zMt - zMtCn);
       }
       async function mtEq(date){
-        const [promoter, zoho, mtCust] = await Promise.all([
+        const [promoter, zoho, cnotes, mtCust] = await Promise.all([
           sbGet('sales_mt_office?select=total&date=eq.'+date),
           sbGet('zoho_invoices?select=customer_name,total&date=eq.'+date),
+          sbGet('zoho_credit_notes?select=customer_name,total&date=eq.'+date),
           sbGet('mt_customers?select=customer_name')
         ]);
         const names = new Set((mtCust||[]).map(x=>String(x.customer_name).toUpperCase()));
         const pT = (promoter||[]).reduce((s,r)=>s+parseFloat(r.total||0),0);
         const zT = (zoho||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
-        return pT + zT;
+        const zCnT = (cnotes||[]).filter(r=>names.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        return pT + (zT - zCnT);
       }
 
       // --- B2B row: sales_b2b view ---
