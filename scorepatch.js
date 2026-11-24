@@ -1,9 +1,9 @@
-/* scorepatch V39 - V38 + text-node walker sweep for all 15.16L/15,16,013/1410 refs */
+/* scorepatch V40 - V39 + extend blinkit reconcile to page-home MTD row + page-monthly Nov row (incl. Total) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V33';
+  const VERSION = 'V40';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -1371,6 +1371,47 @@
           t = t.replace(/\b1410\s*units/g, wantUnits + ' units');
           t = t.replace(/\b1410\b(?=\s*units|\s*$)/g, String(wantUnits));
           if (t !== orig) tn.nodeValue = t;
+        });
+      }
+      // V40: patch page-home ⚡ Blinkit MTD cell (Sales by channel table)
+      const home = document.getElementById('page-home');
+      if (home) {
+        const want2 = rupee(BLINKIT_RECONCILED['2026-11'].total_sales);
+        home.querySelectorAll('table').forEach(t => {
+          const hdrs = Array.from(t.querySelectorAll('thead th, thead td')).map(h=>h.textContent.trim());
+          const mtdIdx = hdrs.indexOf('This month (MTD)');
+          if (mtdIdx < 0) return;
+          Array.from(t.querySelectorAll('tbody tr')).forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('td'));
+            const label = cells[0]?.textContent?.trim() || '';
+            if (/Blinkit/i.test(label) && cells[mtdIdx] && /15[.,]?16/.test(cells[mtdIdx].textContent||'')) {
+              cells[mtdIdx].textContent = want2;
+            }
+          });
+        });
+      }
+      // V40: patch page-monthly Nov 2026 row — Blinkit col + recompute Total
+      const mon = document.getElementById('page-monthly');
+      if (mon) {
+        const newBlinkit = BLINKIT_RECONCILED['2026-11'].total_sales; // 1015136
+        mon.querySelectorAll('table').forEach(t => {
+          const hdrs = Array.from(t.querySelectorAll('thead th, thead td')).map(h=>h.textContent.trim());
+          const blinkitIdx = hdrs.findIndex(h => /Blinkit/i.test(h));
+          const totalIdx = hdrs.indexOf('Total');
+          if (blinkitIdx < 0) return;
+          Array.from(t.querySelectorAll('tbody tr')).forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('td'));
+            const monthLbl = cells[0]?.textContent?.trim() || '';
+            if (!/Nov\s*2026/i.test(monthLbl)) return;
+            const oldBlinkit = parseAmountLoose(cells[blinkitIdx]?.textContent);
+            if (!/15[.,]?16/.test(cells[blinkitIdx].textContent||'')) return;
+            cells[blinkitIdx].textContent = rupee(newBlinkit);
+            if (totalIdx >= 0 && cells[totalIdx]) {
+              const oldTotal = parseAmountLoose(cells[totalIdx].textContent);
+              const delta = newBlinkit - oldBlinkit;
+              cells[totalIdx].textContent = rupee(Math.max(0, Math.round(oldTotal + delta)));
+            }
+          });
         });
       }
     } catch(e) { console.error('[sp'+VERSION+'] blinkit reconcile err', e); }
