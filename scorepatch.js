@@ -1,4 +1,4 @@
-/* scorepatch V37 - V36 + override Secondary Nov callout on Blinkit page header */
+/* scorepatch V38 - V37 + sweep all remaining 15.16L/15,16,013/1410 units on Blinkit page */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -1350,17 +1350,32 @@
           }
         }
       }
-      // Also patch "Secondary · Nov 2026 ₹15.16L" callout on Blinkit page header
+      // Also patch ALL Nov 2026 references across Blinkit page where dashboard shows 15.16L / 1410 units / ₹15,16,013
       if (pg) {
         const want2 = rupee(BLINKIT_RECONCILED['2026-11'].total_sales);
-        // Find leaf elements whose text exactly matches ₹15.16L inside a parent that includes "Secondary · Nov 2026"
-        Array.from(pg.querySelectorAll('div, span, h1, h2, h3, h4, strong')).forEach(el => {
+        const wantUnits = BLINKIT_RECONCILED['2026-11'].units;
+        // Replace ALL leaf ₹15.16L or ₹15,16,013 strings
+        Array.from(pg.querySelectorAll('div, span, h1, h2, h3, h4, strong, td, p, b, i, em')).forEach(el => {
           if (el.children.length !== 0) return;
-          const t = (el.textContent||'').trim();
-          if (!/^₹\s*15[.,]?\s*(?:16)?\s*L$/.test(t)) return;
-          const parentTxt = el.parentElement?.textContent || '';
-          if (/Secondary\s*·\s*Nov\s*2026/.test(parentTxt) || /Nov\s*2026/.test(parentTxt)) {
+          let t = (el.textContent||'').trim();
+          if (!t) return;
+          // Match exact ₹15.16L or ₹15,16,013 (gross)
+          if (/^₹\s*15[.,]?\s*16\s*L$/.test(t) || /^₹\s*15,?16,?013$/.test(t)) {
             el.textContent = want2;
+            return;
+          }
+          // Also match embedded within a parent string (e.g., "Net ₹15,16,013 · 1410 units · ...")
+          if (/₹\s*15,?16,?013/.test(t) || /1410\s*units/.test(t)) {
+            let newT = t
+              .replace(/₹\s*15,?16,?013/g, '₹10,15,136')
+              .replace(/1410\s*units/g, wantUnits + ' units');
+            if (newT !== t) el.textContent = newT;
+            return;
+          }
+          // Match ₹15.16L anywhere in short string
+          if (/₹\s*15[.,]?\s*16\s*L/.test(t) && t.length < 150) {
+            let newT = t.replace(/₹\s*15[.,]?\s*16\s*L/g, want2);
+            if (newT !== t) el.textContent = newT;
           }
         });
       }
