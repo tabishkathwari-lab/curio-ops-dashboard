@@ -1,4 +1,4 @@
-/* scorepatch V33 - V32 + patchMtCategorizationHome (all 5 chains in MT bucket + fix Primary Total), patchHomeAdvertisingCost (sum blinkit+amazon+meta for cur month), patchDispatchesQtyShipped, patchBlinkitPrimaryMonths (include all months) */
+/* scorepatch V35 - V33 + patchMonthlyTotalsPage (fix Fri Jul labels, populate Blinkit/B2B cols from zoho_invoices by customer bucket) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -1204,6 +1204,88 @@
     } catch(e) { console.error('[sp'+VERSION+'] home ad cost err', e); }
   }
 
+  // V35: Monthly totals page — fix "Fri Jul" labels + populate Blinkit/B2B columns by customer bucket
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtMonthYM(ym){
+    // ym = 'YYYY-MM' => 'MMM YYYY' e.g. 'Nov 2026'
+    const [y,m] = ym.split('-');
+    return MONTH_NAMES[parseInt(m,10)-1] + " '" + y.slice(2);
+  }
+  async function patchMonthlyTotalsPage(){
+    try {
+      const pg = document.getElementById('page-monthly');
+      if (!pg) return;
+      const tables = pg.querySelectorAll('table.matrix');
+      if (!tables || tables.length === 0) return;
+      const t0 = tables[0]; // Primary
+      const tbody0 = t0.querySelector('tbody');
+      if (!tbody0 || tbody0.dataset.sp35Done === '1') return;
+      // Fetch data
+      const [inv, cn, mtCust, b2bCust] = await Promise.all([
+        pagedAll('zoho_invoices','date,customer_name,total'),
+        pagedAll('zoho_credit_notes','date,customer_name,total'),
+        sbGet('mt_customers?select=customer_name'),
+        sbGet('b2b_customers?select=customer_name,active')
+      ]);
+      const mtSet = new Set((mtCust||[]).map(x => String(x.customer_name||'').toUpperCase().trim()));
+      const b2bSet = new Set((b2bCust||[]).filter(x=>x.active!==false).map(x => String(x.customer_name||'').toUpperCase().trim()));
+      const BLINK_NAME = 'BLINK COMMERCE PRIVATE LIMITED (MH)';
+      function bucket(name){
+        const n = String(name||'').toUpperCase().trim();
+        if (n === BLINK_NAME) return 'blinkit';
+        if (mtSet.has(n)) return 'mt';
+        if (b2bSet.has(n)) return 'b2b';
+        return null; // Shopify D2C, misc - excluded from this table
+      }
+      // Group by YYYY-MM
+      const byMonth = {}; // {ym: {blinkit, mt, b2b}}
+      function add(rows, sign){
+        rows.forEach(r => {
+          const ym = String(r.date||'').slice(0,7);
+          if (!/^\d{4}-\d{2}$/.test(ym)) return;
+          const b = bucket(r.customer_name);
+          if (!b) return;
+          byMonth[ym] = byMonth[ym] || {blinkit:0, mt:0, b2b:0};
+          byMonth[ym][b] += sign * parseFloat(r.total||0);
+        });
+      }
+      add(inv, +1);
+      add(cn, -1);
+      // Sort descending (newest first)
+      const sortedMonths = Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
+      // Rebuild rows
+      tbody0.innerHTML = '';
+      sortedMonths.forEach(ym => {
+        const d = byMonth[ym];
+        const tot = d.blinkit + d.mt + d.b2b;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${fmtMonthYM(ym)}</td><td>${rupee(d.blinkit)}</td><td>${rupee(d.mt)}</td><td>${rupee(d.b2b)}</td><td>${rupee(tot)}</td>`;
+        tbody0.appendChild(tr);
+      });
+      tbody0.dataset.sp35Done = '1';
+      // Fix the second table (Secondary) if present
+      if (tables[1]) {
+        const tbody1 = tables[1].querySelector('tbody');
+        if (tbody1 && tbody1.dataset.sp35Done !== '1') {
+          // Fix labels only — leave values alone since they come from sales_blinkit (OK)
+          Array.from(tbody1.querySelectorAll('tr')).forEach(tr => {
+            const td0 = tr.querySelector('td');
+            if (!td0) return;
+            const txt = td0.textContent.trim();
+            // If starts with weekday prefix, try to look at next siblings for a numeric month hint
+            const m = txt.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/);
+            if (m) {
+              // Can't infer year from just weekday — but we can match against tbody1 index vs sortedMonths of sales_blinkit
+              // Simpler: strip the weekday prefix only
+              td0.textContent = m[2];
+            }
+          });
+          tbody1.dataset.sp35Done = '1';
+        }
+      }
+    } catch(e) { console.error('[sp'+VERSION+'] monthly totals err', e); }
+  }
+
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
@@ -1219,6 +1301,7 @@
     await patchAmazonBrokenTiles();
     await patchBlinkitAdsTable();
     await patchHomeAdvertisingCost();
+    await patchMonthlyTotalsPage();
     await patchScorecard();
   }
   let pending = false;
