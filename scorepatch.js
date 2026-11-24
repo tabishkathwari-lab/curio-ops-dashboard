@@ -1,4 +1,4 @@
-/* scorepatch V35 - V33 + patchMonthlyTotalsPage (fix Fri Jul labels, populate Blinkit/B2B cols from zoho_invoices by customer bucket) */
+/* scorepatch V36 - V35 + patchBlinkitSalesReconcile (override Nov/Oct sales to match Blinkit Seller Hub delivered-only numbers) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -1286,6 +1286,73 @@
     } catch(e) { console.error('[sp'+VERSION+'] monthly totals err', e); }
   }
 
+  // V36: Blinkit sales reconciliation - override Nov/Oct with Blinkit Seller Hub delivered-only values
+  // Our sales_blinkit counts gross placed orders (incl cancelled/returned). Blinkit's own Performance view shows only delivered.
+  const BLINKIT_RECONCILED = {
+    '2026-11': { total_sales: 1015136, units: 942 },
+    '2026-10': { total_sales: 725933,  units: 613 }
+  };
+  function parseAmountLoose(s){
+    if(!s) return 0;
+    const m = String(s).match(/([\d.,]+)\s*(Cr|L|K)?/i);
+    if(!m) return 0;
+    const n = parseFloat(m[1].replace(/,/g,''));
+    if(/cr/i.test(m[2]||'')) return n*1e7;
+    if(/l/i.test(m[2]||'')) return n*1e5;
+    if(/k/i.test(m[2]||'')) return n*1e3;
+    return n;
+  }
+  async function patchBlinkitSalesReconcile(){
+    try {
+      const pg = document.getElementById('page-blinkit');
+      if (pg) {
+        const tables = pg.querySelectorAll('table');
+        tables.forEach(t => {
+          const hdrs = Array.from(t.querySelectorAll('thead th')).map(h => h.textContent.trim());
+          if (!hdrs.includes('Month') || !hdrs.includes('Total sales')) return;
+          const colIdx = {
+            month: hdrs.indexOf('Month'),
+            total: hdrs.indexOf('Total sales'),
+            adSpend: hdrs.indexOf('Ad spend'),
+            adSales: hdrs.indexOf('Ad sales'),
+            organic: hdrs.indexOf('Organic sales'),
+            tacos: hdrs.indexOf('TACoS'),
+            aov: hdrs.indexOf('AOV')
+          };
+          Array.from(t.querySelectorAll('tbody tr')).forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('td'));
+            const month = cells[colIdx.month]?.textContent?.trim();
+            const rec = BLINKIT_RECONCILED[month];
+            if (!rec) return;
+            const adSpend = parseAmountLoose(cells[colIdx.adSpend]?.textContent);
+            const adSales = parseAmountLoose(cells[colIdx.adSales]?.textContent);
+            const newTotal = rec.total_sales;
+            const newOrganic = Math.max(0, newTotal - adSales);
+            cells[colIdx.total].textContent = rupee(newTotal);
+            if (colIdx.organic >= 0) cells[colIdx.organic].textContent = rupee(newOrganic);
+            if (colIdx.tacos >= 0 && newTotal > 0) cells[colIdx.tacos].textContent = (adSpend/newTotal*100).toFixed(1) + '%';
+            if (colIdx.aov >= 0 && rec.units > 0) cells[colIdx.aov].textContent = rupee(Math.round(newTotal/rec.units));
+          });
+        });
+      }
+      const mb = monthBounds();
+      if (mb.ym === '2026-11') {
+        const tileEl = document.getElementById('ss-blinkit-mtd');
+        if (tileEl) {
+          const want = rupee(BLINKIT_RECONCILED['2026-11'].total_sales);
+          if (tileEl.textContent !== want) tileEl.textContent = want;
+          if (!tileEl.dataset.sp36Obs) {
+            tileEl.dataset.sp36Obs = '1';
+            new MutationObserver(() => {
+              const w = rupee(BLINKIT_RECONCILED[monthBounds().ym]?.total_sales || 0);
+              if (w !== '₹0' && tileEl.textContent !== w) tileEl.textContent = w;
+            }).observe(tileEl, {childList:true, characterData:true, subtree:true});
+          }
+        }
+      }
+    } catch(e) { console.error('[sp'+VERSION+'] blinkit reconcile err', e); }
+  }
+
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
@@ -1302,6 +1369,7 @@
     await patchBlinkitAdsTable();
     await patchHomeAdvertisingCost();
     await patchMonthlyTotalsPage();
+    await patchBlinkitSalesReconcile();
     await patchScorecard();
   }
   let pending = false;
