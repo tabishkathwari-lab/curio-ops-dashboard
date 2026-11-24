@@ -1152,30 +1152,55 @@
   }
 
   // V33: Homepage Total Advertising Cost (Nov tile) = blinkit_ads_live + amazon_ads_live + meta_ads_live for current month
+  // Cached + persistent via per-element MutationObserver so dashboard's own re-render can't overwrite.
+  let __adCache = null;
+  async function computeAdSpend(){
+    const mb = monthBounds();
+    const [bl, am, mt] = await Promise.all([
+      pagedAll('blinkit_ads_live','period_end,budget_spent','&period_end=gte.'+mb.first+'&period_end=lt.'+mb.nextFirst),
+      pagedAll('amazon_ads_live','period,cost'),
+      pagedAll('meta_ads_live','date,spend','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst)
+    ]);
+    const blSpend = bl.reduce((s,r)=>s+parseFloat(r.budget_spent||0),0);
+    const amSpend = am.filter(r=>String(r.period||'').startsWith(mb.ym)).reduce((s,r)=>s+parseFloat(r.cost||0),0);
+    const mtSpend = mt.reduce((s,r)=>s+parseFloat(r.spend||0),0);
+    return blSpend + amSpend + mtSpend;
+  }
+  function parseAmtLoose(s){ if(!s)return 0; const m=String(s).match(/([\d.,]+)\s*(Cr|L|K)?/i); if(!m)return 0; const n=parseFloat(m[1].replace(/,/g,'')); if(/cr/i.test(m[2]||''))return n*1e7; if(/l/i.test(m[2]||''))return n*1e5; if(/k/i.test(m[2]||''))return n*1e3; return n; }
+  function enforceAdCost(){
+    if (__adCache == null || __adCache <= 0) return;
+    const el = document.getElementById('ovAdsVal');
+    if (!el) return;
+    const want = rupee(__adCache);
+    if (el.textContent !== want) el.textContent = want;
+    // Also enforce Blended ROAS
+    const salesN = parseAmtLoose(document.getElementById('ovSalesVal')?.textContent || '');
+    if (salesN > 0) {
+      const roas = salesN / __adCache;
+      const wantRoas = roas.toFixed(2)+'x';
+      const roasEl = document.getElementById('ovRoasVal');
+      if (roasEl && roasEl.textContent !== wantRoas) roasEl.textContent = wantRoas;
+    }
+  }
   async function patchHomeAdvertisingCost(){
     try {
-      const mb = monthBounds();
-      const [bl, am, mt] = await Promise.all([
-        pagedAll('blinkit_ads_live','period_end,budget_spent','&period_end=gte.'+mb.first+'&period_end=lt.'+mb.nextFirst),
-        pagedAll('amazon_ads_live','period,cost'),
-        pagedAll('meta_ads_live','date,spend','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst)
-      ]);
-      const blSpend = bl.reduce((s,r)=>s+parseFloat(r.budget_spent||0),0);
-      // amazon_ads_live uses 'period' text like '2026-11' and 'cost' col — filter by month substring match
-      const amSpend = am.filter(r=>String(r.period||'').startsWith(mb.ym)).reduce((s,r)=>s+parseFloat(r.cost||0),0);
-      const mtSpend = mt.reduce((s,r)=>s+parseFloat(r.spend||0),0);
-      const total = blSpend + amSpend + mtSpend;
-      if (total > 0) {
-        setText('ovAdsVal', rupee(total));
-        // Also recompute Blended ROAS = ovSalesVal / total
-        const salesTxt = document.getElementById('ovSalesVal')?.textContent || '';
-        function parseAmt(s){ if(!s)return 0; const m=String(s).match(/([\d.,]+)\s*(Cr|L|K)?/i); if(!m)return 0; const n=parseFloat(m[1].replace(/,/g,'')); if(/cr/i.test(m[2]||''))return n*1e7; if(/l/i.test(m[2]||''))return n*1e5; if(/k/i.test(m[2]||''))return n*1e3; return n; }
-        const salesN = parseAmt(salesTxt);
-        if (salesN > 0) {
-          const roas = salesN / total;
-          setText('ovRoasVal', roas.toFixed(2)+'x');
+      if (__adCache == null) {
+        __adCache = await computeAdSpend();
+        // Set up persistent observer on ovAdsVal and ovRoasVal
+        const adEl = document.getElementById('ovAdsVal');
+        if (adEl && !adEl.dataset.sp33Obs) {
+          adEl.dataset.sp33Obs = '1';
+          new MutationObserver(() => enforceAdCost()).observe(adEl, {characterData:true, childList:true, subtree:true});
         }
+        const roasEl = document.getElementById('ovRoasVal');
+        if (roasEl && !roasEl.dataset.sp33Obs) {
+          roasEl.dataset.sp33Obs = '1';
+          new MutationObserver(() => enforceAdCost()).observe(roasEl, {characterData:true, childList:true, subtree:true});
+        }
+        // Also re-compute every 2 min so Nov progression stays fresh
+        setInterval(async ()=>{ __adCache = await computeAdSpend(); enforceAdCost(); }, 120000);
       }
+      enforceAdCost();
     } catch(e) { console.error('[sp'+VERSION+'] home ad cost err', e); }
   }
 
