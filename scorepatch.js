@@ -1,9 +1,9 @@
-/* scorepatch V40 - V39 + extend blinkit reconcile to page-home MTD row + page-monthly Nov row (incl. Total) */
+/* scorepatch V41 - V40 + MutationObservers on page-blinkit/home/monthly to re-run sweep when SPA re-renders */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V40';
+  const VERSION = 'V41';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -1417,6 +1417,36 @@
     } catch(e) { console.error('[sp'+VERSION+'] blinkit reconcile err', e); }
   }
 
+  // V41: persistent observer that re-runs blinkit reconcile when SPA re-renders page-blinkit/home/monthly
+  let __blinkitReconcilePending = false;
+  function __scheduleBlinkitReconcile(){
+    if (__blinkitReconcilePending) return;
+    __blinkitReconcilePending = true;
+    setTimeout(async () => {
+      __blinkitReconcilePending = false;
+      try { await patchBlinkitSalesReconcile(); } catch(e){}
+    }, 300);
+  }
+  function __installBlinkitReconcileObservers(){
+    ['page-blinkit','page-home','page-monthly'].forEach(pid => {
+      const el = document.getElementById(pid);
+      if (!el || el.dataset.sp41Obs) return;
+      el.dataset.sp41Obs = '1';
+      new MutationObserver(muts => {
+        // only re-run when meaningful text changes (text nodes or new table rows)
+        for (const m of muts) {
+          if (m.type === 'characterData' || m.addedNodes.length > 0) {
+            const txt = el.textContent || '';
+            if (/15[.,]?16|15,?16,?013|1410/.test(txt)) {
+              __scheduleBlinkitReconcile();
+              return;
+            }
+          }
+        }
+      }).observe(el, {childList:true, characterData:true, subtree:true});
+    });
+  }
+
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
@@ -1434,6 +1464,7 @@
     await patchHomeAdvertisingCost();
     await patchMonthlyTotalsPage();
     await patchBlinkitSalesReconcile();
+    __installBlinkitReconcileObservers();
     await patchScorecard();
   }
   let pending = false;
