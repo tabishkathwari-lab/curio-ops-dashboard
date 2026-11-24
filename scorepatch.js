@@ -1,9 +1,9 @@
-/* scorepatch V41 - V40 + MutationObservers on page-blinkit/home/monthly to re-run sweep when SPA re-renders */
+/* scorepatch V42 - V41 + sync-button safety net: auto-reset "Syncing..." stuck buttons */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V41';
+  const VERSION = 'V42';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -1447,6 +1447,62 @@
     });
   }
 
+  // V42: sync-button safety net
+  // Problem: the dashboard's Zoho/Shopify sync buttons set text to "Syncing from ..." + disabled=true,
+  //         but if the webhook call throws or the handler never resets, the button stays frozen forever
+  //         even though the backend data refresh (observable in console / Supabase) succeeded.
+  // Fix:    install a click-listener that captures the original label, then watches the button and
+  //         auto-restores it after 90s OR as soon as a console log says "sync complete"/"Inventory rewritten".
+  const SYNC_BTN_SELECTORS = [
+    '#btnZohoRefresh', '#btnDispRefresh', '#shopifySyncBtn', '#srkSyncNowBtn',
+    '#b2bSyncBtn', '#mtZohoSyncBtn', '#btnClRefresh'
+  ];
+  const __syncBtnOrig = new WeakMap();
+  function __rememberBtn(btn) {
+    if (__syncBtnOrig.has(btn)) return;
+    __syncBtnOrig.set(btn, { html: btn.innerHTML, text: btn.textContent });
+  }
+  function __resetBtn(btn) {
+    const orig = __syncBtnOrig.get(btn);
+    if (!orig) return;
+    btn.disabled = false;
+    btn.innerHTML = orig.html;
+  }
+  function __installSyncBtnSafetyNet() {
+    SYNC_BTN_SELECTORS.forEach(sel => {
+      const btn = document.querySelector(sel);
+      if (!btn || btn.dataset.sp42SafetyNet) return;
+      btn.dataset.sp42SafetyNet = '1';
+      __rememberBtn(btn);
+      btn.addEventListener('click', () => {
+        __rememberBtn(btn);
+        // hard timeout: restore after 90s no matter what
+        setTimeout(() => {
+          if (btn.disabled || /sync|ing|loading|refresh/i.test(btn.textContent) && !btn.textContent.trim().startsWith(__syncBtnOrig.get(btn).text.trim().slice(0,8))) {
+            __resetBtn(btn);
+          }
+        }, 90000);
+      }, true);
+    });
+  }
+  // Also watch console for sync-complete signals and reset any stuck buttons
+  (function watchConsoleForSyncComplete(){
+    const origLog = console.log.bind(console);
+    console.log = function(...args){
+      try {
+        const line = args.map(a => typeof a === 'string' ? a : '').join(' ');
+        if (/sync complete|rewritten from Zoho|Shopify sync complete/i.test(line)) {
+          // reset any sync button currently in "syncing" state
+          SYNC_BTN_SELECTORS.forEach(sel => {
+            const btn = document.querySelector(sel);
+            if (btn && (btn.disabled || /sync/i.test(btn.textContent))) __resetBtn(btn);
+          });
+        }
+      } catch(e){}
+      return origLog(...args);
+    };
+  })();
+
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
@@ -1465,6 +1521,7 @@
     await patchMonthlyTotalsPage();
     await patchBlinkitSalesReconcile();
     __installBlinkitReconcileObservers();
+    __installSyncBtnSafetyNet();
     await patchScorecard();
   }
   let pending = false;
