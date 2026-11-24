@@ -1,9 +1,9 @@
-/* scorepatch V32 - adds: patchAmazonBrokenTiles (KPI tile + Monthly Breakdown SALES col reads amazon_monthly), patchBlinkitAdsTable (reads blinkit_ads_live), patchHomeAdvertisingCost (sum all 3 ad networks), patchMtCategorization (include all MT chains), patchDispatchesQtyShipped (pull line_items) */
+/* scorepatch V33 - V32 + patchMtCategorizationHome (all 5 chains in MT bucket + fix Primary Total), patchHomeAdvertisingCost (sum blinkit+amazon+meta for cur month), patchDispatchesQtyShipped, patchBlinkitPrimaryMonths (include all months) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V32';
+  const VERSION = 'V33';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -424,14 +424,17 @@
 
       const empty = card.querySelector('.sf-empty');
       if (empty) {
-        const marcheInv = zoho.filter(r => /MARCHE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
-        const marcheCn = cnotes.filter(r => /MARCHE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
-        const marche = marcheInv - marcheCn;
+        // V33: MT bucket now uses full mt_customers list (all 5 chains), not just Marche
+        const mtCustRows = await sbGet('mt_customers?select=customer_name');
+        const mtNames = new Set((mtCustRows||[]).map(x => String(x.customer_name).toUpperCase()));
+        const mtInv = zoho.filter(r => mtNames.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const mtCn = cnotes.filter(r => mtNames.has(String(r.customer_name||'').toUpperCase())).reduce((s,r)=>s+parseFloat(r.total||0),0);
+        const mt = mtInv - mtCn;
         const blinkitInv = zoho.filter(r => /BLINK COMMERCE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
         const blinkitCn = cnotes.filter(r => /BLINK COMMERCE/i.test(r.customer_name||'')).reduce((s,r)=>s+parseFloat(r.total||0),0);
         const blinkit = blinkitInv - blinkitCn;
-        const other = zohoTotal - marche - blinkit;
-        const buckets = [['B2B — Blinkit', blinkit], ['B2B — Direct (Suyash, DRL, etc)', other], ['MT Chains (Marche)', marche], ['Shopify D2C', shopTotal]].filter(b => b[1] !== 0).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+        const other = zohoTotal - mt - blinkit;
+        const buckets = [['B2B — Blinkit', blinkit], ['B2B — Direct (Suyash, DRL, etc)', other], ['MT Chains (all '+mtNames.size+')', mt], ['Shopify D2C', shopTotal]].filter(b => b[1] !== 0).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
         const tot = buckets.reduce((s,b)=>s+b[1],0);
         empty.innerHTML = buckets.map(b => {
           const pct = tot > 0 ? Math.round(b[1]/tot*100) : 0;
@@ -1148,6 +1151,34 @@
     } catch(e) { console.error('[sp'+VERSION+'] blinkit ads err', e); }
   }
 
+  // V33: Homepage Total Advertising Cost (Nov tile) = blinkit_ads_live + amazon_ads_live + meta_ads_live for current month
+  async function patchHomeAdvertisingCost(){
+    try {
+      const mb = monthBounds();
+      const [bl, am, mt] = await Promise.all([
+        pagedAll('blinkit_ads_live','period_end,budget_spent','&period_end=gte.'+mb.first+'&period_end=lt.'+mb.nextFirst),
+        pagedAll('amazon_ads_live','period,cost'),
+        pagedAll('meta_ads_live','date,spend','&date=gte.'+mb.first+'&date=lt.'+mb.nextFirst)
+      ]);
+      const blSpend = bl.reduce((s,r)=>s+parseFloat(r.budget_spent||0),0);
+      // amazon_ads_live uses 'period' text like '2026-11' and 'cost' col — filter by month substring match
+      const amSpend = am.filter(r=>String(r.period||'').startsWith(mb.ym)).reduce((s,r)=>s+parseFloat(r.cost||0),0);
+      const mtSpend = mt.reduce((s,r)=>s+parseFloat(r.spend||0),0);
+      const total = blSpend + amSpend + mtSpend;
+      if (total > 0) {
+        setText('ovAdsVal', rupee(total));
+        // Also recompute Blended ROAS = ovSalesVal / total
+        const salesTxt = document.getElementById('ovSalesVal')?.textContent || '';
+        function parseAmt(s){ if(!s)return 0; const m=String(s).match(/([\d.,]+)\s*(Cr|L|K)?/i); if(!m)return 0; const n=parseFloat(m[1].replace(/,/g,'')); if(/cr/i.test(m[2]||''))return n*1e7; if(/l/i.test(m[2]||''))return n*1e5; if(/k/i.test(m[2]||''))return n*1e3; return n; }
+        const salesN = parseAmt(salesTxt);
+        if (salesN > 0) {
+          const roas = salesN / total;
+          setText('ovRoasVal', roas.toFixed(2)+'x');
+        }
+      }
+    } catch(e) { console.error('[sp'+VERSION+'] home ad cost err', e); }
+  }
+
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
@@ -1162,6 +1193,7 @@
     await patchShopifyBrokenTiles();
     await patchAmazonBrokenTiles();
     await patchBlinkitAdsTable();
+    await patchHomeAdvertisingCost();
     await patchScorecard();
   }
   let pending = false;
