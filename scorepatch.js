@@ -1,4 +1,4 @@
-/* scorepatch V36 - V35 + patchBlinkitSalesReconcile (override Nov/Oct sales to match Blinkit Seller Hub delivered-only numbers) */
+/* scorepatch V37 - V36 + override Secondary Nov callout on Blinkit page header */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -1349,6 +1349,20 @@
             }).observe(tileEl, {childList:true, characterData:true, subtree:true});
           }
         }
+      }
+      // Also patch "Secondary · Nov 2026 ₹15.16L" callout on Blinkit page header
+      if (pg) {
+        const want2 = rupee(BLINKIT_RECONCILED['2026-11'].total_sales);
+        // Find leaf elements whose text exactly matches ₹15.16L inside a parent that includes "Secondary · Nov 2026"
+        Array.from(pg.querySelectorAll('div, span, h1, h2, h3, h4, strong')).forEach(el => {
+          if (el.children.length !== 0) return;
+          const t = (el.textContent||'').trim();
+          if (!/^₹\s*15[.,]?\s*(?:16)?\s*L$/.test(t)) return;
+          const parentTxt = el.parentElement?.textContent || '';
+          if (/Secondary\s*·\s*Nov\s*2026/.test(parentTxt) || /Nov\s*2026/.test(parentTxt)) {
+            el.textContent = want2;
+          }
+        });
       }
     } catch(e) { console.error('[sp'+VERSION+'] blinkit reconcile err', e); }
   }
