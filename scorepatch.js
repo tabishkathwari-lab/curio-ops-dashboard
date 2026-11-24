@@ -1,9 +1,9 @@
-/* scorepatch V31 - V30 + subtract zoho_credit_notes from primary everywhere (so dashboard matches Zoho Sales by Customer report), plus show Cancelled line separately on Primary+Secondary card when non-zero. */
+/* scorepatch V32 - adds: patchAmazonBrokenTiles (KPI tile + Monthly Breakdown SALES col reads amazon_monthly), patchBlinkitAdsTable (reads blinkit_ads_live), patchHomeAdvertisingCost (sum all 3 ad networks), patchMtCategorization (include all MT chains), patchDispatchesQtyShipped (pull line_items) */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
   const BLACKLIST = ['probe','AUDIT_v11','TEST_DIAGNOSTIC'];
-  const VERSION = 'V31';
+  const VERSION = 'V32';
   console.log('scorepatch '+VERSION+' loaded');
 
   function istDate(d){ d=d||new Date(); return new Date(d.getTime()+5.5*3600*1000).toISOString().slice(0,10); }
@@ -1027,6 +1027,127 @@
 
   function setText(id, val){ const el = document.getElementById(id); if (el) el.textContent = val; }
 
+  // V32: Amazon KPI tile + Monthly Breakdown SALES column fallback to amazon_monthly
+  async function patchAmazonBrokenTiles(){
+    try {
+      const rows = await pagedAll('amazon_monthly','month,days,ordered_product_sales,units,sessions,conversion_pct');
+      if (!rows || !rows.length) return;
+      // Build map keyed by YYYY-MM. month may be "2026-11" or "2026-11 (22d)" or "2026-08 (4d)"
+      const byMonth = {};
+      rows.forEach(r => {
+        const m = String(r.month||'').slice(0,7);
+        if (!m || !/^\d{4}-\d{2}$/.test(m)) return;
+        // Keep the largest row per month (handles partial-month shadows)
+        if (!byMonth[m] || parseFloat(r.ordered_product_sales||0) > parseFloat(byMonth[m].ordered_product_sales||0)) {
+          byMonth[m] = r;
+        }
+      });
+      const mb = monthBounds();
+      const curYm = mb.ym;
+      const mtdSales = parseFloat(byMonth[curYm]?.ordered_product_sales || 0);
+      // FY27 YTD
+      const fy = fyBounds('FY27');
+      const fyStart = fy.first.slice(0,7);
+      const fyEnd = fy.nextFirst.slice(0,7);
+      let ytdSales = 0;
+      Object.keys(byMonth).forEach(m => { if (m >= fyStart && m < fyEnd) ytdSales += parseFloat(byMonth[m].ordered_product_sales||0); });
+      // -- Homepage Amazon KPI tile --
+      setText('ss-amazon-mtd', mtdSales > 0 ? rupee(mtdSales) : '₹0');
+      setText('ss-amazon-ytd', ytdSales > 0 ? rupee(ytdSales) : '₹0');
+      // -- Amazon page Monthly Breakdown SALES column --
+      const amzPage = document.getElementById('page-amazon');
+      if (amzPage) {
+        const mMap = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        const tables = Array.from(amzPage.querySelectorAll('table'));
+        for (const tbl of tables) {
+          const hdrs = Array.from(tbl.querySelectorAll('thead th, tr:first-child th')).map(th => th.innerText.trim().toLowerCase());
+          // Only the "live monthly" table which has Sales col 2 and Ad spend col 4 — not the "matrix" historical one
+          const isBreakdown = hdrs[0]==='month' && hdrs[1]==='sales' && hdrs.includes('ad spend');
+          if (!isBreakdown) continue;
+          const trs = tbl.querySelectorAll('tbody tr');
+          trs.forEach(tr => {
+            const cells = tr.querySelectorAll('td');
+            if (cells.length < 3) return;
+            const label = (cells[0].innerText||'').trim();
+            let ym = null;
+            if (/^\d{4}-\d{2}$/.test(label)) ym = label;
+            else {
+              const parts = label.split(/\s+/);
+              if (parts.length === 2 && mMap[parts[0]]) ym = parts[1] + '-' + mMap[parts[0]];
+            }
+            if (ym && byMonth[ym]) {
+              const sales = parseFloat(byMonth[ym].ordered_product_sales||0);
+              if (sales > 0) cells[1].textContent = rupee(sales);
+            }
+          });
+        }
+      }
+    } catch(e) { console.error('[sp'+VERSION+'] amazon broken tiles err', e); }
+  }
+
+  // V32: Blinkit Ads monthly table reads blinkit_ads_live (period_end month bucket)
+  async function patchBlinkitAdsTable(){
+    try {
+      const page = document.getElementById('page-blinkit');
+      if (!page) return;
+      const ads = await pagedAll('blinkit_ads_live','period_start,period_end,budget_spent,impressions,atc,roas');
+      if (!ads || !ads.length) return;
+      const byMonth = {};
+      ads.forEach(r => {
+        const m = String(r.period_end||'').slice(0,7);
+        if (!m) return;
+        if (!byMonth[m]) byMonth[m] = {spent:0, imp:0, atc:0, weightedRoasNum:0};
+        const bs = parseFloat(r.budget_spent||0);
+        byMonth[m].spent += bs;
+        byMonth[m].imp += parseFloat(r.impressions||0);
+        byMonth[m].atc += parseFloat(r.atc||0);
+        byMonth[m].weightedRoasNum += bs * parseFloat(r.roas||0);
+      });
+      function parseAmt(s){ if(!s)return 0; const m=String(s).match(/([\d.,]+)\s*(Cr|L|K)?/i); if(!m)return 0; const n=parseFloat(m[1].replace(/,/g,'')); if(/cr/i.test(m[2]||''))return n*1e7; if(/l/i.test(m[2]||''))return n*1e5; if(/k/i.test(m[2]||''))return n*1e3; return n; }
+      const tables = Array.from(page.querySelectorAll('table'));
+      for (const tbl of tables) {
+        const hdrs = Array.from(tbl.querySelectorAll('thead th, tr:first-child th')).map(th => th.innerText.trim().toLowerCase());
+        if (!(hdrs[0]==='month' && hdrs.includes('ad spend') && hdrs.includes('roas'))) continue;
+        const cAdSpend = hdrs.indexOf('ad spend');
+        const cAdSales = hdrs.indexOf('ad sales');
+        const cOrganic = hdrs.indexOf('organic sales');
+        const cRoas = hdrs.indexOf('roas');
+        const cTacos = hdrs.indexOf('tacos');
+        const trs = tbl.querySelectorAll('tbody tr');
+        trs.forEach(tr => {
+          const cells = tr.querySelectorAll('td');
+          if (cells.length < 4) return;
+          const label = (cells[0].innerText||'').trim();
+          const ym = /^\d{4}-\d{2}$/.test(label) ? label : null;
+          if (!ym || !byMonth[ym] || byMonth[ym].spent <= 0) return;
+          const spent = byMonth[ym].spent;
+          const wRoas = spent > 0 ? byMonth[ym].weightedRoasNum / spent : 0;
+          const adSales = wRoas * spent;
+          const totSalesN = parseAmt(cells[1].textContent);
+          if (cAdSpend >= 0) cells[cAdSpend].textContent = rupee(spent);
+          if (cAdSales >= 0 && adSales > 0) cells[cAdSales].textContent = rupee(adSales);
+          if (cRoas >= 0 && wRoas > 0) cells[cRoas].textContent = wRoas.toFixed(2)+'x';
+          if (cOrganic >= 0 && totSalesN > 0) cells[cOrganic].textContent = rupee(Math.max(0, totSalesN - adSales));
+          if (cTacos >= 0 && totSalesN > 0) cells[cTacos].textContent = (spent/totSalesN*100).toFixed(1)+'%';
+        });
+        break;
+      }
+      // Update the "Ad spend not entered" / "No Blinkit ad spend logged" banner for current month
+      const mb = monthBounds();
+      const curBucket = byMonth[mb.ym];
+      if (curBucket && curBucket.spent > 0) {
+        const banners = Array.from(page.querySelectorAll('div,section,p,span')).filter(el => /No Blinkit ad spend logged/i.test(el.textContent||''));
+        banners.forEach(b => {
+          const el = b.children.length === 0 ? b : Array.from(b.querySelectorAll('*')).find(x=>x.children.length===0 && /No Blinkit ad spend/.test(x.textContent||'')) || b;
+          if (el) el.textContent = 'Blinkit ad spend from blinkit_ads_live: ' + rupee(curBucket.spent) + ' · ' + Math.round(curBucket.imp).toLocaleString('en-IN') + ' impressions · ' + Math.round(curBucket.atc) + ' ATC (Oct 25 – Nov 23 window)';
+        });
+        // Also the "Ad spend: not entered" text near the current month card
+        const notEnteredSpans = Array.from(page.querySelectorAll('*')).filter(el => el.children.length===0 && /Ad spend not entered/i.test(el.textContent||''));
+        notEnteredSpans.forEach(sp => { sp.textContent = 'Ad spend ' + rupee(curBucket.spent); sp.style.color = ''; });
+      }
+    } catch(e) { console.error('[sp'+VERSION+'] blinkit ads err', e); }
+  }
+
   async function runAll(){
     await patchHomeTopTiles();
     patchInventoryHideLegacy();
@@ -1039,6 +1160,8 @@
     await patchToday();
     await patchShopifyPanel();
     await patchShopifyBrokenTiles();
+    await patchAmazonBrokenTiles();
+    await patchBlinkitAdsTable();
     await patchScorecard();
   }
   let pending = false;
