@@ -1,4 +1,4 @@
-/* scorepatch V38 - V37 + sweep all remaining 15.16L/15,16,013/1410 units on Blinkit page */
+/* scorepatch V39 - V38 + text-node walker sweep for all 15.16L/15,16,013/1410 refs */
 (function(){
   const SB_URL = 'https://cikyevecsuamzndxfpir.supabase.co/rest/v1/';
   const SB_KEY = 'sb_publishable_GOTgzhOGd5ZEhwRFqJhDOQ_LEAmPkRH';
@@ -1350,33 +1350,27 @@
           }
         }
       }
-      // Also patch ALL Nov 2026 references across Blinkit page where dashboard shows 15.16L / 1410 units / ₹15,16,013
+      // Also patch ALL Nov 2026 refs: 15.16L, 15,16,013, 1410 units anywhere on Blinkit page
       if (pg) {
-        const want2 = rupee(BLINKIT_RECONCILED['2026-11'].total_sales);
-        const wantUnits = BLINKIT_RECONCILED['2026-11'].units;
-        // Replace ALL leaf ₹15.16L or ₹15,16,013 strings
-        Array.from(pg.querySelectorAll('div, span, h1, h2, h3, h4, strong, td, p, b, i, em')).forEach(el => {
-          if (el.children.length !== 0) return;
-          let t = (el.textContent||'').trim();
-          if (!t) return;
-          // Match exact ₹15.16L or ₹15,16,013 (gross)
-          if (/^₹\s*15[.,]?\s*16\s*L$/.test(t) || /^₹\s*15,?16,?013$/.test(t)) {
-            el.textContent = want2;
-            return;
-          }
-          // Also match embedded within a parent string (e.g., "Net ₹15,16,013 · 1410 units · ...")
-          if (/₹\s*15,?16,?013/.test(t) || /1410\s*units/.test(t)) {
-            let newT = t
-              .replace(/₹\s*15,?16,?013/g, '₹10,15,136')
-              .replace(/1410\s*units/g, wantUnits + ' units');
-            if (newT !== t) el.textContent = newT;
-            return;
-          }
-          // Match ₹15.16L anywhere in short string
-          if (/₹\s*15[.,]?\s*16\s*L/.test(t) && t.length < 150) {
-            let newT = t.replace(/₹\s*15[.,]?\s*16\s*L/g, want2);
-            if (newT !== t) el.textContent = newT;
-          }
+        const want2 = rupee(BLINKIT_RECONCILED['2026-11'].total_sales); // ₹10.15L
+        const wantUnits = BLINKIT_RECONCILED['2026-11'].units; // 942
+        const wantFull = '10,15,136'; // without ₹ for bare number cells
+        // Walk all leaf text nodes
+        const walker = document.createTreeWalker(pg, NodeFilter.SHOW_TEXT, null);
+        const textNodes = [];
+        let n;
+        while ((n = walker.nextNode())) {
+          if (n.nodeValue && n.nodeValue.trim()) textNodes.push(n);
+        }
+        textNodes.forEach(tn => {
+          let t = tn.nodeValue;
+          const orig = t;
+          t = t.replace(/₹\s*15[.,]?\s*16\s*L/g, want2);
+          t = t.replace(/₹\s*15,?16,?013/g, '₹10,15,136');
+          t = t.replace(/\b15,?16,?013\b/g, wantFull);
+          t = t.replace(/\b1410\s*units/g, wantUnits + ' units');
+          t = t.replace(/\b1410\b(?=\s*units|\s*$)/g, String(wantUnits));
+          if (t !== orig) tn.nodeValue = t;
         });
       }
     } catch(e) { console.error('[sp'+VERSION+'] blinkit reconcile err', e); }
